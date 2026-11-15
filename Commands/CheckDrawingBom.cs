@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
+using ADDIN.Commands.DxfChecking;
 
 namespace ADDIN.Commands
 {
@@ -519,6 +520,9 @@ namespace ADDIN.Commands
 
             finally
             {
+                try { _isolatedFlatSideVerifier?.Dispose(); }
+                catch { }
+                _isolatedFlatSideVerifier = null;
                 RestoreBatchActiveDocument(originalTitle);
                 displayScope?.Dispose();
                 strictHiddenBatch = false;
@@ -858,6 +862,130 @@ namespace ADDIN.Commands
 
         #region Title Block Exact Geometric & Property Recognition (3 Blocks)
 
+        private static string CdShortSyncReason(
+            CdFlatSidePolicyDecision decision,
+            CdDirectFlatSideProbe probe,
+            CdWorkingCopyBlockAssessment blockAssessment)
+        {
+            string code = decision != null ? (decision.Code ?? "") : "";
+            if (code == "DIRTY_DRAWING_UNVERIFIED")
+            {
+                return string.Format(CultureInfo.InvariantCulture,
+                    "Drawing có GetSaveFlag=true (NeedsRebuild2={0}, OutOfDateViews={1})",
+                    probe != null ? probe.DrawingNeedsRebuild2 : -1,
+                    probe != null ? probe.OutOfDateViewCount : 0);
+            }
+            if (code == "WC_BOTH_SIDES_PINK_AMBIGUOUS")
+                return "Cả hai mặt đều màu hồng";
+            if (code == "DIRECT_WORKCOPY_DISAGREE")
+                return "Direct Read và Working Copy bất đồng";
+
+            var parts = new List<string>();
+            if (probe != null && probe.Geom2DAvailable && !probe.Geom2DVerified)
+                parts.Add("2D Geom LỆCH");
+            if (code == "DIRTY_ASM_UNVERIFIED_PROOF" ||
+                (blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0))
+            {
+                string asms = blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0
+                    ? string.Join(", ", blockAssessment.MatchedDirtyAssemblyPaths.Select(Path.GetFileName))
+                    : "assembly chưa lưu";
+                parts.Add("ExtRef chưa khóa tới ASM bẩn: " + asms);
+            }
+            else if (blockAssessment != null && blockAssessment.OtherDirtyDependencyPaths.Count > 0)
+            {
+                parts.Add("Phụ thuộc chưa lưu: " +
+                    string.Join(", ", blockAssessment.OtherDirtyDependencyPaths.Select(Path.GetFileName)));
+            }
+            if (parts.Count > 0)
+                return string.Join("; ", parts);
+
+            return string.IsNullOrWhiteSpace(code) ? "Chưa đủ điều kiện chứng minh" : code;
+        }
+
+        private static void MergeIsolatedVisibleResult(
+            CdIsolatedVerifyResult isoRes,
+            ref FlatDrawingViewSideResult direct,
+            ref CdDirectFlatSideProbe probe,
+            string originalExpectedPartPath)
+        {
+            if (isoRes == null || !isoRes.Success || isoRes.Result == null || isoRes.Probe == null)
+                return;
+
+            CdDirectFlatSideProbe liveProbe = probe;
+            CdDirectFlatSideProbe isoProbe = isoRes.Probe;
+
+            // Preserve LIVE session freshness & external reference truth while taking
+            // visual body/2D-geom/color evidence from the isolated visible copy.
+            isoProbe.DrawingPath = liveProbe.DrawingPath;
+            isoProbe.DrawingExists = liveProbe.DrawingExists;
+            isoProbe.DrawingDirty = liveProbe.DrawingDirty;
+            isoProbe.DrawingVisible = liveProbe.DrawingVisible;
+            isoProbe.DrawingNeedsRebuild2 = liveProbe.DrawingNeedsRebuild2;
+            isoProbe.OutOfDateViewCount = liveProbe.OutOfDateViewCount;
+            isoProbe.ExpectedPartPath = originalExpectedPartPath ?? liveProbe.ExpectedPartPath;
+            isoProbe.ViewReferencedPartPath = liveProbe.ViewReferencedPartPath;
+            isoProbe.PartExists = liveProbe.PartExists;
+            isoProbe.PartDirty = liveProbe.PartDirty;
+            isoProbe.PartNeedsRebuild2 = liveProbe.PartNeedsRebuild2;
+            isoProbe.RequestedConfigDirty = liveProbe.RequestedConfigDirty;
+            isoProbe.RequestedConfigNeedsRebuild = liveProbe.RequestedConfigNeedsRebuild;
+            isoProbe.PartExternalRefCount = liveProbe.PartExternalRefCount;
+            isoProbe.ExternalRefs.Clear();
+            isoProbe.ExternalRefs.AddRange(liveProbe.ExternalRefs);
+
+            direct = isoRes.Result;
+            probe = isoProbe;
+        }
+
+        private sealed class CdCachedSideAudit
+        {
+            public FlatDrawingViewSideResult Side { get; set; }
+            public string SyncReason { get; set; } = "";
+            public string DecisionCode { get; set; } = "";
+            public bool? DirectPink { get; set; }
+            public bool GeomAvailable { get; set; }
+            public bool GeomVerified { get; set; }
+            public bool IsPilotUnknown { get; set; }
+        }
+
+        private static string CdFormatObservedViewSummary(
+            bool? directPink,
+            string expected,
+            string decisionCode,
+            string detailTag)
+        {
+            string obsSideText = directPink.HasValue
+                ? (directPink.Value ? "mặt hồng (ウラ)" : "mặt màu (表)")
+                : "chưa xác định";
+            string matchTag = directPink.HasValue
+                ? (CompareFlatSideMarker(expected, directPink) == DrawingBomCheckStatus.OK
+                    ? "khớp chữ " + expected
+                    : "LỆCH chữ " + expected)
+                : decisionCode;
+            return obsSideText + " (" + matchTag + detailTag + ")";
+        }
+
+        private static string CdFormatActualSideText(
+            string viewName,
+            string expected,
+            CdCachedSideAudit audit)
+        {
+            FlatDrawingViewSideResult side = audit.Side;
+            if (audit.IsPilotUnknown)
+            {
+                string geomTag = audit.GeomAvailable
+                    ? (audit.GeomVerified ? ", 2D Geom khớp" : ", 2D Geom LỆCH")
+                    : "";
+                return viewName + ": " + expected +
+                    " / View=" + CdFormatObservedViewSummary(audit.DirectPink, expected, audit.DecisionCode, geomTag) +
+                    " | Đồng bộ: WARNING (" + audit.SyncReason + ")";
+            }
+
+            return viewName + ": " + expected + " / " + (side.PinkFacingViewer.HasValue
+                ? side.PinkFacingViewer.Value ? "mặt hồng (ウラ)" : "mặt màu (表)"
+                : "chưa xác định mặt");
+        }
+
         private void AddFlatPatternSideChecks(DrawingCheckItemResult itemResult,
             DrawingDoc drawing, string sheetName, List<NoteDiagnosticInfo> notes, SheetFrameBounds frameBounds)
         {
@@ -901,7 +1029,7 @@ namespace ADDIN.Commands
             var checker = new UraOmoteChecker(swApp);
             var actual = new List<string>();
             var messages = new List<string>();
-            var cache = new Dictionary<string, FlatDrawingViewSideResult>(StringComparer.OrdinalIgnoreCase);
+            var sideAuditCache = new Dictionary<string, CdCachedSideAudit>(StringComparer.OrdinalIgnoreCase);
             foreach (NoteDiagnosticInfo marker in markers)
             {
                 string expected = NormalizeFlatSideMarker(marker.DisplayedText);
@@ -923,8 +1051,9 @@ namespace ADDIN.Commands
                 else
                 {
                     string name = candidates[0].Name ?? "";
+                    CdCachedSideAudit auditEntry;
                     FlatDrawingViewSideResult side;
-                    if (!cache.TryGetValue(name, out side))
+                    if (!sideAuditCache.TryGetValue(name, out auditEntry))
                     {
                         SolidWorks.Interop.sldworks.View candidateView = candidates[0];
                         CdDirectFlatSideProbe probe;
@@ -932,6 +1061,50 @@ namespace ADDIN.Commands
                             CdTryFlatSideReadOnlyDetailed(candidateView, drawing as ModelDoc2, itemResult.PartPath, out probe);
                         FlatDrawingViewSideResult workingCopy =
                             checker.CheckFlatDrawingView(candidateView);
+
+                        bool pilotEnabled = CdIsReviewedFlatSidePilotEnabled();
+                        bool isolatedEnabled = CdIsIsolatedVisibleVerifierEnabled();
+                        bool needIsolatedVisible = isolatedEnabled && (
+                            !direct.PinkFacingViewer.HasValue ||
+                            !string.Equals(probe.BodyResolutionMethod, "VISIBLE_ENTITIES2", StringComparison.Ordinal) ||
+                            !probe.Geom2DVerified ||
+                            (pilotEnabled && !workingCopy.PinkFacingViewer.HasValue));
+
+                        if (needIsolatedVisible)
+                        {
+                            if (_isolatedFlatSideVerifier == null)
+                                _isolatedFlatSideVerifier = new CdIsolatedVisibleFlatSideVerifier(LogDebug);
+
+                            string drwPath = "";
+                            try { drwPath = (drawing as ModelDoc2)?.GetPathName() ?? ""; } catch { drwPath = ""; }
+                            string candSheetName = "";
+                            try { candSheetName = (candidateView.Sheet as Sheet)?.GetName() ?? ""; } catch { candSheetName = ""; }
+
+                            CdIsolatedVerifyResult isoRes = _isolatedFlatSideVerifier.VerifyView(
+                                drwPath,
+                                candSheetName,
+                                name,
+                                itemResult.PartPath,
+                                (ISldWorks wApp, SolidWorks.Interop.sldworks.View wView, ModelDoc2 wDrw, string wPartPath, out CdDirectFlatSideProbe wProbe) =>
+                                    CdTryFlatSideDetailedOnSession(wApp, wView, wDrw, wPartPath, true, out wProbe));
+
+                            if (isoRes != null && isoRes.Success && isoRes.Result != null && isoRes.Probe != null)
+                            {
+                                MergeIsolatedVisibleResult(isoRes, ref direct, ref probe, itemResult.PartPath);
+                                LogDebug("[CD ISO VERIFIER OK] view=" + name +
+                                    " restarted=" + isoRes.RestartedWorker +
+                                    " direct=" + direct.PinkFacingViewer +
+                                    " bodySrc=" + probe.BodyResolutionMethod +
+                                    " geom2d=" + probe.Geom2DVerified +
+                                    " dW=" + probe.Geom2DDeltaWMm.ToString("F3", CultureInfo.InvariantCulture) +
+                                    " dH=" + probe.Geom2DDeltaHMm.ToString("F3", CultureInfo.InvariantCulture));
+                            }
+                            else
+                            {
+                                LogDebug("[CD ISO VERIFIER FAIL] view=" + name +
+                                    " err=" + (isoRes != null ? isoRes.ErrorReason : "null"));
+                            }
+                        }
 
                         CdWorkingCopyBlockAssessment blockAssessment =
                             CdClassifyWorkingCopyBlock(candidateView, drawing as ModelDoc2, itemResult.PartPath, workingCopy, probe);
@@ -944,7 +1117,6 @@ namespace ADDIN.Commands
                             probe,
                             blockAssessment);
 
-                        bool pilotEnabled = CdIsReviewedFlatSidePilotEnabled();
                         CdFlatSidePolicyInput input = new CdFlatSidePolicyInput
                         {
                             PilotEnabled = pilotEnabled,
@@ -954,6 +1126,7 @@ namespace ADDIN.Commands
                             WorkingCopyBackPinkMm2 = workingCopy.BackPinkAreaMm2,
                             WorkingCopyBlockedSpecificallyByDirtyAssembly =
                                 blockAssessment.BlockedSpecificallyByDirtyAssembly,
+                            OwnerDrawingDirty = probe != null && probe.DrawingDirty,
                             DirectProof = proof
                         };
 
@@ -989,21 +1162,48 @@ namespace ADDIN.Commands
                                 " fallbackMsg=" + workingCopy.Message);
                         }
 
+                        bool isPilotUnknown = false;
+                        string syncShort = "";
                         if (decision.Choice == CdFlatSideChoice.UseDirectRead)
                         {
                             side = direct;
-                            side.Message += " [PILOT direct-check; dependency freshness separately verified]";
+                            string geomInfo = probe.Geom2DAvailable
+                                ? string.Format(CultureInfo.InvariantCulture,
+                                    ", 2D Geom PASS dW={0:F3}mm/dH={1:F3}mm",
+                                    probe.Geom2DDeltaWMm, probe.Geom2DDeltaHMm)
+                                : "";
+                            side.Message += " [PILOT direct-check (" + probe.WorkerMode + geomInfo + "); dependency freshness verified]";
                         }
-                        else if (decision.Choice == CdFlatSideChoice.Unknown)
+                        else if (decision.Choice == CdFlatSideChoice.Unknown ||
+                                 (pilotEnabled && !workingCopy.PinkFacingViewer.HasValue))
                         {
+                            isPilotUnknown = pilotEnabled;
+                            syncShort = CdShortSyncReason(decision, probe, blockAssessment);
+                            string geomDetail = probe.Geom2DAvailable
+                                ? string.Format(CultureInfo.InvariantCulture,
+                                    ", 2D Geom {0} dW={1:F3}mm/dH={2:F3}mm",
+                                    probe.Geom2DVerified ? "PASS" : "FAIL",
+                                    probe.Geom2DDeltaWMm, probe.Geom2DDeltaHMm)
+                                : "";
+                            string syncDetail = !string.IsNullOrWhiteSpace(syncShort) &&
+                                                decision.Code == "DIRECT_PROMOTION_BLOCKED"
+                                ? decision.Explanation + " [" + syncShort + "]"
+                                : decision.Explanation;
+
                             side = new FlatDrawingViewSideResult
                             {
                                 ViewName = direct.ViewName,
                                 Configuration = direct.Configuration,
                                 DisplayState = direct.DisplayState,
                                 PinkFacingViewer = null,
-                                Message = "[CD PILOT " + decision.Code + "] " +
-                                    decision.Explanation +
+                                Message = "[Fact 1 - Mặt trên Drawing View] " +
+                                    CdFormatObservedViewSummary(
+                                        direct.PinkFacingViewer,
+                                        expected,
+                                        decision.Code,
+                                        ", " + probe.WorkerMode + geomDetail) +
+                                    " | [Fact 2 - Đồng bộ Model/Source] WARNING (" + decision.Code + "): " +
+                                    syncDetail +
                                     " | Direct=" + direct.Message +
                                     " | Working Copy=" + workingCopy.Message
                             };
@@ -1014,12 +1214,26 @@ namespace ADDIN.Commands
                             if (!workingCopy.PinkFacingViewer.HasValue)
                                 side.Message = direct.Message + " | Working Copy: " + workingCopy.Message;
                         }
-                        cache.Add(name, side);
+
+                        auditEntry = new CdCachedSideAudit
+                        {
+                            Side = side,
+                            SyncReason = syncShort,
+                            DecisionCode = decision.Code,
+                            DirectPink = direct.PinkFacingViewer,
+                            GeomAvailable = probe.Geom2DAvailable,
+                            GeomVerified = probe.Geom2DVerified,
+                            IsPilotUnknown = isPilotUnknown
+                        };
+                        sideAuditCache[name] = auditEntry;
+                    }
+                    else
+                    {
+                        side = auditEntry.Side;
                     }
                     status = CompareFlatSideMarker(expected, side.PinkFacingViewer);
                     message = name + ": chữ " + expected + "; " + side.Message;
-                    actual.Add(name + ": " + expected + " / " + (side.PinkFacingViewer.HasValue
-                        ? side.PinkFacingViewer.Value ? "mặt hồng (ウラ)" : "mặt màu (表)" : "chưa xác định mặt"));
+                    actual.Add(CdFormatActualSideText(name, expected, auditEntry));
                 }
                 if (!field.HasDrawingLocation || status == DrawingBomCheckStatus.NG)
                 {
@@ -1198,9 +1412,18 @@ namespace ADDIN.Commands
         // is established across all target cases.
         private const bool CdEnableDirectFlatSideVerdict = false;
         private const bool CdEnableReviewedFlatSidePilot = false;
+        private const bool CdEnableIsolatedVisibleVerification = false;
 
         // Isolated test-harness opt-in ONLY (always defaults to false in production).
         internal static bool CdReviewedFlatSidePilotOptInForTestsOnly = false;
+        internal static bool CdIsolatedVisibleVerificationOptInForTestsOnly = false;
+
+        private CdIsolatedVisibleFlatSideVerifier _isolatedFlatSideVerifier;
+
+        private static bool CdIsIsolatedVisibleVerifierEnabled()
+        {
+            return CdEnableIsolatedVisibleVerification || CdIsolatedVisibleVerificationOptInForTestsOnly;
+        }
 
         private static bool CdIsReviewedFlatSidePilotEnabled()
         {
@@ -1264,6 +1487,15 @@ namespace ADDIN.Commands
             public string CombinedAppearanceSources { get; set; } = "";
             public bool AllPlanarFacesResolvedUnambiguously { get; set; }
             public bool HasExplicitPinkOnOneSideOnly { get; set; }
+            public bool Geom2DAvailable { get; set; }
+            public bool Geom2DVerified { get; set; }
+            public double Geom2DDeltaWMm { get; set; }
+            public double Geom2DDeltaHMm { get; set; }
+            public int Geom2DArcCount { get; set; }
+            public string Geom2DFailureReason { get; set; } = "";
+            public string WorkerMode { get; set; } = "LIVE_HIDDEN";
+            public int DrawingNeedsRebuild2 { get; set; } = -1;
+            public int OutOfDateViewCount { get; set; }
             public int PartExternalRefCount { get; set; } = -1;
             public List<CdExternalRefRecord> ExternalRefs { get; } = new List<CdExternalRefRecord>();
             public List<string> FaceAuditSummary { get; } = new List<string>();
@@ -1377,38 +1609,8 @@ namespace ADDIN.Commands
                 try { partDirty = partDoc != null && partDoc.GetSaveFlag(); } catch { }
                 assessment.PartDirty = partDirty;
 
-                if (drawingDirty)
-                {
-                    assessment.BlockCategory = "DIRTY_DRAWING";
-                    assessment.Detail = "Owner drawing has unsaved changes.";
-                    return assessment;
-                }
-                if (partDirty)
-                {
-                    assessment.BlockCategory = "DIRTY_PART";
-                    assessment.Detail = "Referenced part has unsaved changes.";
-                    return assessment;
-                }
-
-                // If Working Copy actually measured pink area on either face, it was NOT
-                // blocked at CheckPartWorkingCopy's dirty-reference gate; it failed later
-                // during paint/geometry classification.
-                if (workingCopy.FrontPinkAreaMm2 > 1e-6 || workingCopy.BackPinkAreaMm2 > 1e-6)
-                {
-                    assessment.BlockCategory = "COLOR_OR_GEOMETRY_UNKNOWN";
-                    assessment.Detail = "Working Copy measured pink area but remained indeterminate.";
-                    return assessment;
-                }
-
-                if (view == null || !view.IsModelLoaded() || view.SuppressState != 0 ||
-                    string.IsNullOrWhiteSpace(view.ReferencedConfiguration) ||
-                    string.IsNullOrWhiteSpace(view.DisplayState))
-                {
-                    assessment.BlockCategory = "VIEW_OR_CONFIG_UNAVAILABLE";
-                    assessment.Detail = "Drawing view model/config/display-state is unavailable.";
-                    return assessment;
-                }
-
+                // Populate dirty assembly / dependency lists before returning DIRTY_DRAWING or DIRTY_PART
+                // so diagnostics and provenance logs reflect actual dirty assemblies (e.g. SB1-fr3).
                 string partFullPath = !string.IsNullOrWhiteSpace(expectedPartPath)
                     ? expectedPartPath
                     : (partDoc != null ? (partDoc.GetPathName() ?? "") : "");
@@ -1446,9 +1648,8 @@ namespace ADDIN.Commands
                         if (CdExactPath(docPath, partFullPath))
                         {
                             assessment.PartDirty = true;
-                            assessment.BlockCategory = "DIRTY_PART";
-                            assessment.Detail = "Open part document matches referenced part and is dirty.";
-                            return assessment;
+                            partDirty = true;
+                            continue;
                         }
 
                         bool isAsm = IsAssemblyDocument(doc);
@@ -1473,6 +1674,38 @@ namespace ADDIN.Commands
                         else
                             assessment.OtherDirtyDependencyPaths.Add(docPath);
                     }
+                }
+
+                if (drawingDirty)
+                {
+                    assessment.BlockCategory = "DIRTY_DRAWING";
+                    assessment.Detail = "Owner drawing has unsaved changes.";
+                    return assessment;
+                }
+                if (partDirty)
+                {
+                    assessment.BlockCategory = "DIRTY_PART";
+                    assessment.Detail = "Referenced part has unsaved changes.";
+                    return assessment;
+                }
+
+                // If Working Copy actually measured pink area on either face, it was NOT
+                // blocked at CheckPartWorkingCopy's dirty-reference gate; it failed later
+                // during paint/geometry classification.
+                if (workingCopy.FrontPinkAreaMm2 > 1e-6 || workingCopy.BackPinkAreaMm2 > 1e-6)
+                {
+                    assessment.BlockCategory = "COLOR_OR_GEOMETRY_UNKNOWN";
+                    assessment.Detail = "Working Copy measured pink area but remained indeterminate.";
+                    return assessment;
+                }
+
+                if (view == null || !view.IsModelLoaded() || view.SuppressState != 0 ||
+                    string.IsNullOrWhiteSpace(view.ReferencedConfiguration) ||
+                    string.IsNullOrWhiteSpace(view.DisplayState))
+                {
+                    assessment.BlockCategory = "VIEW_OR_CONFIG_UNAVAILABLE";
+                    assessment.Detail = "Drawing view model/config/display-state is unavailable.";
+                    return assessment;
                 }
 
                 if (assessment.OtherDirtyDependencyPaths.Count > 0)
@@ -1556,7 +1789,15 @@ namespace ADDIN.Commands
                     probe.BackPlanarFaceCount >= 1 &&
                     probe.TotalPositiveAreaMm2 > 0 &&
                     probe.TotalNegativeAreaMm2 > 0;
-                proof.FlatPatternBodyVerified = visibleBodyVerified;
+                bool geom2dOk = !probe.Geom2DAvailable || probe.Geom2DVerified;
+                if (string.Equals(probe.WorkerMode, "ISOLATED_VISIBLE_COPY", StringComparison.Ordinal))
+                    geom2dOk = probe.Geom2DAvailable && probe.Geom2DVerified;
+                proof.DrawingView2DGeometryVerified = probe.Geom2DVerified;
+                proof.View2DGeomDeltaWMm = probe.Geom2DAvailable ? (double?)probe.Geom2DDeltaWMm : null;
+                proof.View2DGeomDeltaHMm = probe.Geom2DAvailable ? (double?)probe.Geom2DDeltaHMm : null;
+                proof.View2DGeomArcCount = probe.Geom2DAvailable ? (int?)probe.Geom2DArcCount : null;
+                proof.WorkerMode = probe.WorkerMode;
+                proof.FlatPatternBodyVerified = visibleBodyVerified && geom2dOk;
 
                 proof.FaceColorCompleteAndUnambiguous =
                     direct.PinkFacingViewer.HasValue &&
@@ -1578,6 +1819,10 @@ namespace ADDIN.Commands
                 if (probe.ViewLightweight) freshnessBlocks.Add("view_lightweight");
                 if (!visibleBodyVerified)
                     freshnessBlocks.Add("body_not_visible_entities2(" + probe.BodyResolutionMethod + ")");
+                if (probe.Geom2DAvailable && !probe.Geom2DVerified)
+                    freshnessBlocks.Add("geom2d_mismatch(" + probe.Geom2DFailureReason + ")");
+                else if (string.Equals(probe.WorkerMode, "ISOLATED_VISIBLE_COPY", StringComparison.Ordinal) && !probe.Geom2DAvailable)
+                    freshnessBlocks.Add("geom2d_unavailable_in_isolated_visible");
 
                 if (probe.PartExternalRefCount < 0)
                 {
@@ -1659,7 +1904,16 @@ namespace ADDIN.Commands
             string extStatuses = probe.ExternalRefs.Count > 0
                 ? string.Join(",", probe.ExternalRefs.Select(e => e.Status).Distinct())
                 : "none";
-            return string.Format(CultureInfo.InvariantCulture,
+            string workerMeta = string.Format(CultureInfo.InvariantCulture,
+                "worker={0} geom2d={1}({2:F3}/{3:F3},arcs={4}) drawRebuild2={5} outOfDateViews={6} ",
+                probe.WorkerMode ?? "LIVE_HIDDEN",
+                probe.Geom2DAvailable ? (probe.Geom2DVerified ? "PASS" : "FAIL") : "UNAVAIL",
+                probe.Geom2DDeltaWMm,
+                probe.Geom2DDeltaHMm,
+                probe.Geom2DArcCount,
+                probe.DrawingNeedsRebuild2,
+                probe.OutOfDateViewCount);
+            return workerMeta + string.Format(CultureInfo.InvariantCulture,
                 "view={0} sheet={1} draw=\"{2}\" part=\"{3}\" expectedPart=\"{4}\" activeCfg=\"{5}\" viewCfg=\"{6}\" ds=\"{7}\" bodySrc={8} vis={9}/{10} selBodies={11} activeBodies={12} frontFaces={13} backFaces={14} frontPinkMm2={15:F1} backPinkMm2={16:F1} frontSrc={17} backSrc={18} extRefs={19} extStatuses=[{20}] drawDirty={21} partDirty={22} cfgDirty={23} cfgRebuild={24} partRebuild2={25} viewOutOfDate={26} disableAuto={27} lightweight={28} wcBlock={29} dirtyAsms=[{30}] proof=[D={31},P={32},C={33},DS={34},Body={35},Color={36},Fresh={37}] freshnessReason=\"{38}\" faceAudit=[{39}]",
                 probe.ViewName,
                 probe.SheetName,
@@ -2117,10 +2371,278 @@ namespace ADDIN.Commands
             string expectedPartPath,
             out CdDirectFlatSideProbe probe)
         {
+            return CdTryFlatSideDetailedOnSession(
+                swApp, view, ownerDrawing, expectedPartPath, allowIsolatedCopyActivation: false, out probe);
+        }
+
+        private static int CdCountOutOfDateViewsOnActiveSheet(ModelDoc2 ownerDrawing)
+        {
+            DrawingDoc drw = ownerDrawing as DrawingDoc;
+            if (drw == null) return 0;
+            int count = 0;
+            try
+            {
+                SolidWorks.Interop.sldworks.View cur =
+                    drw.GetFirstView() as SolidWorks.Interop.sldworks.View;
+                while (cur != null)
+                {
+                    try
+                    {
+                        if (cur.Type != (int)swDrawingViewTypes_e.swDrawingSheet &&
+                            cur.IsModelOutOfDate())
+                        {
+                            count++;
+                        }
+                    }
+                    catch { }
+                    cur = cur.GetNextView() as SolidWorks.Interop.sldworks.View;
+                }
+            }
+            catch { }
+            return count;
+        }
+
+        private static double CdGetViewScaleSafe(SolidWorks.Interop.sldworks.View view, MathTransform xform)
+        {
+            try
+            {
+                double s = view.ScaleDecimal;
+                if (s > 1e-9 && !double.IsNaN(s) && !double.IsInfinity(s))
+                    return s;
+            }
+            catch { }
+            try
+            {
+                double[] xd = xform?.ArrayData as double[];
+                if (xd != null && xd.Length >= 13 && xd[12] > 1e-9)
+                    return xd[12];
+            }
+            catch { }
+            return 1.0;
+        }
+
+        private static void CdReleaseComObjectSafe(object comObj)
+        {
+            if (comObj != null && System.Runtime.InteropServices.Marshal.IsComObject(comObj))
+            {
+                try { System.Runtime.InteropServices.Marshal.ReleaseComObject(comObj); }
+                catch { }
+            }
+        }
+
+        private static void CdAccumulateTransformedPointMm(
+            MathUtility math,
+            MathTransform xform,
+            double scale,
+            object rawPt,
+            ref double minX,
+            ref double maxX,
+            ref double minY,
+            ref double maxY,
+            ref bool hasPoint)
+        {
+            double[] arr = rawPt as double[];
+            if (arr == null || arr.Length < 3 || math == null || xform == null)
+                return;
+            MathPoint mp = null;
+            MathPoint tp = null;
+            try
+            {
+                mp = math.CreatePoint(new[] { arr[0], arr[1], arr[2] }) as MathPoint;
+                if (mp == null) return;
+                tp = mp.MultiplyTransform(xform) as MathPoint;
+                double[] td = tp?.ArrayData as double[];
+                if (td == null || td.Length < 2) return;
+                double xMm = (td[0] / scale) * 1000.0;
+                double yMm = (td[1] / scale) * 1000.0;
+                if (double.IsNaN(xMm) || double.IsInfinity(xMm) ||
+                    double.IsNaN(yMm) || double.IsInfinity(yMm))
+                    return;
+                if (xMm < minX) minX = xMm;
+                if (xMm > maxX) maxX = xMm;
+                if (yMm < minY) minY = yMm;
+                if (yMm > maxY) maxY = yMm;
+                hasPoint = true;
+            }
+            finally
+            {
+                CdReleaseComObjectSafe(tp);
+                CdReleaseComObjectSafe(mp);
+            }
+        }
+
+        private static void CdVerifyView2DGeometryMatchesBody(
+            SolidWorks.Interop.sldworks.View view,
+            Body2 body,
+            MathUtility math,
+            MathTransform xform,
+            CdDirectFlatSideProbe probe)
+        {
+            if (probe == null || view == null || body == null || math == null || xform == null)
+                return;
+
+            double[] rawBuffer = null;
+            try { rawBuffer = view.GetPolyLinesAndCurves((short)1) as double[]; }
+            catch { rawBuffer = null; }
+
+            if (rawBuffer == null || rawBuffer.Length == 0)
+            {
+                probe.Geom2DAvailable = false;
+                probe.Geom2DFailureReason = "view_polylines_empty";
+                return;
+            }
+
+            DrawingNormalizationReport report;
+            List<DxfEdge> viewEdges = DrawingViewCurveBuffer.Read(rawBuffer, 1.0, out report, false);
+            if (viewEdges == null || viewEdges.Count == 0)
+            {
+                probe.Geom2DAvailable = false;
+                probe.Geom2DFailureReason = "parsed_view_edges_empty";
+                return;
+            }
+
+            double plcMinX = double.PositiveInfinity, plcMinY = double.PositiveInfinity;
+            double plcMaxX = double.NegativeInfinity, plcMaxY = double.NegativeInfinity;
+            bool hasPlc = false;
+            int arcCount = 0;
+
+            foreach (DxfEdge e in viewEdges)
+            {
+                if (e == null) continue;
+                if (string.Equals(e.Type, "ARC", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(e.Type, "CIRCLE", StringComparison.OrdinalIgnoreCase))
+                {
+                    arcCount++;
+                }
+                DxfBox b = e.Bounds;
+                if (!double.IsInfinity(b.MinX) && !double.IsInfinity(b.MaxX) &&
+                    !double.IsInfinity(b.MinY) && !double.IsInfinity(b.MaxY))
+                {
+                    if (b.MinX < plcMinX) plcMinX = b.MinX;
+                    if (b.MaxX > plcMaxX) plcMaxX = b.MaxX;
+                    if (b.MinY < plcMinY) plcMinY = b.MinY;
+                    if (b.MaxY > plcMaxY) plcMaxY = b.MaxY;
+                    hasPlc = true;
+                }
+            }
+
+            probe.Geom2DArcCount = arcCount;
+            if (!hasPlc)
+            {
+                probe.Geom2DAvailable = false;
+                probe.Geom2DFailureReason = "view_edge_bounds_invalid";
+                return;
+            }
+
+            Array bodyEdges = null;
+            try { bodyEdges = body.GetEdges() as Array; }
+            catch { bodyEdges = null; }
+            if (bodyEdges == null || bodyEdges.Length == 0)
+            {
+                probe.Geom2DAvailable = true;
+                probe.Geom2DVerified = false;
+                probe.Geom2DFailureReason = "body_edges_empty";
+                return;
+            }
+
+            double scale = CdGetViewScaleSafe(view, xform);
+            double bMinX = double.PositiveInfinity, bMinY = double.PositiveInfinity;
+            double bMaxX = double.NegativeInfinity, bMaxY = double.NegativeInfinity;
+            bool hasBodyPts = false;
+
+            foreach (object edgeObj in bodyEdges)
+            {
+                Edge edge = edgeObj as Edge;
+                if (edge == null) continue;
+                CurveParamData cpd = null;
+                try
+                {
+                    try { cpd = edge.GetCurveParams3(); } catch { cpd = null; }
+                    if (cpd != null)
+                    {
+                        CdAccumulateTransformedPointMm(math, xform, scale, cpd.StartPoint, ref bMinX, ref bMaxX, ref bMinY, ref bMaxY, ref hasBodyPts);
+                        CdAccumulateTransformedPointMm(math, xform, scale, cpd.EndPoint, ref bMinX, ref bMaxX, ref bMinY, ref bMaxY, ref hasBodyPts);
+                        bool isLine = cpd.CurveType == (int)swCurveTypes_e.LINE_TYPE;
+                        double uMin = cpd.UMinValue;
+                        double uMax = cpd.UMaxValue;
+                        if (!isLine && !double.IsNaN(uMin) && !double.IsNaN(uMax) && Math.Abs(uMax - uMin) > 1e-12)
+                        {
+                            const int steps = 32;
+                            for (int s = 1; s < steps; s++)
+                            {
+                                double u = uMin + (uMax - uMin) * (s / (double)steps);
+                                object ev = null;
+                                try { ev = edge.Evaluate2(u, 0); } catch { ev = null; }
+                                CdAccumulateTransformedPointMm(math, xform, scale, ev, ref bMinX, ref bMaxX, ref bMinY, ref bMaxY, ref hasBodyPts);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            Vertex sv = edge.GetStartVertex() as Vertex;
+                            Vertex ev = edge.GetEndVertex() as Vertex;
+                            if (sv != null) CdAccumulateTransformedPointMm(math, xform, scale, sv.GetPoint(), ref bMinX, ref bMaxX, ref bMinY, ref bMaxY, ref hasBodyPts);
+                            if (ev != null) CdAccumulateTransformedPointMm(math, xform, scale, ev.GetPoint(), ref bMinX, ref bMaxX, ref bMinY, ref bMaxY, ref hasBodyPts);
+                        }
+                        catch { }
+                    }
+                }
+                finally
+                {
+                    CdReleaseComObjectSafe(cpd);
+                }
+            }
+
+            if (!hasBodyPts)
+            {
+                probe.Geom2DAvailable = true;
+                probe.Geom2DVerified = false;
+                probe.Geom2DFailureReason = "body_edge_projection_empty";
+                return;
+            }
+
+            double plcW = plcMaxX - plcMinX;
+            double plcH = plcMaxY - plcMinY;
+            double bodyW = bMaxX - bMinX;
+            double bodyH = bMaxY - bMinY;
+            double dW = Math.Abs(plcW - bodyW);
+            double dH = Math.Abs(plcH - bodyH);
+
+            probe.Geom2DAvailable = true;
+            probe.Geom2DDeltaWMm = dW;
+            probe.Geom2DDeltaHMm = dH;
+
+            const double toleranceMm = 0.35;
+            if (dW <= toleranceMm && dH <= toleranceMm)
+            {
+                probe.Geom2DVerified = true;
+                probe.Geom2DFailureReason = "";
+            }
+            else
+            {
+                probe.Geom2DVerified = false;
+                probe.Geom2DFailureReason = string.Format(CultureInfo.InvariantCulture,
+                    "bbox_mismatch(view={0:F2}x{1:F2},body={2:F2}x{3:F2},dW={4:F3},dH={5:F3})",
+                    plcW, plcH, bodyW, bodyH, dW, dH);
+            }
+        }
+
+        internal FlatDrawingViewSideResult CdTryFlatSideDetailedOnSession(
+            ISldWorks sessionApp,
+            SolidWorks.Interop.sldworks.View view,
+            ModelDoc2 ownerDrawing,
+            string expectedPartPath,
+            bool allowIsolatedCopyActivation,
+            out CdDirectFlatSideProbe probe)
+        {
+            ISldWorks activeSw = sessionApp ?? swApp;
             FlatDrawingViewSideResult result = new FlatDrawingViewSideResult();
             probe = new CdDirectFlatSideProbe
             {
-                ExpectedPartPath = expectedPartPath ?? ""
+                ExpectedPartPath = expectedPartPath ?? "",
+                WorkerMode = allowIsolatedCopyActivation ? "ISOLATED_VISIBLE_COPY" : "LIVE_HIDDEN"
             };
             string reason = "not started";
             try
@@ -2131,6 +2653,8 @@ namespace ADDIN.Commands
                     try { probe.DrawingExists = !string.IsNullOrWhiteSpace(probe.DrawingPath) && File.Exists(probe.DrawingPath); } catch { }
                     try { probe.DrawingDirty = ownerDrawing.GetSaveFlag(); } catch { }
                     try { probe.DrawingVisible = ownerDrawing.Visible; } catch { }
+                    try { probe.DrawingNeedsRebuild2 = ownerDrawing.Extension != null ? ownerDrawing.Extension.NeedsRebuild2 : -1; } catch { }
+                    probe.OutOfDateViewCount = CdCountOutOfDateViewsOnActiveSheet(ownerDrawing);
                 }
 
                 if (view == null) { reason = "view null"; return result; }
@@ -2165,8 +2689,9 @@ namespace ADDIN.Commands
                     result.DisplayState.Length == 0)
                 { reason = "Part, config or display-state unavailable"; return result; }
 
-                // Crucial guard: Never activate a different config or mutate the user's model.
-                // If the active config differs from the view's referenced config, resolve by name.
+                // Crucial guard: In live read-only mode, never activate a different config or mutate the user's model.
+                // ONLY inside isolated temp copies (allowIsolatedCopyActivation == true) may we activate
+                // (RequestedConfiguration, DisplayState) before reading visible bodies & RenderMaterials.
                 Configuration activeCfg = model.ConfigurationManager.ActiveConfiguration;
                 probe.ActiveModelConfig = activeCfg != null ? (activeCfg.Name ?? "") : "";
                 bool activeConfigSame = activeCfg != null && string.Equals(activeCfg.Name,
@@ -2194,7 +2719,33 @@ namespace ADDIN.Commands
                 if (!stateFound)
                 { reason = "view display-state not found in referenced config"; return result; }
 
-                MathUtility math = swApp?.GetMathUtility() as MathUtility;
+                if (allowIsolatedCopyActivation)
+                {
+                    if (!activeConfigSame)
+                    {
+                        bool switched = false;
+                        try { switched = model.ShowConfiguration2(result.Configuration); } catch { }
+                        if (!switched)
+                        {
+                            reason = "isolated copy failed ShowConfiguration2(" + result.Configuration + ")";
+                            return result;
+                        }
+                        activeCfg = model.ConfigurationManager.ActiveConfiguration;
+                        probe.ActiveModelConfig = activeCfg != null ? (activeCfg.Name ?? "") : "";
+                        activeConfigSame = activeCfg != null && string.Equals(activeCfg.Name,
+                            result.Configuration, StringComparison.OrdinalIgnoreCase);
+                        probe.ActiveConfigMatchesRequested = activeConfigSame;
+                        if (!activeConfigSame || activeCfg == null)
+                        {
+                            reason = "isolated copy active config did not switch to " + result.Configuration;
+                            return result;
+                        }
+                        cfg = activeCfg;
+                    }
+                    try { cfg.ApplyDisplayState(result.DisplayState); } catch { }
+                }
+
+                MathUtility math = activeSw?.GetMathUtility() as MathUtility;
                 MathTransform xform = view.ModelToViewTransform;
                 if (math == null || xform == null)
                 { reason = "view transform unavailable"; return result; }
@@ -2364,6 +2915,10 @@ namespace ADDIN.Commands
                         " activeConfigSame=" + activeConfigSame);
                 }
 
+                // Verify 2D Drawing View contour against the selected flat-pattern Body2 when
+                // 2D polylines/curves are exposed by SOLIDWORKS (visible live view or isolated worker).
+                CdVerifyView2DGeometryMatchesBody(view, body, math, xform, probe);
+
                 var dsModelEntries = new List<CdAppearanceEntry>();
                 double[] dsModelRaw = cfg.GetDisplayStateProperties(result.DisplayState) as double[];
                 if (CdKnownRgb(dsModelRaw))
@@ -2376,8 +2931,8 @@ namespace ADDIN.Commands
                 }
 
                 // RenderMaterials via swSpecifyDisplayState query the active configuration's display state.
-                // Guard with activeConfigSame so an active config's state name cannot cross-contaminate
-                // a different ReferencedConfiguration, and never use swAllDisplayState / swThisDisplayState.
+                // Guard with activeConfigSame (either naturally or after isolated copy activation) so an
+                // active config's state name cannot cross-contaminate a different ReferencedConfiguration.
                 var rmFaceEntries = new List<CdAppearanceEntry>();
                 var rmFeatureEntries = new List<CdAppearanceEntry>();
                 var rmBodyEntries = new List<CdAppearanceEntry>();
@@ -2424,6 +2979,32 @@ namespace ADDIN.Commands
                     }
                 }
 
+                // Config/display-state scoped direct material property fallback (Face2.GetMaterialPropertyValues2,
+                // Body2.MaterialPropertyValues2, ModelDoc2.MaterialPropertyValues): only query when the exact
+                // configuration + display state is guaranteed active (isolated copy activation or matching single-DS).
+                bool allowConfigDirectMaterial =
+                    activeConfigSame &&
+                    (allowIsolatedCopyActivation || (states != null && states.Length == 1));
+                double[] directBodyMp = null;
+                double[] directModelMp = null;
+                if (allowConfigDirectMaterial)
+                {
+                    try
+                    {
+                        double[] rawBodyMp = body.MaterialPropertyValues2 as double[];
+                        if (CdKnownRgb(rawBodyMp))
+                            directBodyMp = new[] { rawBodyMp[0], rawBodyMp[1], rawBodyMp[2] };
+                    }
+                    catch { directBodyMp = null; }
+                    try
+                    {
+                        double[] rawModelMp = model.MaterialPropertyValues as double[];
+                        if (CdKnownRgb(rawModelMp))
+                            directModelMp = new[] { rawModelMp[0], rawModelMp[1], rawModelMp[2] };
+                    }
+                    catch { directModelMp = null; }
+                }
+
                 double positiveArea = 0, negativeArea = 0, otherArea = 0;
                 double positivePink = 0, negativePink = 0;
                 var sources = new HashSet<string>(StringComparer.Ordinal);
@@ -2459,6 +3040,20 @@ namespace ADDIN.Commands
                     if (!CdResolveAppearanceLevel(face, face, dsFaceEntries, rmFaceEntries, true, "face", out rgb, out conflict))
                     { reason = conflict; return result; }
                     if (rgb != null) source = "FACE";
+                    else if (allowConfigDirectMaterial)
+                    {
+                        try
+                        {
+                            double[] faceMp = face.GetMaterialPropertyValues2(
+                                (int)swInConfigurationOpts_e.swThisConfiguration, null) as double[];
+                            if (CdKnownRgb(faceMp))
+                            {
+                                rgb = new[] { faceMp[0], faceMp[1], faceMp[2] };
+                                source = "FACE_MAT";
+                            }
+                        }
+                        catch { }
+                    }
 
                     if (rgb == null)
                     {
@@ -2473,6 +3068,11 @@ namespace ADDIN.Commands
                         if (!CdResolveAppearanceLevel(body, face, dsBodyEntries, rmBodyEntries, false, "body", out rgb, out conflict))
                         { reason = conflict; return result; }
                         if (rgb != null) source = "BODY";
+                        else if (directBodyMp != null)
+                        {
+                            rgb = directBodyMp;
+                            source = "BODY_MAT";
+                        }
                     }
 
                     if (rgb == null)
@@ -2480,6 +3080,11 @@ namespace ADDIN.Commands
                         if (!CdResolveAppearanceLevel(model, face, dsModelEntries, rmModelEntries, false, "model", out rgb, out conflict))
                         { reason = conflict; return result; }
                         if (rgb != null) source = "MODEL";
+                        else if (directModelMp != null)
+                        {
+                            rgb = directModelMp;
+                            source = "MODEL_MAT";
+                        }
                     }
 
                     // null / -1 / invalid RGB means UNKNOWN, *not* confirmed non-pink.

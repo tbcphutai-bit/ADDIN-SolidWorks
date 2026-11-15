@@ -31,6 +31,11 @@ namespace ADDIN.Commands
         public string AppearanceSources { get; set; }
         public string FreshnessReason { get; set; }
         public string ProvenanceSummary { get; set; }
+        public bool DrawingView2DGeometryVerified { get; set; }
+        public double? View2DGeomDeltaWMm { get; set; }
+        public double? View2DGeomDeltaHMm { get; set; }
+        public int? View2DGeomArcCount { get; set; }
+        public string WorkerMode { get; set; }
 
         // Positive obligation across every link in the chain.
         public bool IsComplete
@@ -60,6 +65,7 @@ namespace ADDIN.Commands
 
         // Typed/structured classifier result from the CHECK DRAWING call boundary.
         public bool WorkingCopyBlockedSpecificallyByDirtyAssembly { get; set; }
+        public bool OwnerDrawingDirty { get; set; }
         public CdFlatSideProof DirectProof { get; set; }
     }
 
@@ -116,6 +122,13 @@ namespace ADDIN.Commands
                 return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.Unknown, null,
                     "DIRECT_WORKCOPY_DISAGREE",
                     "Direct Read disagrees with a determinate Working Copy.");
+
+            // Consistent fail-closed Drawing Dirty guard in Pilot: Working Copy
+            // inspects only the Part on disk and does not verify an unsaved Drawing.
+            if (input.OwnerDrawingDirty)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.Unknown, null,
+                    "DIRTY_DRAWING_UNVERIFIED",
+                    "Owner Drawing is dirty; cannot certify side against saved/in-context sources.");
 
             // The proven legacy checker remains authoritative when determinate
             // and unambiguous. This also covers agreement with Direct Read.
@@ -278,6 +291,32 @@ namespace ADDIN.Commands
             require(d.Choice == CdFlatSideChoice.Unknown &&
                 d.Code == "WC_BOTH_SIDES_PINK_AMBIGUOUS",
                 "1D both-sides-pink guarded even before disagree");
+
+            // 14. Dirty owner Drawing in Pilot blocks Working Copy LEGACY_CONFIRMED (3D2 consistency)
+            p = new CdFlatSidePolicyInput
+            {
+                PilotEnabled = true,
+                DirectPinkFacingViewer = false,
+                WorkingCopyPinkFacingViewer = false,
+                WorkingCopyBlockedSpecificallyByDirtyAssembly = false,
+                OwnerDrawingDirty = true,
+                DirectProof = makeVerified()
+            };
+            p.DirectProof.DrawingPathVerified = true;
+            p.DirectProof.SourceFreshnessVerified = false;
+            d = Evaluate(p);
+            require(d.Choice == CdFlatSideChoice.Unknown &&
+                !d.PinkFacingViewer.HasValue &&
+                d.Code == "DIRTY_DRAWING_UNVERIFIED",
+                "3D2 dirty drawing blocks LEGACY_CONFIRMED in pilot");
+
+            // 15. Dirty owner Drawing in Shadow retains baseline legacy result (zero baseline change)
+            p.PilotEnabled = false;
+            d = Evaluate(p);
+            require(d.Choice == CdFlatSideChoice.UseWorkingCopy &&
+                d.PinkFacingViewer == false &&
+                d.Code == "SHADOW_LEGACY",
+                "dirty drawing in shadow preserves legacy");
 
             return count;
         }

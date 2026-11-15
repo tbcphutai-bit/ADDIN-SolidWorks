@@ -1,204 +1,146 @@
-# CHECK DRAWING: BÁO CÁO HOÀN THIỆN & KIỂM THỬ THỰC TẾ 表/ウラ (PR #62)
+# Báo Cáo Kỹ Thuật PR #62: Xác Minh Mặt `表/ウラ` Trong `CHECK DRAWING`
 
 - **Repository:** `tbcphutai-bit/ADDIN-SolidWorks`
-- **PR:** `#62` (`https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/62` — **KHÔNG MERGE**)
-- **Branch:** `fix/check-drawing-goban-display-retry-uraomote-20261108`
-- **Base Commit (bản gốc PR):** `5d19539269c610a4363c095e72cf042a32f58a93` (cùng tài liệu tích hợp tại `f182754`)
-- **Commit mã nguồn hoàn chỉnh:** `a8cec4f35b2c836d31dfe70b3b50a6a4eb92285f` (`a8cec4f`) *(báo cáo này được commit ngay sau trên cùng branch PR #62)*
-- **Môi trường kiểm thử:** SOLIDWORKS 2024 SP5.0 (`SLDWORKS.exe 32.5.0.48`), `.NET Framework 4.8`, cấu hình `Debug|x64`
-- **Cờ an toàn mặc định trên production:**
-  - `CdEnableDirectFlatSideVerdict = false`
-  - `CdEnableReviewedFlatSidePilot = false`
-  - `CdReviewedFlatSidePilotOptInForTestsOnly = false`
-- **Phạm vi sửa đổi (strict CHECK DRAWING ONLY):**
-  - `ADDIN.csproj`
-  - `Commands/CdFlatSidePilotPolicy.cs` *(mới)*
-  - `Commands/CheckDrawingBom.cs`
-  - `docs/reports/CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md` *(báo cáo này)*
-  - **Không thay đổi:** `CheckUraOmote.cs`, `CheckPartWorkingCopy.cs`, Check Same Part, Check Hole, DXF, Xuất Excel, hay bất kỳ command nào khác. Không ghi đè `C:\Tao moi\ADDIN.dll` (người dùng tự rebuild thủ công); đã đồng bộ cả 3 file nguồn trên sang `C:\Tao moi\ADDIN\`.
+- **Pull Request:** `#62` — Branch `fix/check-drawing-goban-display-retry-uraomote-20261108`
+- **Base Commit đã kiểm tra:** `c98f277` (bản cập nhật mới sẽ được đính kèm commit SHA ngay trong bình luận PR #62 sau khi push)
+- **Môi trường kiểm thử:** SOLIDWORKS 2024 SP5.0 (`SLDWORKS.exe 32.5.0.48`, x64 Debug), bộ dữ liệu bản sao cô lập tại `D:\CG1-ISOLATED-TEST-COPIES\4365` và `D:\CG1-ISOLATED-TEST-COPIES\4332a`
+- **Phạm vi sửa đổi (chỉ `CHECK DRAWING`):**
+  - [`ADDIN.csproj`](../../ADDIN.csproj)
+  - [`Commands/CdFlatSidePilotPolicy.cs`](../../Commands/CdFlatSidePilotPolicy.cs)
+  - [`Commands/CdIsolatedVisibleFlatSideVerifier.cs`](../../Commands/CdIsolatedVisibleFlatSideVerifier.cs)
+  - [`Commands/CheckDrawingBom.cs`](../../Commands/CheckDrawingBom.cs)
+  - [`docs/reports/CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md`](CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md)
+  - Không sửa `CheckUraOmote.cs`, `CheckPartWorkingCopy.cs`, `ExcelDrawingCheckExporter.cs` hay bất kỳ command nào khác.
 
 ---
 
-## 1. Tóm tắt kiến trúc & mã nguồn đã tích hợp (`a8cec4f`)
+## 1. Trạng Thái Cờ An Toàn Production (Mặc Định TẮT)
 
-Đã tích hợp bộ giải pháp fail-closed từ `docs/anti/PR62_FlatSidePilotPolicy.cs.txt`, `docs/anti/PR62_FlatSideIntegration.cs.txt` và `docs/anti/PR62_ANTIGRAVITY_IMPLEMENTATION_PROMPT.md`, đồng thời sửa các lỗ hổng phát hiện khi kiểm thử thực tế trên SOLIDWORKS 2024 SP5.0:
+Mọi cờ bật tính năng Direct Verdict, Reviewed Pilot và Isolated Visible Verification đều giữ **tắt mặc định (`false`)** trong mã nguồn commit:
 
-### 1.1 `Commands/CdFlatSidePilotPolicy.cs`
-- Tách logic quyết định thuần (COM-free, có unit self-test độc lập):
-  - Enum `CdFlatSideChoice` (`UseWorkingCopy`, `UseDirectRead`, `Unknown`)
-  - Class `CdFlatSideProof`: 7 điều kiện chứng minh độc lập theo chuỗi (`DrawingPathVerified`, `ReferencedPartPathVerified`, `ConfigurationVerified`, `DisplayStateVerified`, `FlatPatternBodyVerified`, `FaceColorCompleteAndUnambiguous`, `SourceFreshnessVerified`) $\rightarrow$ `IsComplete`
-  - Class `CdFlatSidePolicyInput`, `CdFlatSidePolicyDecision`
-  - Method `CdFlatSidePilotPolicy.Evaluate`:
-    1. **`SHADOW_LEGACY`**: `PilotEnabled == false` giữ nguyên hoàn toàn hành vi Working Copy hiện hành.
-    2. **`WC_BOTH_SIDES_PINK_AMBIGUOUS`**: nếu `WorkingCopyFrontPinkMm2 > 1e-6 && WorkingCopyBackPinkMm2 > 1e-6`, trả `Unknown` (`Warning`) — **không bao giờ** tự kết luận `ウラ` như hàm phân loại cũ khi cả hai mặt đều có màu hồng.
-    3. **`DIRECT_WORKCOPY_DISAGREE`**: nếu cả Direct Read và Working Copy đều xác định được nhưng ngược cực, trả `Unknown` (`Warning`).
-    4. **`LEGACY_CONFIRMED`**: khi Working Copy xác định được và không mâu thuẫn/không hai mặt hồng, giữ kết quả Working Copy.
-    5. **`PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED`**: **chỉ** cho phép Direct Read thay thế Working Copy khi `PilotEnabled == true` **VÀ** `WorkingCopyBlockedSpecificallyByDirtyAssembly == true` **VÀ** `DirectProof.IsComplete == true` (`7/7` điều kiện chứng minh đều `true`).
-    6. **`DIRECT_PROMOTION_BLOCKED`**: mọi ca thiếu bằng chứng độc lập đều giữ nguyên `Warning` / kết quả Working Copy.
-  - `RunSelfTests()`: 13 assertion đơn vị bao phủ Shadow OFF, controlled dirty-assembly pilot, stale source, unrelated WC block, clean agreement, disagree, both-sides-pink (`1B`, `1D`), two unknowns, part dirty, drawing dirty, unverified body, incomplete color.
+- `CdEnableDirectFlatSideVerdict = false`
+- `CdEnableReviewedFlatSidePilot = false`
+- `CdReviewedFlatSidePilotOptInForTestsOnly = false`
+- `CdEnableIsolatedVisibleVerification = false`
+- `CdIsolatedVisibleVerificationOptInForTestsOnly = false`
 
-### 1.2 `Commands/CheckDrawingBom.cs`
-1. **Giữ Pilot TẮT mặc định + Opt-in nội bộ cho test:**
-   - `CdEnableDirectFlatSideVerdict = false`, `CdEnableReviewedFlatSidePilot = false`, `internal static bool CdReviewedFlatSidePilotOptInForTestsOnly = false`, `CdIsFlatSidePilotEnabled()`.
-2. **Sửa lỗi gốc rễ kế thừa màu Display State tầng `Body` / `Feature` trên SOLIDWORKS 2024 SP5.0:**
-   - **Phát hiện thực nghiệm bằng COM probe:** trên SOLIDWORKS 2024 SP5.0, `ISldWorks.IsSame(viewBody, dsBody)` trả `0` (`swObjectNotSame`) khi so `Body2` từ `GetVisibleEntities2` với `Body2` từ `GetDisplayStateBodyProperties` (kể cả khi `activeConfigSame=False` lẫn `True`); tương tự `Feature` từ `face.GetFeature()` (`ﾌﾗｯﾄ-ﾊﾟﾀｰﾝ92`) khác đối tượng `Feature` trả về từ `GetDisplayStateFeatureProperties` (`ﾍﾞｰｽ-ﾌﾗﾝｼﾞ1`), trong khi `Face2.IsSame` trên các mặt thuộc `Body2` / `Feature` đó lại khớp (`= 1`). Lỗi này trước đây làm override cấp `Body`/`Feature` bị trượt xuống `MODEL`.
-   - **Cách sửa:** thêm cache `GetOwnedFaces()` vào `CdAppearanceEntry`, trích helper `CdEntryMatches(CdAppearanceEntry entry, object target, Face2 ownerFace, bool isFaceLevel)`, và cập nhật `CdResolveAppearanceLevel` để khớp theo `CdSameObject` **hoặc** `Face2.IsSame(ownerFace, f)` đối với entry cấp `Body2` / `Feature`.
-3. **Phân loại block & chứng minh độ tươi độc lập (`CdClassifyWorkingCopyBlock`, `CdReadExternalReferences`, `CdBuildCandidateFlatSideProof`):**
-   - Chỉ gắn `WorkingCopyBlockedSpecificallyByDirtyAssembly` khi đích danh `CheckPartWorkingCopy` báo lỗi assembly dirty (`Model tham chieu co thay doi chua luu:` trỏ `.SLDASM`), **không** bật khi Part dirty (`Part co thay doi chua luu`), Drawing dirty, Drawing lỗi mở/thiếu tham chiếu hoặc View out-of-date.
-   - `FlatPatternBodyVerified` chỉ `true` khi `Probe.BodyResolutionMethod == "VISIBLE_ENTITIES2"` (bản vẽ ẩn dùng `HIDDEN_DS_FACE_BODY` chỉ được phép ghi log chẩn đoán, **bị chặn** thăng hạng trong Pilot).
-   - `SourceFreshnessVerified` kiểm tra đầy đủ: `Visible`, `FlatPatternBodyVerified`, `!DrawingDirty`, `!PartDirty`, `!CfgDirty`, `!CfgNeedsRebuild`, `PartNeedsRebuild2 == 0`, `!ViewOutOfDate`, `!ViewDisableAutoUpdate`, `!PartIsLightweight`, và mọi in-context external reference trong `ListExternalFileReferences2` nếu không **Locked** (`status == 1`) đều không được tham chiếu tới assembly đang dirty. Không gán cứng `= true`.
-4. **Thay thế `AddFlatPatternSideChecks`:** tích hợp trực tiếp `CdEvaluateFlatSidePilot`, log chi tiết `[CD PROVENANCE]`, `[CD PILOT DECISION]`, `[DIRECT_WORKCOPY_DISAGREE]`, `[FLAT SIDE NOTE]`, xử lý đúng multi-view / missing marker / unattached marker thành `Warning`.
+Chế độ Shadow legacy giữ nguyên hành vi đối chiếu không can thiệp kết quả production cho đến khi người dùng/team review chốt chính sách nghiệp vụ cho các chi tiết có External Reference chưa khóa trỏ tới Assembly bẩn (`status=3`).
 
 ---
 
-## 2. Điều tra các trường hợp chênh lệch (`1B_TR11_rn1`, `1D_4332a_P1_l1`) & 37 WARNING
+## 2. Phân Tích Nguyên Nhân Gốc Rễ (Theo Comment Review PR #62 `c98f277`)
 
-### 2.1 Nguyên nhân 37 WARNING trong bộ 55 Drawing (`4365-01-TI.SLDDRW`)
-- Khi mở `4365-01-TI.SLDDRW` và chạy `LoadBom()`, SOLIDWORKS nạp **`11` assembly**, trong đó **`8` assembly bị đánh dấu `dirty=True`** sẵn ngay ở `BATCH_START`:
-  - `4365-01-TI.SLDASM`, `4365-02-TI-UK1.SLDASM`, `4365-03-TI-SB1.SLDASM`, `4365-03-TI-SB2.SLDASM`, `4365-03-TI-SB3.SLDASM`, `4365-02-TI-UK2.SLDASM`, `4365-03-TI-FB1.SLDASM`, `4365-03-TI-SA1.SLDASM`.
-- Trong **55 dòng BOM**:
-  - `5` chi tiết không có view phẳng/lệnh kiểm tra `表/ウラ` (`NO_FLAT_FIELD=5`: dòng `51..55`).
-  - `50` bản vẽ có flat view: `13` ca `WC=OK` (`11` ca `ITEM=OK` + `2` ca `4365-04-TI-siU1`, `4365-04-TI-siL1` bị `ITEM=Warning` do cảnh báo ở mục BOM khác), `0` ca `WC=NG`, và **`37` ca `WC=WARNING`** (`35` ca `DIRTY_ASSEMBLY_ONLY` + **`2` ca `DIRTY_DRAWING`** là dòng `18` `4365-04-TI-SB1-fr3` và dòng `28` `4365-04-TI-UK2-l2`).
-  - Toàn bộ `37/37` ca `WC=WARNING` giữ `dirty` assembly y nguyên từ `BATCH_START` đến `BATCH_END`; không gây rò rỉ `.SLDDRW` và không làm dirty thêm part nào.
+### 2.1. 7 view trả về `GetVisibleEntities2 == 0` khi chạy batch ẩn (`strictHiddenBatch`)
+Trong bộ 55 Drawing (`50` Drawing có ký hiệu `表/ウラ`, `5` Drawing không có trường phẳng), có `7` Drawing (`#19 SA1-fr1`, `#30 SA2-fr4`, `#33 SA1-fr2`, `#34 SA1-fr5`, `#35 SA1-fr3`, `#36 SA2-fr1`, `#42 SB3-fr1`) rơi vào `DIRECT_UNKNOWN` khi mở Drawing ẩn (`DocumentVisible(false)`):
+- `IView.GetVisibleEntities2(null, swViewEntityType_Face)` trả về rỗng trong batch ẩn, đồng thời Display State của các Part này không có explicit face-level override (`display-state has no explicit face body`), nên đường đọc ẩn (`HIDDEN_DS_FACE_BODY`) không dựng được mặt để đọc màu.
+- **Giải pháp đã chứng minh:** Dùng `CdIsolatedVisibleFlatSideVerifier` — một tiến trình `SLDWORKS.exe` out-of-process riêng (`_workerApp.Visible = false`, cửa sổ OS ẩn hoàn toàn, định danh ROT `SolidWorks_PID_<pid>`), chỉ mở **bản sao tạm (temp copy) của Drawing + Part** với `DocumentVisible(true)` (tuyệt đối không mở Assembly), đồng thời kiểm tra ranh giới đường dẫn cô lập (`IsPathInsideDirectory(actualRefPath, itemTempDir)`).
+- **Fix lỗi `CopyAndRepointPartDependencies` trên `CdIsolatedVisibleFlatSideVerifier`:** Trước đây hàm key trùng lặp chỉ theo `normDep`, nên khi `GetDocumentDependencies2(..., searchFlag={true,false})` trả về cả đường dẫn resolved và đường dẫn lưu cũ, hàm tạo bản sao `*_1.SLDPRT` và bị `ISOLATED_PATH_GUARD_BLOCKED`. Đã sửa bằng cách copy `expectedPartPath` trước (`expectedTempPartPath`), map mọi dependency trùng tên `expectedPartName` về `expectedTempPartPath`, deduplicate các `.SLDPRT` khác qua `copiedBySourcePath`, và hỗ trợ đường dẫn tương đối trong `ResolveExistingPartFile`.
+- **Kết quả sau fix:** `50/50` lượt gọi Isolated Worker thành công (`0` lỗi `ISO VERIFIER FAIL`, `0` lỗi `ISOLATED_PATH_GUARD_BLOCKED`, `50/50` đạt `bodySrc=VISIBLE_ENTITIES2`, `0` lần restart worker), toàn bộ `7/7` ca từng bị `DIRECT_UNKNOWN` trong chế độ ẩn đều đọc được màu `MODEL+FACE` rõ ràng qua worker cô lập.
 
-### 2.2 Giải mã `1B_TR11_rn1` (`4365-04-TI-TR11-rn1.slddrw`)
-- **Direct Read + Render PNG (`4365-04-TI-TR11-rn1_shaded.png`):** Mặt phẳng chính nằm trong khung bản vẽ (`図面ﾋﾞｭｰ13`, nhãn `表`) hiển thị **màu vàng** (`MODEL rgb=1.00,1.00,0.50`, `frontPinkMm2=0.0`) và mặt sau (`z=-1.00`) sơn **hồng** (`FACE rgb=1.00,0.75,0.75`, `backPinkMm2=42239.0`) theo Display State `表示状態-18` (`SPEC_RM[0]=Face(-1.00) pink`, `SPEC_RM[1]=Model yellow`), kết luận `isUra=False` (`表`).
-- **Working Copy (`dsaudit_stdout.log`):** Khi đọc `face.GetMaterialPropertyValues2(swThisConfiguration)` / `swSpecifyConfiguration` sau khi kích hoạt cấu hình `SM-FLAT-PATTERN` trên bản Working Copy, **cả hai mặt** (`z=+1.00` diện tích `42109.7 mm²` và `z=-1.00` diện tích `42239.0 mm²`) đều trả RGB hồng `(1.00, 0.7529, 0.7529)`. Hàm cũ thấy `front > 0` liền trả `true` (`ウラ`).
-- **Hành vi mới với Pilot Policy:** Bị chặn ngay bởi **`WC_BOTH_SIDES_PINK_AMBIGUOUS`** (`Working Copy painted both sides; cannot certify polarity.`) $\rightarrow$ trả **`Warning` (`Unknown`)**, không mù quáng báo `ウラ` NG giả và không tự ý ghi đè theo Direct Read.
+### 2.2. Đối chiếu hình học 2D View <-> 3D Flat Pattern `Body2` (`DrawingViewCurveBuffer`)
+- Để không tin mù quáng vào thuộc tính cấu hình/tên body khi Assembly đang dirty hoặc view lỗi thời, `CheckDrawingBom` thực hiện đối chiếu biên dạng 2D của Drawing View (qua `DrawingViewCurveBuffer.Read(rawBuffer, 1.0, out report, false)`) với `Box` chiếu của Flat Pattern `Body2`.
+- Kết quả trên `50` Flat View trong Isolated Worker:
+  - `49/50` đạt `geom2d=True` (`dW=0.000mm`, `dH=0.000mm`).
+  - `1/50` phát hiện lệch thật là `#30 4365-04-TI-SA2-fr4`: `geom2d=False` (`dW=0.000mm`, `dH=10.000mm`, `arcs=1`, `view=369.00x83.50`, `body=369.00x73.50`), bị chặn fail-closed ở mức `Body=False` và ghi rõ `2D Geom LỆCH` trong Fact 1 & Fact 2.
 
-### 2.3 Giải mã `1D_4332a_P1_l1` (`4332-04-TI-P-1-l1.slddrw`)
-- **Kiểm tra trực quan (`4332-04-TI-P-1-l1_shaded.png`) & BOM:** Trên cùng sheet `4379-68` có **`3` view phẳng** (`図面ﾋﾞｭｰ13` trong khung vẽ màu xanh ngọc `cyan` nhãn `表`; `図面ﾋﾞｭｰ17` ngoài khung phía trên màu hồng; `図面ﾋﾞｭｰ16` nhìn cạnh màu xanh ngọc). Ở cấp bản vẽ, `CheckOneDrawing` đã trả `Warning` (`Chữ 表 không gắn được với một view 展開 duy nhất.`).
-- **Chẩn đoán từng view:** Direct Read phân biệt đúng từng view (`図面ﾋﾞｭｰ13 = 表 (cyan)`, `図面ﾋﾞｭｰ16 = UNKNOWN`, `図面ﾋﾞｭｰ17 = ウラ (pink)`), trong khi Working Copy `face.GetMaterialPropertyValues2` đọc cả hai mặt trên `図面ﾋﾞｭｰ13` và `図面ﾋﾞｭｰ17` là hồng `(51480.4 / 51480.4 mm²)` vì chỉ đọc face-level material trong Display State mà không áp override `Model cyan (0.50,1.00,1.00)` trong `表示状態-2`. Pilot Policy đánh dấu đây là **hai mặt hồng không xác định** (`WC_BOTH_SIDES_PINK_AMBIGUOUS`), giữ nguyên `Warning`.
+### 2.3. Giải quyết dứt điểm nguyên nhân 35 WARNING Assembly Dirty và WARNING Drawing Dirty
+1. **`35` WARNING liên quan Assembly Dirty trong bộ 55 Drawing:**
+   - `34` dòng (`DIRECT_PROMOTION_BLOCKED`) vẫn bị giữ `WARNING` theo nguyên tắc an toàn **fail-closed** vì Part có External Reference In-Context đang ở trạng thái **chưa khóa** (`status=3`) trỏ trực tiếp tới các `.SLDASM` đang `dirty=True` (`GetSaveFlag=true`), ví dụ `4365-01-TI.SLDASM`, `4365-02-TI-UK1/UK2.SLDASM`, `4365-03-TI-FB1/SB1/SB2/SB3/SA1.SLDASM`. Hệ thống không tự ý khóa External Reference hay sửa/save file gốc.
+   - `1` dòng là `#37 4365-04-TI-SA2-fr2` có External Reference **chỉ trỏ tới Assembly sạch** (`4365-03-TI-SA2.SLDASM`, `dirty=False`). Với Pilot + Isolated, `#37` chuyển từ **`Warning -> OK`** (`PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED`), khớp đúng chứng minh có kiểm soát `3E1`/`3E2`.
+2. **Drawing Dirty (`DIRTY_DRAWING_UNVERIFIED`):**
+   - Toàn bộ `3` Drawing có `drawDirty=True` (`GetSaveFlag=true (NeedsRebuild2=0, OutOfDateViews=0)`) là `#07 4365-04-TI-SB1-ks2`, `#18 4365-04-TI-SB1-fr3`, `#28 4365-04-TI-UK2-l2` đều bị chặn fail-closed ở mức `WARNING` (`DIRTY_DRAWING_UNVERIFIED`). Riêng `#07 SB1-ks2` ở chế độ Shadow cũ từng cho `OK` dù Drawing dirty, nay ở Pilot+Isolated bị hạ an toàn từ **`OK -> Warning`** (do đó tổng đếm chung toàn lô 55 dòng không đổi: `OK=11, NG=0, Warning=44`, phản ánh `+1` từ `#37` bù `-1` từ `#07`).
+3. **Ca hai mặt cùng hồng (`1B_TR11-rn1` / `1E_BOTH_PINK`):**
+   - Trong Shadow cũ, Working Copy báo giả `NG` (`ウラ`). Với `CdFlatSidePilotPolicy` (`WC_BOTH_SIDES_PINK_AMBIGUOUS`), các ca này được phân loại chuẩn xác là **`Warning`** (chưa đủ căn cứ khẳng định chiều ngược từ Working Copy), đồng thời vẫn hiển thị kết quả quan sát Drawing View (Fact 1).
+
+### 2.4. Tách bạch rõ Fact 1 và Fact 2 trên UI và Excel (không sửa `ExcelDrawingCheckExporter.cs`)
+Hàm `CdFormatObservedViewSummary`, `CdShortSyncReason` và `AddFlatPatternSideChecks` trong [`Commands/CheckDrawingBom.cs`](../../Commands/CheckDrawingBom.cs) tách rõ hai sự thật cho mọi dòng bị chặn (`DIRECT_PROMOTION_BLOCKED`, `DIRTY_DRAWING_UNVERIFIED`, `WC_BOTH_SIDES_PINK_AMBIGUOUS`), ví dụ thực tế trích từ log:
+- **`DrawingValue` (cột Drawing trên UI & Excel):**
+  `図面ﾋﾞｭｰ13: 表 / View=mặt màu (表) (khớp chữ 表, 2D Geom khớp) | Đồng bộ: WARNING (ExtRef chưa khóa tới ASM bẩn: 4365-01-TI.SLDASM, 4365-02-TI-UK2.SLDASM, ...)`
+  (Hoặc với `#30 SA2-fr4`: `2D Geom LỆCH | Đồng bộ: WARNING (2D Geom LỆCH; ExtRef chưa khóa tới ASM bẩn: ...)`)
+- **`Message` (Banner chi tiết UI & Sheet Export):**
+  `図面ﾋﾞｭｰ13: chữ 表; [Fact 1 - Mặt trên Drawing View] ... | [Fact 2 - Đồng bộ Model/Source] WARNING (<code>): ...`
 
 ---
 
-## 3. Kết quả Build, Self-Test & Kiểm thử Runtime trên bản build cuối (`ADDIN.dll` SHA-256 `4AFF60B8...`)
+## 3. Kết Quả Build, Self-Tests & Runtime Verification (Sau Lần Sửa Cuối Cùng)
 
-- **Build (`Debug|x64`):** `MSBuild C:\Tao moi\ADDIN-CheckDrawing\ADDIN.csproj /t:Build /p:Configuration=Debug /p:Platform=x64 /p:OutputPath=bin\x64\Debug\ /p:PostBuildEvent=` $\rightarrow$ **`0 errors`** (`C:\Tao moi\ADDIN-CheckDrawing\bin\x64\Debug\ADDIN.dll`, SHA-256 `4AFF60B8F50BD4B31F94D5AC99D35AC3F995743B51C22E79692C359081B3B029`).
-- **Đồng bộ mã nguồn sang `C:\Tao moi\ADDIN\`:** Trùng SHA-256 cả 3 file (`CheckDrawingBom.cs`: `D260CDA9...`, `CdFlatSidePilotPolicy.cs`: `596E0AFC...`, `ADDIN.csproj`: `5F9EDE15...`). `C:\Tao moi\ADDIN.dll` giữ nguyên không ghi đè (`20BB502B...`).
-- **Unit Self-Tests (`run_selftest.ps1`):** Exit code **`0`** — toàn bộ đều pass:
+### 3.1. Build & Toàn Vẹn File Gốc
+- **Build Debug x64 (`MSBuild ADDIN.csproj /p:Configuration=Debug /p:Platform=x64`):** `0` errors.
+  - Output `bin\x64\Debug\ADDIN.dll` SHA-256: `4EBEEAB324900DB2F33D37D8818AC7FCC8A91ABAED57EA53A7732834FE19BF3F`
+- **`C:\Tao moi\ADDIN.dll`:** Giữ nguyên **không ghi đè**, SHA-256 unchanged `20BB502B7E8F37B0853F1104CDDFC49A991E266FAA38FE1BF63A8458D4C07CF5` (`2026-11-13 10:38:33`).
+- **Tập tin nguồn thử nghiệm:** `SOURCE_INTEGRITY unchanged=True` (`6/6` file ở targeted suite), `SOURCE_FILES_UNCHANGED checked=20 allEqual=True` ở cả 2 lượt chạy batch 55 Drawing.
+
+### 3.2. Unit / Regression Self-Tests (`run_selftest.ps1`)
+- Kết quả: **Exit `0`**
   - `RunGobanLinkSelfTests PASSED ALL 29 CASES!`
-  - `NormalizeFlatSideMarker` & `CompareFlatSideMarker` passed
-  - `DEFAULT_FLAGS: CdEnableDirectFlatSideVerdict=False CdEnableReviewedFlatSidePilot=False CdReviewedFlatSidePilotOptInForTestsOnly=False`
-  - `CdFlatSidePilotPolicy.RunSelfTests passed 13 synthetic policy assertions!`
-  - `RunExcelAndPreviewSyncSelfTests passed!` & `RunWidthLengthSelfTests passed!`
+  - `NormalizeFlatSideMarker` & `CompareFlatSideMarker`: passed
+  - `DEFAULT_FLAGS`: tất cả `5` cờ đều `False` (`CdEnableDirectFlatSideVerdict=False`, `CdEnableReviewedFlatSidePilot=False`, `CdReviewedFlatSidePilotOptInForTestsOnly=False`, `CdEnableIsolatedVisibleVerification=False`, `CdIsolatedVisibleVerificationOptInForTestsOnly=False`)
+  - `CdFlatSidePilotPolicy.RunSelfTests passed 15 synthetic policy assertions!`
+  - `RunExcelAndPreviewSyncSelfTests passed!`
+  - `RunWidthLengthSelfTests passed!`
 
-### 3.1 Targeted Suite trên SOLIDWORKS 2024 SP5.0 (`targeted_v8_stdout.log` & `p4_3e_v8_stdout.log`)
+### 3.3. Bộ Test Có Mục Tiêu Trên SOLIDWORKS 2024 SP5.0 (`targeted_post_final_stdout.log`)
+Tất cả các phase (`p1`, `p1b`, `p1d`, `p2a`, `p2_1f2`, `p2_1g`, `p2c`, `p3_2a..p3_2d`, `p4`, `p4_3e`) hoàn thành với **Exit `0`**:
 
-> **Lưu ý về độ ổn định teardown của harness:** Khi chạy trên bản vẽ ẩn bằng `CloseAllDocsSafe` (gọi `QuitDoc` cho Drawing rồi `QuitDoc` cho Part/Assembly liên tiếp về 0 tài liệu trong `SLDWORKS.exe` chạy ngầm), SOLIDWORKS 2024 SP5.0 phát sinh crash native nội bộ (`0xc0000374` tại `ntdll.dll` / `0xc0000005` tại `sldapiu.dll` ở các lần chạy thử đầu); còn `p1` dùng `CloseAllDocsSafe` có 1 event lỗi `SLDMODU.dll` (`0xc0000005` lúc `18:11:30`, process vẫn hoàn tất `EXIT=0`). Khi harness chuyển các ca đọc đơn sang `closeAllAfter: false` (chỉ đóng Drawing bằng `QuitDoc` giống `RunBatch`) và tách riêng từng bản sao `SB1-fr8` theo phase, toàn bộ `p1b`, `p2_1e`..`p2_1g2`, `p3_2a`..`p3_2d`, `p4`, `p4_3e` chạy xong với **`EXIT=0` và `0` Application Error (`EventCount=0`)**. Quá trình chạy Batch 55 dòng (110 lượt mở Drawing ở Shadow + Pilot) có **`0` crash**. `6/6` file gốc trong `D:\CG1-ISOLATED-TEST-COPIES` giữ nguyên checksum SHA-256 (`unchanged=True`).
+| Case / Phase | Kịch bản kiểm tra | Shadow | Pilot (+ Iso) | Ghi chú xác minh |
+|---|---|---|---|---|
+| `1A` (`SB1-fr8` clean) | Drawing `表` sạch | `OK` | `OK` | Khớp cả Direct & Working Copy |
+| `1B` (`TR11-rn1`) | Working Copy cả 2 mặt hồng | `NG` (WC giả `ウラ`) | `Warning` | `WC_BOTH_SIDES_PINK_AMBIGUOUS`, Direct=`表 (OK)` |
+| `1C` (`FB1-fr3`) | Không tô hồng + Drawing dirty | `Warning` | `Warning` | Shadow giữ fallback cũ; Pilot báo `DIRTY_DRAWING_UNVERIFIED` |
+| `1D` (`4332-04-TI-P-1-l1`) | Project khác (`4332a`) thiếu ref | `Warning` | `Warning` | Cách ly phase riêng `p1d`, an toàn |
+| `1E` (synthetic both pink) | Tô hồng cả 2 mặt Part | `NG` | `Warning` | `WC_BOTH_SIDES_PINK_AMBIGUOUS` |
+| `1F` / `1F2` | Kế thừa màu `BODY+FACE` | `OK` | `OK` | Đọc đúng màu kế thừa |
+| `1G` / `1G2` | Kế thừa màu `FEATURE+FACE` | `OK` | `OK` | Đọc đúng màu kế thừa |
+| `2A` / `2B` / `2D` | Flip view / đảo mặt thật / đảo nhãn | `NG` | `NG` | Phát hiện đảo mặt / đảo nhãn chính xác (`表`/`ウラ`) |
+| `2C` | Drawing `ウラ` đúng chuẩn | `OK` | `OK` | Xác nhận `ウラ` chuẩn không false NG |
+| `3A` / `3B` / `3C` | ASM bẩn / sửa Part / sửa sibling chưa lưu | `Warning` | `Warning` | `3A/3C` giữ `Warning` tách rõ Fact 1 & Fact 2; `3B` hạ Direct=`Warning` |
+| `3D1` / `3D2` | Part dirty / Drawing dirty riêng lẻ | `Warning` | `Warning` | `DIRTY_DRAWING_UNVERIFIED` chặn fail-closed |
+| `3E1` / `3E2` | ASM bẩn nhưng ExtRef đã khóa sạch | `Warning` | **`OK`** | `PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED` (chạy cả `p4` và `p4_3e`) |
+| `3E3` | ExtRef khóa nhưng Drawing dirty | `Warning` | `Warning` | `DIRTY_DRAWING_UNVERIFIED` chặn promotion dù ExtRef sạch |
 
-| Ca kiểm thử | Kịch bản & cấu hình | `wcBlock` / `Fresh` | Direct Read (`sources`, Front / Back Pink) | Kết quả cuối (`FlatFieldStatus` / Decision Code) |
-| :--- | :--- | :--- | :--- | :--- |
-| **`1A` (Shadow)** | `4365-04-TI-SB1-fr8.slddrw` (sạch, `表`) | `NOT_BLOCKED` / `True` | `False` (`MODEL+FACE`, `0.0 / 113191.8`) | **`OK`** (`SHADOW_LEGACY`) |
-| **`1A` (Pilot)** | `4365-04-TI-SB1-fr8.slddrw` (sạch, `表`) | `NOT_BLOCKED` / `True` | `False` (`MODEL+FACE`, `0.0 / 113191.8`) | **`OK`** (`LEGACY_CONFIRMED`) |
-| **`1B` (Shadow)** | `4365-04-TI-TR11-rn1.slddrw` (`flip=True`, `表`) | `NOT_BLOCKED` / `True` | `False` (`MODEL+FACE`, `0.0 / 42239.0`) | **`NG`** (`SHADOW_LEGACY` — WC đọc sai cả 2 mặt hồng `42109.7 / 42239.0`) |
-| **`1B` (Pilot)** | `4365-04-TI-TR11-rn1.slddrw` (`flip=True`, `表`) | `NOT_BLOCKED` / `True` | `False` (`MODEL+FACE`, `0.0 / 42239.0`) | **`Warning`** (**`WC_BOTH_SIDES_PINK_AMBIGUOUS`** — chặn cả hai mặt hồng) |
-| **`1C` (Shadow & Pilot)** | `4365-04-TI-FB1-fr3.slddrw` (không sơn hồng) | `DIRTY_DRAWING` / `False` | `UNKNOWN` (`no unambiguous one-sided pink paint`) | **`Warning`** (`SHADOW_LEGACY` / `DIRECT_PROMOTION_BLOCKED`) |
-| **`1D` (Shadow & Pilot)** | `4332-04-TI-P-1-l1.slddrw` (3 view `13/16/17`) | Multi-view sheet warning | View `13`: `False`; View `16`: `UNKNOWN`; View `17`: `True` | **`Warning`** (`Chữ 表 không gắn được với một view 展開 duy nhất`) |
-| **`1E` (Shadow)** | Clone `SB1-fr8` sơn hồng cả 2 mặt | `NOT_BLOCKED` / `True` | `UNKNOWN` (`113191.8 / 113191.8`) | **`NG`** (`SHADOW_LEGACY` — WC kết luận sai `ウラ`) |
-| **`1E` (Pilot)** | Clone `SB1-fr8` sơn hồng cả 2 mặt | `NOT_BLOCKED` / `True` | `UNKNOWN` (`113191.8 / 113191.8`) | **`Warning`** (**`WC_BOTH_SIDES_PINK_AMBIGUOUS`** — được bảo vệ) |
-| **`1F`** | Override **Body** cyan `(0.20,0.80,1.00)` + mặt sau hồng (`activeConfigSame=False`) | `NOT_BLOCKED` / `True` | `False` (**`BODY+FACE`**, `frontSrc=BODY`, `0.0 / 113191.8`) | **`OK`** (`LEGACY_CONFIRMED`) |
-| **`1F2`** | Override **Body** cyan + mặt sau hồng (`activeConfigSame=True`) | `NOT_BLOCKED` / `True` | `False` (**`BODY+FACE`**, `frontSrc=BODY`, `0.0 / 113191.8`) | **`OK`** (`LEGACY_CONFIRMED`) |
-| **`1G`** | Override **Feature** cyan `(0.20,0.80,1.00)` + mặt sau hồng (`activeConfigSame=False`) | `NOT_BLOCKED` / `True` | `False` (**`FEATURE+FACE`**, `frontSrc=FEATURE`, `0.0 / 113191.8`) | **`OK`** (`LEGACY_CONFIRMED`) |
-| **`1G2`** | Override **Feature** cyan + mặt sau hồng (`activeConfigSame=True`) | `NOT_BLOCKED` / `True` | `False` (**`FEATURE+FACE`**, `frontSrc=FEATURE`, `0.0 / 113191.8`) | **`OK`** (`LEGACY_CONFIRMED`) |
-| **`2A`** | Lật thật `IView.FlipView=True` + Save (`flip=True`, nhãn `表`) | `NOT_BLOCKED` / `True` | `True` (`FACE+MODEL`, `113191.8 / 0.0`) | **`NG`** (`LEGACY_CONFIRMED` — Direct & WC cùng phát hiện `ウラ` $\neq$ `表`) |
-| **`2B`** | Đổi thật màu 2 mặt trên Part (`ウラ`), nhãn giữ `表` | `NOT_BLOCKED` / `True` | `True` (`FACE+MODEL`, `113191.8 / 0.0`) | **`NG`** (`LEGACY_CONFIRMED`) |
-| **`2C`** | Đổi thật màu 2 mặt trên Part (`ウラ`) + nhãn `ウラ` | `NOT_BLOCKED` / `True` | `True` (`FACE+MODEL`, `113191.8 / 0.0`) | **`OK`** (`LEGACY_CONFIRMED` — `ウラ` đúng) |
-| **`2D`** | Hình học `表` chuẩn + đảo nhãn thành `ウラ` | `NOT_BLOCKED` / `True` | `False` (`MODEL+FACE`, `0.0 / 113191.8`) | **`NG`** (`LEGACY_CONFIRMED`) |
-| **`3A`** | Assembly `4365-03-TI-SB1.SLDASM` `dirty=True`, ext refs **chưa khóa** (`extStatuses=[3]`, `20/20`), Part sạch | `DIRTY_ASSEMBLY_ONLY` / **`False`** | `False` (`MODEL+FACE`, `0.0 / 113191.8`) | **`Warning`** (`DIRECT_PROMOTION_BLOCKED`; `asmDirty=True->True`, `readOnly=False`) |
-| **`3B`** | Assembly `dirty=True` + sơn hồng cả 2 mặt Part trong RAM không Save | `DIRTY_PART` / **`False`** | `UNKNOWN` (`113191.8 / 113191.8`) | **`Warning`** (`DIRECT_PROMOTION_BLOCKED`) |
-| **`3C`** | Assembly `dirty=True` + sửa Part anh em `SB1-rn1` chưa Save | `DIRTY_ASSEMBLY_ONLY` / **`False`** | `False` (`0.0 / 113191.8`) | **`Warning`** (`DIRECT_PROMOTION_BLOCKED`, `non_locked_ext_refs=20/20`) |
-| **`3D1`** | Assembly đóng; chỉ **Part** `dirty=True` | `DIRTY_PART` / **`False`** | `False` (`0.0 / 113191.8`) | **`Warning`** (`DIRECT_PROMOTION_BLOCKED`) |
-| **`3D2`** | Assembly đóng; Part sạch; **Drawing** `dirty=True` | `NOT_BLOCKED` / **`False`** | `False` (`0.0 / 113191.8`) | Direct proof `Fresh=False` (`UNVERIFIED: drawing_dirty`), UI giữ WC sạch trên đĩa (`LEGACY_CONFIRMED`) |
-| **`3E1`** *(lưu ý)* | `SB1-fr8` khóa ext ref (`extStatuses=[1]`), Assembly `dirty=True`, Drawing mở qua `DocumentVisible(false)` nhưng mở 1 mình nên SW vẫn nạp `VISIBLE_ENTITIES2` (`vis=1/1`) | `DIRTY_ASSEMBLY_ONLY` / **`True`** | `False` (`VISIBLE_ENTITIES2`, `0.0 / 113191.8`) | **`OK`** (`PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED`) — ghi chú: trường hợp `HIDDEN_DS_FACE_BODY -> Warning` được kiểm chứng trực tiếp qua Batch 55 bên dưới |
-| **`3E2`** | `SB1-fr8` khóa ext ref (`extStatuses=[1]`, `20/20`), Part/Drawing sạch (`partDirty=False`, `drawDirty=False`), Assembly `dirty=True`, view hiển thị (`VISIBLE_ENTITIES2`, `vis=1/1`) | `DIRTY_ASSEMBLY_ONLY` / **`True`** (`VERIFIED_CLEAN_VISIBLE_AND_NO_DIRTY_INCONTEXT_EXTREF`) | `False` (`VISIBLE_ENTITIES2`, `MODEL+FACE`, `0.0 / 113191.8`) | **`OK`** (**`PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED`** — cứu hộ có kiểm soát thành công) |
-| **`3E3`** | Như `3E2` nhưng làm **Drawing** `dirty=True` (`SetSaveFlag`) | `DIRTY_DRAWING` / **`False`** (`UNVERIFIED: drawing_dirty`) | `False` (`0.0 / 113191.8`) | **`Warning`** (**`DIRECT_PROMOTION_BLOCKED`** — giữ chốt an toàn khi bản vẽ dirty) |
+### 3.4. Đối Chiếu 55 Drawing Batch (`batch55_shadow` vs `batch55_pilot_iso`)
 
-### 3.2 Bộ 55 Drawing BOM Batch (`batch55_shadow_v3_stdout.log` vs `batch55_pilot_v3_stdout.log`)
+| Chỉ số | Shadow (Mặc định Production OFF) | Pilot + Isolated Worker | Chênh lệch / Ý nghĩa |
+|---|---|---|---|
+| Thời gian chạy / Exit code | `86.24s` / Exit `0` | `282.98s` / Exit `0` | Worker chỉ chạy 1 instance dùng lại cho cả lô |
+| Phân bố kết quả (`55` dòng) | `OK=11`, `NG=0`, `Warning=44` | `OK=11`, `NG=0`, `Warning=44` | `#37 SA2-fr2` (`Warning -> OK`), `#07 SB1-ks2` (`OK -> Warning`) |
+| Policy Code (`50` Flat View) | `50 SHADOW_LEGACY` | `34 DIRECT_PROMOTION_BLOCKED`, `12 LEGACY_CONFIRMED`, `3 DIRTY_DRAWING_UNVERIFIED`, `1 PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED` | Phản ánh đúng từng nguyên nhân kỹ thuật |
+| Hidden `GetVisibleEntities2` vs Worker | `43 DIRECT_OK`, `7 DIRECT_UNKNOWN` | **`50/50 VISIBLE_ENTITIES2`** (`0` restart, `0` fail) | `7/7` ca từng `UNKNOWN` trong hidden batch đều đọc được `MODEL+FACE` ở worker |
+| Kiểm tra biên dạng 2D View | `LIVE/HIDDEN` (`geom2d` PASS) | **`49/50` PASS**, **`1/50` FAIL (`#30 SA2-fr4`)** | `#30 SA2-fr4` lệch chiều cao thật `dH=10.000mm` (`369.00x83.50` vs `369.00x73.50`) |
+| Rò rỉ tài liệu SW (`DOCS_AFTER_BATCH`) | `75` | `75` | Không rò rỉ thêm doc chưa đóng |
+| File Excel Preview xuất ra | `58,365` bytes (`PR62_BatchPreview_Shadow.xlsx`) | `59,296` bytes (`Batch55_PilotIso_Audit.xlsx`) | Kiểm tra XML Sheet: `sharedStrings=514`, `Fact1MsgCells=15`, `Fact2MsgCells=15`, `DualValCells=11` |
 
-- **Thời gian thực thi:** Shadow OFF **`74.89` giây** / Pilot ON **`74.89` giây** (`canceled=False`, `0` crash, `appErrors=0`).
-- **Tổng hợp kết quả:**
-  - **Shadow OFF (`batch55`):** `55/55 dòng BOM: 11 OK, 0 NG, 44 Warning.` (`WC_OK=13`, `WC_NG=0`, `WC_WARNING=37`, `NO_FLAT_FIELD=5`; Decision: `50/50 SHADOW_LEGACY`; Direct: `43 DIRECT_OK`, `7 DIRECT_UNKNOWN`, `DISAGREE=0`).
-  - **Pilot ON (`batch55_pilot`):** `55/55 dòng BOM: 11 OK, 0 NG, 44 Warning.` (`0` dòng bị thăng hạng sai từ `Warning` lên `OK`; Decision: **`13 LEGACY_CONFIRMED`**, **`37 DIRECT_PROMOTION_BLOCKED`**).
-- **Vì sao `37` dòng WARNING trong Batch 55 giữ nguyên `DIRECT_PROMOTION_BLOCKED` khi bật Pilot ON?**
-  1. Ở chế độ batch ẩn (`strictHiddenBatch = true`), cả 50 bản vẽ đều trả `GetVisibleEntities2` rỗng (`43` dùng `HIDDEN_DS_FACE_BODY`, `7` `NONE`), nên **`FlatPatternBodyVerified = false`** (không thỏa chứng minh hình học view hiển thị trực tiếp).
-  2. Ngoài ra, **`34/35` ca `DIRTY_ASSEMBLY_ONLY`** trong batch còn có `non_locked_ext_refs_to_dirty_asm` (`1/1` đến `20/20`, status không Locked `[1]`) và **`2` ca** (`SB1-fr3` dòng 18, `UK2-l2` dòng 28) có `drawDirty=True`. Chính sách Pilot đã **từ chối thăng hạng giả**, đúng yêu cầu fail-closed.
-- **Preview & Xuất Excel + Toàn vẹn phiên SOLIDWORKS:**
-  - Xuất Excel thành công cả 2 lần (`PR62_BatchPreview_Shadow.xlsx`: `58,340` bytes; `PR62_BatchPreview_Pilot.xlsx`: `58,384` bytes).
-  - `DOCS_AFTER_BATCH = 75` ở cả Shadow và Pilot (`0` bản vẽ `.SLDDRW` rò rỉ mở sót); `SOURCE_FILES_UNCHANGED checked=20 allEqual=True`.
-
-#### Bảng đối chiếu đầy đủ 55/55 dòng (Shadow v3 vs Pilot v3 trên `4AFF60B8...`)
-
-| # | Component | `ITEM` (Shadow = Pilot) | `WC` (`表/ウラ`) | `DIRECT` (chẩn đoán) | `wcBlock` & Lý do chưa chứng minh tươi trong Batch ẩn |
-| :---: | :--- | :---: | :---: | :---: | :--- |
-| 01 | `4365-04-TI-SB1-ks1` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=2/2` |
-| 02 | `4365-04-TI-SB1-ks3` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 03 | `4365-04-TI-FB1-ks3` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=9/9` |
-| 04 | `4365-04-TI-SB2-ks1` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 05 | `4365-04-TI-SB2-ks3` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 06 | `4365-04-TI-SB3-ks3` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 07 | `4365-04-TI-SB1-ks2` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`; `drawing_dirty`) |
-| 08 | `4365-04-TI-T1-ft1` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 09 | `4365-04-TI-SB1-rn1` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 10 | `4365-04-TI-TR1-u1` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 11 | `4365-04-TI-SB1-rn2` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 12 | `4365-04-TI-siU1` | Warning | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`; dòng BOM Warning ở mục khác) |
-| 13 | `4365-04-TI-siL1` | Warning | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`; dòng BOM Warning ở mục khác) |
-| 14 | `4365-04-TI-SB1-fr8` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=20/20` |
-| 15 | `4365-04-TI-SB1-fr1` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=3/3` |
-| 16 | `4365-04-TI-SB1-fr2` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=3/3` |
-| 17 | `4365-04-TI-FB1-fr2` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 18 | `4365-04-TI-SB1-fr3` | Warning | Warning | `DIRECT_OK` | `DIRTY_DRAWING` \| `drawing_dirty`; `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=9/9` |
-| 19 | `4365-04-TI-SA1-fr1` | OK | OK | `DIRECT_UNKNOWN` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`; hidden view không có explicit DS face) |
-| 20 | `4365-04-TI-SB1-fr2a` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=2/2` |
-| 21 | `4365-04-TI-FB1-fr2a` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=3/3` |
-| 22 | `4365-04-TI-SB1-fr5` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=5/5` |
-| 23 | `4365-04-TI-SB1-fr4` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=8/8` |
-| 24 | `4365-04-TI-FB1-fr4` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=9/9` |
-| 25 | `4365-04-TI-FB1-fr4b` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=9/9` |
-| 26 | `4365-04-TI-UK1-l1` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=1/1` |
-| 27 | `4365-04-TI-UK1-l2` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=1/1` |
-| 28 | `4365-04-TI-UK2-l2` | Warning | Warning | `DIRECT_OK` | `DIRTY_DRAWING` \| `drawing_dirty`; `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=2/2` |
-| 29 | `4365-04-TI-SB1-fr6` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=6/6` |
-| 30 | `4365-04-TI-SA2-fr4` | Warning | Warning | `DIRECT_UNKNOWN` | `DIRTY_ASSEMBLY_ONLY` \| `NONE`; `non_locked_ext_refs=1/1` |
-| 31 | `4365-04-TI-SA2-fr5` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=1/1` |
-| 32 | `4365-04-TI-SA1-fr4` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=3/3` |
-| 33 | `4365-04-TI-SA1-fr2` | Warning | Warning | `DIRECT_UNKNOWN` | `DIRTY_ASSEMBLY_ONLY` \| `NONE`; `non_locked_ext_refs=4/4` |
-| 34 | `4365-04-TI-SA1-fr5` | Warning | Warning | `DIRECT_UNKNOWN` | `DIRTY_ASSEMBLY_ONLY` \| `NONE`; `non_locked_ext_refs=1/1` |
-| 35 | `4365-04-TI-SA1-fr3` | Warning | Warning | `DIRECT_UNKNOWN` | `DIRTY_ASSEMBLY_ONLY` \| `NONE`; `non_locked_ext_refs=1/1` |
-| 36 | `4365-04-TI-SA2-fr1` | OK | OK | `DIRECT_UNKNOWN` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`; hidden view không có explicit DS face) |
-| 37 | `4365-04-TI-SA2-fr2` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY` (chỉ thiếu `VISIBLE_ENTITIES2` trong batch ẩn) |
-| 38 | `4365-04-TI-SA1-fr7` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=1/1` |
-| 39 | `4365-04-TI-SA1-fr6` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 40 | `4365-04-TI-SB1-fr7` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 41 | `4365-04-TI-SB2-fr2` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 42 | `4365-04-TI-SB3-fr1` | Warning | Warning | `DIRECT_UNKNOWN` | `DIRTY_ASSEMBLY_ONLY` \| `NONE`; `non_locked_ext_refs=4/4` |
-| 43 | `4365-04-TI-SB2-fr4` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=7/7` |
-| 44 | `4365-04-TI-SB3-fr4` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=7/7` |
-| 45 | `4365-04-TI-SB1-fr4a` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 46 | `4365-04-TI-FB1-fr4a` | OK | OK | `DIRECT_OK` | `NOT_BLOCKED` (`LEGACY_CONFIRMED`) |
-| 47 | `4365-04-TI-SB2-fr2a` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=5/5` |
-| 48 | `4365-04-TI-SB3-fr1a` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=5/5` |
-| 49 | `4365-04-TI-SB2-fr3` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=4/4` |
-| 50 | `4365-04-TI-SB2-fr1` | Warning | Warning | `DIRECT_OK` | `DIRTY_ASSEMBLY_ONLY` \| `HIDDEN_DS_FACE_BODY`; `non_locked_ext_refs=2/2` |
-| 51..55 | `T1-t1`, `T1-t2`, `SB2-v1`, `TR1-t1`, `FB1-co1` | Warning | `NONE` | `-` | Không phải chi tiết khai triển (`NO_FLAT_FIELD=5`) |
+### 3.5. Trạng Thái Tiến Trình SOLIDWORKS & Event Log (Báo Cáo Trung Thực)
+- Tiến trình SOLIDWORKS của người dùng mở sẵn từ trước (`PID 48072`) vẫn hoạt động nguyên vẹn suốt quá trình chạy và sau khi hoàn tất.
+- Mọi harness kiểm thử (`targeted`, `batch55_shadow`, `batch55_pilot_iso`) đều kết thúc với **Exit `0`**, không treo, không đóng nhầm tài liệu gốc, và Isolated Worker (`PID 33468`) chạy hết `50/50` view không cần restart (`restarted=False` trên cả 50 lượt).
+- Tuy nhiên, khi kiểm tra Windows Event Log (`Application`, Event ID 1000), ghi nhận `4` sự kiện exception `0xc0000005` thuộc nội bộ `SLDWORKS.exe 32.5.0.48` của các tiến trình test sở hữu bởi harness (không thuộc `PID 48072`):
+  - `10:13:58` (`swccu.dll`, `PID 34112` — teardown cuối phase `p1b`),
+  - `10:30:32` (`slduiu.dll`, `PID 49532` — trong giai đoạn khởi động/nạp batch Shadow),
+  - `10:32:13` (`slduiu.dll`, `PID 40680` — phiên chính batch Pilot+Iso),
+  - `10:33:09` (`sldapiu.dll`, `PID 33468` — Isolated Worker đang chạy).
+  Cả ba tiến trình `49532`, `40680`, `33468` đều không bị chấm dứt giữa chừng (tiếp tục trả lời COM đầy đủ 55 bản vẽ tới cuối batch và thoát ở teardown bình thường), không ghi nhận dialog treo người dùng hay mất dữ liệu.
 
 ---
 
-## 4. Bảng tổng hợp PASS / FAIL / BLOCKED / NOT TESTED & Khuyến nghị tiếp theo
+## 4. Kho Tài Liệu Hiện Có Trong `docs/`
 
-| Hạng mục | Trạng thái | Ghi chú thực chứng |
-| :--- | :---: | :--- |
-| Build `Debug\|x64` + Cờ mặc định TẮT (`false`) | **PASS** | `0` errors; `ADDIN.dll` SHA-256 `4AFF60B8...`; 3 cờ đều `false` |
-| Unit Self-Tests (`run_selftest.ps1`) | **PASS** | Goban 29 cases + Marker + 13 `CdFlatSidePilotPolicy` + Excel/Preview + W/L đều pass |
-| Chặn 2 mặt hồng (`1B`, `1E`, `1D`) & Ngược cực | **PASS** | `WC_BOTH_SIDES_PINK_AMBIGUOUS` trả `Warning`, `0` false OK |
-| Kế thừa Display State 4 tầng (`Face/Feature/Body/Model`) | **PASS** | `1F`, `1F2` (`BODY+FACE`), `1G`, `1G2` (`FEATURE+FACE`) đều `OK` cả khi `activeConfigSame=False` & `True` |
-| Đảo mặt `FlipView` / đổi màu `ウラ` / đảo nhãn | **PASS** | `2A`, `2B`, `2D` trả `NG`; `2C` trả `OK` |
-| Cứu hộ Assembly Dirty có kiểm soát (`3E2`) & Chốt stale (`3A..3D`, `3E3`) | **PASS** | `3E2` trả `PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED -> OK`; `3A..3D1`, `3E3` giữ `Warning` |
-| Bộ 55 Drawing BOM (`batch55` Shadow & Pilot) + Xuất Excel | **PASS** | 55/55 chạy trong `74.89s`, `0` crash, `20/20` file nguồn nguyên vẹn, Excel OK |
-| Mở UI TaskPane tương tác thủ công của người dùng | **NOT TESTED** | Cố ý không đụng phiên SOLIDWORKS đang mở của người dùng (`PID 48072`) và không ghi đè `C:\Tao moi\ADDIN.dll`; chờ người dùng rebuild thủ công từ `C:\Tao moi\ADDIN\` |
+Trong repository hiện giữ nguyên các tài liệu liên quan phục vụ đối chiếu và review PR #62:
+- `docs/CheckDrawing_Link_Report_Code_For_Anti.txt`
+- `docs/CHECK_DRAWING_PROPERTY_LINK_CHANGELOG.md`
+- `docs/anti/PR62_ANTIGRAVITY_IMPLEMENTATION_PROMPT.md`
+- `docs/anti/PR62_FlatSideIntegration.cs.txt`
+- `docs/anti/PR62_FlatSidePilotPolicy.cs.txt`
+- [`docs/diagnostics/`](../diagnostics) (`3` file chẩn đoán `20261103`)
+- [`docs/reports/CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md`](CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md) (báo cáo này)
 
-### Khuyến nghị bước tiếp theo
-1. Người dùng tự mở solution tại `C:\Tao moi\ADDIN\` để rebuild `C:\Tao moi\ADDIN.dll` và kiểm tra khói nhanh trên UI nếu cần.
-2. Trên PR #62 (`a8cec4f` + commit báo cáo này), tiếp tục **giữ `CdEnableReviewedFlatSidePilot = false` và `CdEnableDirectFlatSideVerdict = false`** cho bản production hiện tại.
-3. Nếu muốn cứu hộ các ca `DIRTY_ASSEMBLY_ONLY` ngay trong **chế độ batch ẩn** ở PR tiếp theo sau khi review xong: cần đánh giá riêng với ChatGPT hai điểm thiết kế là (a) cơ chế giải phóng/xác minh body của drawing mở ẩn cho nhóm `SA1-fr*` (`NONE`) và (b) quy trình khóa external references hoặc điều kiện cho phép đọc Direct với assembly dirty nhưng chi tiết tham chiếu sạch.
+---
+
+## 5. Điểm Mở Nghiệp Vụ Cần User / ChatGPT Chốt Trước Khi Bật Production
+
+Về mặt kỹ thuật, **Isolated Visible Worker + 2D Geom + Policy tách 2 Fact** đã giải quyết trọn vẹn phần đọc mặt trên Drawing View (`50/50` view lấy được `VISIBLE_ENTITIES2`, `49/50` khớp hình học 2D, phát hiện đúng `1/50` ca lệch kích thước `#30 SA2-fr4`).
+
+Điểm duy nhất còn chờ quyết định nghiệp vụ là **chính sách cho `34` Part sạch Drawing nhưng có In-Context External Reference chưa khóa (`status=3`) trỏ tới Assembly đang dirty (`DIRECT_PROMOTION_BLOCKED`)**:
+1. **Giữ nguyên fail-closed hiện tại (khuyến nghị an toàn mặc định):** Coi Fact 1 đã chứng minh `表/ウラ` khớp trên Drawing View & 2D Geom, nhưng vẫn giữ Fact 2 = `WARNING` cho tới khi kỹ sư Save các Assembly bẩn hoặc khóa External Reference (`status=4`).
+2. **Hoặc mở ngoại lệ có điều kiện (cần xác nhận quy trình xưởng):** Chấp nhận kết quả kiểm tra mặt phẳng khi `Isolated Visible + 2D Geom` đều PASS dù có `status=3` tới Assembly bẩn (vẫn giữ chặn `DIRTY_DRAWING_UNVERIFIED` và `geom2d=FAIL`).
+
+> Hiện tại toàn bộ feature flag trong commit đều **tắt mặc định (`false`)** để không ảnh hưởng production cho đến khi chốt phương án trên và ChatGPT hoàn tất review PR #62 (chưa merge).
