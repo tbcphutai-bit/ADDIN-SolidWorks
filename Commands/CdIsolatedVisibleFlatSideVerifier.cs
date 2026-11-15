@@ -139,6 +139,9 @@ namespace ADDIN.Commands
 
             try
             {
+                Stopwatch stepSw = Stopwatch.StartNew();
+                Log(FormatStageLog("BEFORE_REPOINT", drawingPath, stepSw));
+
                 File.Copy(drawingPath, drwCopyPath, true);
                 EnsureWritableNormal(drwCopyPath);
 
@@ -159,6 +162,14 @@ namespace ADDIN.Commands
                 }
                 catch { }
 
+                AuditWorkerDocs("beforeOpen", itemTempDir, out int beforeOutside, out int beforeAsm, out string beforeSummary);
+                if (beforeOutside > 0 || beforeAsm > 0)
+                {
+                    CloseAllWorkerDocuments();
+                    AuditWorkerDocs("beforeOpenRetry", itemTempDir, out beforeOutside, out beforeAsm, out beforeSummary);
+                }
+
+                Log(FormatStageLog("BEFORE_OPENDOC", drawingPath, stepSw));
                 int openErr = 0;
                 int openWarn = 0;
                 drwDoc = _workerApp.OpenDoc6(
@@ -168,11 +179,17 @@ namespace ADDIN.Commands
                     "",
                     ref openErr,
                     ref openWarn) as ModelDoc2;
+                Log(FormatStageLog("AFTER_OPENDOC", drawingPath, stepSw) +
+                    " ok=" + (drwDoc != null) + " err=" + openErr + " warn=" + openWarn);
 
                 if (drwDoc == null)
                     return Fail("ISOLATED_OPEN_DRAWING_FAILED err=" + openErr + " warn=" + openWarn);
 
                 KeepWorkerWindowHidden(_workerApp);
+
+                AuditWorkerDocs("afterOpen", itemTempDir, out int openOutside, out int openAsm, out string openSummary);
+                if (openOutside > 0 || openAsm > 0)
+                    return Fail("ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_OPEN: " + openSummary);
 
                 try
                 {
@@ -218,6 +235,7 @@ namespace ADDIN.Commands
                     ? expectedTempPartPath
                     : actualRefPath;
 
+                Log(FormatStageLog("BEFORE_DELEGATE", drawingPath, stepSw));
                 CheckDrawingBom.CdDirectFlatSideProbe probe;
                 FlatDrawingViewSideResult sideResult = inspectDelegate(
                     _workerApp,
@@ -225,6 +243,11 @@ namespace ADDIN.Commands
                     drwDoc,
                     partPathForDelegate,
                     out probe);
+                Log(FormatStageLog("AFTER_DELEGATE", drawingPath, stepSw));
+
+                AuditWorkerDocs("afterDelegate", itemTempDir, out int delOutside, out int delAsm, out string delSummary);
+                if (delOutside > 0 || delAsm > 0)
+                    return Fail("ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_DELEGATE: " + delSummary);
 
                 return new CdIsolatedVerifyResult
                 {
@@ -235,8 +258,17 @@ namespace ADDIN.Commands
             }
             finally
             {
-                CloseAllWorkerDocuments();
-                TryDeleteDirectory(itemTempDir);
+                Log("[CD ISO VERIFIER STAGE] stage=BEFORE_CLOSE pid=" + (_workerPid ?? 0) + " file=" + Path.GetFileName(drawingPath));
+                int remainingDocs = CloseAllWorkerDocuments();
+                Log("[CD ISO VERIFIER STAGE] stage=AFTER_CLOSE pid=" + (_workerPid ?? 0) + " remainingDocs=" + remainingDocs);
+                if (remainingDocs > 0)
+                {
+                    AuditWorkerDocs("afterCloseNonZero", itemTempDir, out _, out _, out _);
+                }
+                if (!TryDeleteDirectory(itemTempDir))
+                {
+                    Log("[CD ISO VERIFIER CLEANUP WARN] Failed to delete itemTempDir=" + itemTempDir);
+                }
             }
         }
 
@@ -474,7 +506,7 @@ namespace ADDIN.Commands
                     throw new InvalidOperationException(
                         "Isolated SLDWORKS.exe exited prematurely code=" + proc.ExitCode);
 
-                app = TryGetAppFromRot(expectedMoniker);
+                app = TryGetAppFromRot(expectedMoniker, proc.Id);
                 if (app != null)
                 {
                     try
@@ -522,7 +554,7 @@ namespace ADDIN.Commands
             }
         }
 
-        private static ISldWorks TryGetAppFromRot(string expectedName)
+        private static ISldWorks TryGetAppFromRot(string expectedName, int expectedPid)
         {
             IRunningObjectTable table = null;
             IBindCtx ctx = null;
@@ -549,12 +581,26 @@ namespace ADDIN.Commands
                     {
                         string name;
                         moniker.GetDisplayName(ctx, null, out name);
-                        if (!string.IsNullOrEmpty(name) &&
-                            name.IndexOf(expectedName, StringComparison.OrdinalIgnoreCase) >= 0)
+                        string normalizedMoniker = (name ?? "").Trim().TrimStart('!');
+                        if (string.Equals(normalizedMoniker, expectedName, StringComparison.OrdinalIgnoreCase))
                         {
                             object obj;
-                            if (table.GetObject(moniker, out obj) == 0 && obj is ISldWorks)
-                                return (ISldWorks)obj;
+                            if (table.GetObject(moniker, out obj) == 0 && obj is ISldWorks sw)
+                            {
+                                try
+                                {
+                                    if (sw.GetProcessID() == expectedPid)
+                                        return sw;
+                                }
+                                catch { }
+
+                                try
+                                {
+                                    if (Marshal.IsComObject(obj))
+                                        Marshal.ReleaseComObject(obj);
+                                }
+                                catch { }
+                            }
                         }
                     }
                     catch { }
@@ -575,37 +621,165 @@ namespace ADDIN.Commands
             return null;
         }
 
-        private void CloseAllWorkerDocuments()
+        private string FormatStageLog(string stage, string drawingPath, Stopwatch sw)
         {
+            return string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "[CD ISO VERIFIER STAGE] stage={0} pid={1} t={2} elapsedMs={3} file={4}",
+                stage,
+                _workerPid ?? 0,
+                DateTime.Now.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture),
+                sw != null ? sw.ElapsedMilliseconds : 0,
+                Path.GetFileName(drawingPath ?? ""));
+        }
+
+        private void AuditWorkerDocs(
+            string stage,
+            string itemTempDir,
+            out int outsideTempCount,
+            out int asmCount,
+            out string summary)
+        {
+            outsideTempCount = 0;
+            asmCount = 0;
+            summary = "none";
             if (_workerApp == null)
                 return;
+
+            var entries = new List<string>();
+            int total = 0;
             try
             {
                 Array docs = _workerApp.GetDocuments() as Array;
                 if (docs != null)
                 {
-                    var titles = new List<string>();
-                    foreach (object d in docs)
+                    for (int i = docs.GetLowerBound(0); i <= docs.GetUpperBound(0); i++)
                     {
-                        ModelDoc2 md = d as ModelDoc2;
-                        if (md == null) continue;
-                        try
-                        {
-                            string t = md.GetTitle();
-                            if (!string.IsNullOrWhiteSpace(t))
-                                titles.Add(t);
-                        }
-                        catch { }
-                    }
-                    for (int i = 0; i < titles.Count; i++)
-                    {
-                        try { _workerApp.CloseDoc(titles[i]); } catch { }
+                        ModelDoc2 md = docs.GetValue(i) as ModelDoc2;
+                        if (md == null)
+                            continue;
+                        total++;
+                        int docType = -1;
+                        string path = "";
+                        string title = "";
+                        bool dirty = false;
+                        bool ro = false;
+                        try { docType = md.GetType(); } catch { }
+                        try { path = md.GetPathName() ?? ""; } catch { }
+                        try { title = md.GetTitle() ?? ""; } catch { }
+                        try { dirty = md.GetSaveFlag(); } catch { }
+                        try { ro = md.IsOpenedReadOnly(); } catch { }
+
+                        bool isAsm = docType == (int)swDocumentTypes_e.swDocASSEMBLY ||
+                            path.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase);
+                        bool insideTemp = !string.IsNullOrWhiteSpace(path) && IsPathInsideDirectory(path, itemTempDir);
+                        if (isAsm) asmCount++;
+                        if (!insideTemp) outsideTempCount++;
+
+                        entries.Add(string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "{0}:type={1}:inTemp={2}:asm={3}:dirty={4}:ro={5}:path={6}",
+                            title,
+                            docType,
+                            insideTemp,
+                            isAsm,
+                            dirty,
+                            ro,
+                            path));
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                summary = "audit_err=" + ex.Message;
+                Log("[CD ISO VERIFIER DOC AUDIT] stage=" + stage + " pid=" + (_workerPid ?? 0) + " error=" + ex.Message);
+                return;
+            }
+
+            summary = entries.Count > 0 ? string.Join(" ; ", entries) : "none";
+            Log("[CD ISO VERIFIER DOC AUDIT] stage=" + stage +
+                " pid=" + (_workerPid ?? 0) +
+                " count=" + total +
+                " outsideTemp=" + outsideTempCount +
+                " asmCount=" + asmCount +
+                " docs=[" + summary + "]");
+        }
+
+        private int CloseAllWorkerDocuments()
+        {
+            if (_workerApp == null)
+                return 0;
+
+            for (int guard = 0; guard < 16; guard++)
+            {
+                Array docs = null;
+                try { docs = _workerApp.GetDocuments() as Array; }
+                catch { break; }
+
+                if (docs == null || docs.Length == 0)
+                    break;
+
+                // Close Drawings before Assemblies and Assemblies before Parts via QuitDoc (close without saving)
+                // to mirror main batch cleanup order and avoid CloseDoc saving prompts or dependency traps.
+                var targets = new List<KeyValuePair<int, string>>();
+                for (int i = docs.GetLowerBound(0); i <= docs.GetUpperBound(0); i++)
+                {
+                    ModelDoc2 md = docs.GetValue(i) as ModelDoc2;
+                    if (md == null) continue;
+                    int t = -1;
+                    string title = "";
+                    try { t = md.GetType(); } catch { }
+                    try { title = md.GetTitle() ?? ""; } catch { }
+                    if (string.IsNullOrWhiteSpace(title))
+                        continue;
+
+                    int prio = t == (int)swDocumentTypes_e.swDocDRAWING ? 0
+                             : t == (int)swDocumentTypes_e.swDocASSEMBLY ? 1
+                             : t == (int)swDocumentTypes_e.swDocPART ? 2 : 3;
+                    targets.Add(new KeyValuePair<int, string>(prio, title));
+                }
+
+                if (targets.Count == 0)
+                    break;
+
+                targets.Sort((a, b) => a.Key.CompareTo(b.Key));
+                int topPriority = targets[0].Key;
+                bool closedAny = false;
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    if (targets[i].Key != topPriority)
+                        break;
+                    try
+                    {
+                        _workerApp.QuitDoc(targets[i].Value);
+                        closedAny = true;
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            _workerApp.CloseDoc(targets[i].Value);
+                            closedAny = true;
+                        }
+                        catch { }
+                    }
+                }
+
+                if (!closedAny)
+                    break;
+            }
 
             try { SafeSetDocumentVisible(_workerApp, false); } catch { }
+
+            try
+            {
+                Array remaining = _workerApp.GetDocuments() as Array;
+                return remaining != null ? remaining.Length : 0;
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
         private static void SafeSetDocumentVisible(ISldWorks app, bool visible)
@@ -704,7 +878,7 @@ namespace ADDIN.Commands
             }
         }
 
-        private static void TryDeleteDirectory(string path)
+        private static bool TryDeleteDirectory(string path)
         {
             try
             {
@@ -716,8 +890,12 @@ namespace ADDIN.Commands
                     }
                     Directory.Delete(path, true);
                 }
+                return string.IsNullOrWhiteSpace(path) || !Directory.Exists(path);
             }
-            catch { }
+            catch
+            {
+                return false;
+            }
         }
 
         private CdIsolatedVerifyResult Fail(string reason)

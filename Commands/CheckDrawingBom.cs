@@ -871,7 +871,7 @@ namespace ADDIN.Commands
             if (code == "DIRTY_DRAWING_UNVERIFIED")
             {
                 return string.Format(CultureInfo.InvariantCulture,
-                    "Drawing có GetSaveFlag=true (NeedsRebuild2={0}, OutOfDateViews={1})",
+                    "Drawing chưa lưu (GetSaveFlag=true, NeedsRebuild2={0}, OutOfDateViews={1})",
                     probe != null ? probe.DrawingNeedsRebuild2 : -1,
                     probe != null ? probe.OutOfDateViewCount : 0);
             }
@@ -881,15 +881,21 @@ namespace ADDIN.Commands
                 return "Direct Read và Working Copy bất đồng";
 
             var parts = new List<string>();
+            if (probe != null && probe.DrawingDirty)
+            {
+                parts.Add(string.Format(CultureInfo.InvariantCulture,
+                    "Drawing chưa lưu (GetSaveFlag=true, NeedsRebuild2={0}, OutOfDateViews={1})",
+                    probe.DrawingNeedsRebuild2, probe.OutOfDateViewCount));
+            }
             if (probe != null && probe.Geom2DAvailable && !probe.Geom2DVerified)
-                parts.Add("2D Geom LỆCH");
+                parts.Add("2D BBOX MISMATCH");
             if (code == "DIRTY_ASM_UNVERIFIED_PROOF" ||
                 (blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0))
             {
                 string asms = blockAssessment != null && blockAssessment.MatchedDirtyAssemblyPaths.Count > 0
                     ? string.Join(", ", blockAssessment.MatchedDirtyAssemblyPaths.Select(Path.GetFileName))
                     : "assembly chưa lưu";
-                parts.Add("ExtRef chưa khóa tới ASM bẩn: " + asms);
+                parts.Add("ExtRef chưa khóa (status=3) tới ASM bẩn: " + asms);
             }
             else if (blockAssessment != null && blockAssessment.OtherDirtyDependencyPaths.Count > 0)
             {
@@ -899,7 +905,7 @@ namespace ADDIN.Commands
             if (parts.Count > 0)
                 return string.Join("; ", parts);
 
-            return string.IsNullOrWhiteSpace(code) ? "Chưa đủ điều kiện chứng minh" : code;
+            return string.IsNullOrWhiteSpace(code) ? "Chưa đủ điều kiện chứng minh đồng bộ" : code;
         }
 
         private static void MergeIsolatedVisibleResult(
@@ -942,27 +948,68 @@ namespace ADDIN.Commands
             public FlatDrawingViewSideResult Side { get; set; }
             public string SyncReason { get; set; } = "";
             public string DecisionCode { get; set; } = "";
+            public string WorkerMode { get; set; } = "";
             public bool? DirectPink { get; set; }
             public bool GeomAvailable { get; set; }
             public bool GeomVerified { get; set; }
-            public bool IsPilotUnknown { get; set; }
+            public bool IsSeparatedWarning { get; set; }
         }
 
-        private static string CdFormatObservedViewSummary(
+        internal static string CdFormatObservedViewSummary(
             bool? directPink,
             string expected,
             string decisionCode,
+            string workerMode,
             string detailTag)
         {
+            bool isIso = string.Equals(workerMode, "ISOLATED_VISIBLE_COPY", StringComparison.Ordinal);
+            string scopePrefix = isIso ? "Bản sao Drawing" : "Direct (ẩn)";
             string obsSideText = directPink.HasValue
                 ? (directPink.Value ? "mặt hồng (ウラ)" : "mặt màu (表)")
-                : "chưa xác định";
-            string matchTag = directPink.HasValue
-                ? (CompareFlatSideMarker(expected, directPink) == DrawingBomCheckStatus.OK
-                    ? "khớp chữ " + expected
-                    : "LỆCH chữ " + expected)
-                : decisionCode;
-            return obsSideText + " (" + matchTag + detailTag + ")";
+                : "chưa xác định mặt";
+            string matchTag;
+            if (directPink.HasValue)
+            {
+                matchTag = CompareFlatSideMarker(expected, directPink) == DrawingBomCheckStatus.OK
+                    ? "khớp nhãn " + expected
+                    : "LỆCH nhãn " + expected;
+            }
+            else
+            {
+                matchTag = decisionCode == "WC_BOTH_SIDES_PINK_AMBIGUOUS"
+                    ? "cả 2 mặt hồng"
+                    : decisionCode == "DIRECT_WORKCOPY_DISAGREE"
+                        ? "Direct ≠ Working Copy"
+                        : "chưa đủ dữ liệu view ẩn";
+            }
+            return scopePrefix + ": " + obsSideText + " (" + matchTag + detailTag + ")";
+        }
+
+        internal static string CdFormatActualSideText(
+            string viewName,
+            string expected,
+            bool? sidePink,
+            bool isSeparatedWarning,
+            bool? directPink,
+            string decisionCode,
+            string workerMode,
+            bool geomAvailable,
+            bool geomVerified,
+            string syncReason)
+        {
+            if (isSeparatedWarning)
+            {
+                string bboxTag = geomAvailable
+                    ? (geomVerified ? ", 2D BBOX MATCH" : ", 2D BBOX MISMATCH")
+                    : "";
+                return viewName + ": Nhãn " + expected +
+                    " | Fact 1=" + CdFormatObservedViewSummary(directPink, expected, decisionCode, workerMode, bboxTag) +
+                    " | Fact 2=Đồng bộ WARNING (" + syncReason + ")";
+            }
+
+            return viewName + ": " + expected + " / " + (sidePink.HasValue
+                ? sidePink.Value ? "mặt hồng (ウラ)" : "mặt màu (表)"
+                : "chưa xác định mặt");
         }
 
         private static string CdFormatActualSideText(
@@ -971,19 +1018,74 @@ namespace ADDIN.Commands
             CdCachedSideAudit audit)
         {
             FlatDrawingViewSideResult side = audit.Side;
-            if (audit.IsPilotUnknown)
+            return CdFormatActualSideText(
+                viewName,
+                expected,
+                side != null ? side.PinkFacingViewer : null,
+                audit.IsSeparatedWarning,
+                audit.DirectPink,
+                audit.DecisionCode,
+                audit.WorkerMode,
+                audit.GeomAvailable,
+                audit.GeomVerified,
+                audit.SyncReason);
+        }
+
+        internal static string CdBuildSeparatedFlatSideMessage(
+            string expected,
+            bool? directPink,
+            string directMessage,
+            string workingCopyMessage,
+            string decisionCode,
+            string decisionExplanation,
+            string syncShort,
+            string workerMode,
+            bool geomAvailable,
+            bool geomVerified,
+            double geomDeltaWMm,
+            double geomDeltaHMm)
+        {
+            bool isIso = string.Equals(workerMode, "ISOLATED_VISIBLE_COPY", StringComparison.Ordinal);
+            string geomDetail = geomAvailable
+                ? string.Format(CultureInfo.InvariantCulture,
+                    ", 2D BBOX {0} dW={1:F3}mm/dH={2:F3}mm (chỉ kiểm Bounding Box W/H, không khẳng định toàn bộ biên dạng/lỗ)",
+                    geomVerified ? "MATCH" : "MISMATCH",
+                    geomDeltaWMm,
+                    geomDeltaHMm)
+                : "";
+            string fact1Summary = CdFormatObservedViewSummary(
+                directPink,
+                expected,
+                decisionCode,
+                workerMode,
+                ", " + (string.IsNullOrWhiteSpace(workerMode) ? "LIVE_HIDDEN" : workerMode) + geomDetail);
+
+            string clarification;
+            if (directPink.HasValue)
             {
-                string geomTag = audit.GeomAvailable
-                    ? (audit.GeomVerified ? ", 2D Geom khớp" : ", 2D Geom LỆCH")
-                    : "";
-                return viewName + ": " + expected +
-                    " / View=" + CdFormatObservedViewSummary(audit.DirectPink, expected, audit.DecisionCode, geomTag) +
-                    " | Đồng bộ: WARNING (" + audit.SyncReason + ")";
+                bool matchesLabel = CompareFlatSideMarker(expected, directPink) == DrawingBomCheckStatus.OK;
+                clarification = matchesLabel
+                    ? "Mặt quan sát khớp nhãn " + expected + " (Drawing không sai mặt; giữ WARNING chung do đồng bộ Model/Assembly)"
+                    : "Cảnh báo: mặt quan sát KHÔNG khớp nhãn " + expected + " (cần kiểm tra hướng nhìn/màu mặt)";
+            }
+            else
+            {
+                clarification = "Chưa xác định được mặt từ view hiện tại (không khẳng định Drawing bị sai mặt)";
             }
 
-            return viewName + ": " + expected + " / " + (side.PinkFacingViewer.HasValue
-                ? side.PinkFacingViewer.Value ? "mặt hồng (ウラ)" : "mặt màu (表)"
-                : "chưa xác định mặt");
+            string syncDetail = !string.IsNullOrWhiteSpace(syncShort) &&
+                                (decisionCode == "DIRECT_PROMOTION_BLOCKED" || decisionCode == "SHADOW_LEGACY")
+                ? decisionExplanation + " [" + syncShort + "]"
+                : decisionExplanation;
+            string provenanceNote = isIso
+                ? " Worker chỉ copy bản sao Drawing+Part, không copy Assembly nên chưa chứng minh đồng bộ in-memory của Assembly."
+                : "";
+
+            return "[Fact 1 - Mặt 表/ウラ quan sát được] " + fact1Summary + ". " + clarification +
+                " | [Fact 2 - Đồng bộ Drawing/Part/Assembly] WARNING (" + decisionCode + "): " +
+                syncDetail + provenanceNote +
+                " | Direct=" + (directMessage ?? "") +
+                " | Working Copy=" + (workingCopyMessage ?? "");
         }
 
         private void AddFlatPatternSideChecks(DrawingCheckItemResult itemResult,
@@ -1095,7 +1197,7 @@ namespace ADDIN.Commands
                                     " restarted=" + isoRes.RestartedWorker +
                                     " direct=" + direct.PinkFacingViewer +
                                     " bodySrc=" + probe.BodyResolutionMethod +
-                                    " geom2d=" + probe.Geom2DVerified +
+                                    " bbox2d=" + probe.Geom2DVerified +
                                     " dW=" + probe.Geom2DDeltaWMm.ToString("F3", CultureInfo.InvariantCulture) +
                                     " dH=" + probe.Geom2DDeltaHMm.ToString("F3", CultureInfo.InvariantCulture));
                             }
@@ -1162,57 +1264,47 @@ namespace ADDIN.Commands
                                 " fallbackMsg=" + workingCopy.Message);
                         }
 
-                        bool isPilotUnknown = false;
+                        bool isSeparatedWarning = false;
                         string syncShort = "";
                         if (decision.Choice == CdFlatSideChoice.UseDirectRead)
                         {
                             side = direct;
                             string geomInfo = probe.Geom2DAvailable
                                 ? string.Format(CultureInfo.InvariantCulture,
-                                    ", 2D Geom PASS dW={0:F3}mm/dH={1:F3}mm",
+                                    ", 2D BBOX MATCH (chỉ kiểm Bounding Box W/H) dW={0:F3}mm/dH={1:F3}mm",
                                     probe.Geom2DDeltaWMm, probe.Geom2DDeltaHMm)
                                 : "";
                             side.Message += " [PILOT direct-check (" + probe.WorkerMode + geomInfo + "); dependency freshness verified]";
                         }
                         else if (decision.Choice == CdFlatSideChoice.Unknown ||
-                                 (pilotEnabled && !workingCopy.PinkFacingViewer.HasValue))
+                                 !workingCopy.PinkFacingViewer.HasValue)
                         {
-                            isPilotUnknown = pilotEnabled;
+                            isSeparatedWarning = true;
                             syncShort = CdShortSyncReason(decision, probe, blockAssessment);
-                            string geomDetail = probe.Geom2DAvailable
-                                ? string.Format(CultureInfo.InvariantCulture,
-                                    ", 2D Geom {0} dW={1:F3}mm/dH={2:F3}mm",
-                                    probe.Geom2DVerified ? "PASS" : "FAIL",
-                                    probe.Geom2DDeltaWMm, probe.Geom2DDeltaHMm)
-                                : "";
-                            string syncDetail = !string.IsNullOrWhiteSpace(syncShort) &&
-                                                decision.Code == "DIRECT_PROMOTION_BLOCKED"
-                                ? decision.Explanation + " [" + syncShort + "]"
-                                : decision.Explanation;
-
                             side = new FlatDrawingViewSideResult
                             {
                                 ViewName = direct.ViewName,
                                 Configuration = direct.Configuration,
                                 DisplayState = direct.DisplayState,
                                 PinkFacingViewer = null,
-                                Message = "[Fact 1 - Mặt trên Drawing View] " +
-                                    CdFormatObservedViewSummary(
-                                        direct.PinkFacingViewer,
-                                        expected,
-                                        decision.Code,
-                                        ", " + probe.WorkerMode + geomDetail) +
-                                    " | [Fact 2 - Đồng bộ Model/Source] WARNING (" + decision.Code + "): " +
-                                    syncDetail +
-                                    " | Direct=" + direct.Message +
-                                    " | Working Copy=" + workingCopy.Message
+                                Message = CdBuildSeparatedFlatSideMessage(
+                                    expected,
+                                    direct.PinkFacingViewer,
+                                    direct.Message,
+                                    workingCopy.Message,
+                                    decision.Code,
+                                    decision.Explanation,
+                                    syncShort,
+                                    probe.WorkerMode,
+                                    probe.Geom2DAvailable,
+                                    probe.Geom2DVerified,
+                                    probe.Geom2DDeltaWMm,
+                                    probe.Geom2DDeltaHMm)
                             };
                         }
                         else
                         {
                             side = workingCopy;
-                            if (!workingCopy.PinkFacingViewer.HasValue)
-                                side.Message = direct.Message + " | Working Copy: " + workingCopy.Message;
                         }
 
                         auditEntry = new CdCachedSideAudit
@@ -1220,10 +1312,11 @@ namespace ADDIN.Commands
                             Side = side,
                             SyncReason = syncShort,
                             DecisionCode = decision.Code,
+                            WorkerMode = probe.WorkerMode ?? "",
                             DirectPink = direct.PinkFacingViewer,
                             GeomAvailable = probe.Geom2DAvailable,
                             GeomVerified = probe.Geom2DVerified,
-                            IsPilotUnknown = isPilotUnknown
+                            IsSeparatedWarning = isSeparatedWarning
                         };
                         sideAuditCache[name] = auditEntry;
                     }
@@ -1820,9 +1913,9 @@ namespace ADDIN.Commands
                 if (!visibleBodyVerified)
                     freshnessBlocks.Add("body_not_visible_entities2(" + probe.BodyResolutionMethod + ")");
                 if (probe.Geom2DAvailable && !probe.Geom2DVerified)
-                    freshnessBlocks.Add("geom2d_mismatch(" + probe.Geom2DFailureReason + ")");
+                    freshnessBlocks.Add("bbox2d_mismatch(" + probe.Geom2DFailureReason + ")");
                 else if (string.Equals(probe.WorkerMode, "ISOLATED_VISIBLE_COPY", StringComparison.Ordinal) && !probe.Geom2DAvailable)
-                    freshnessBlocks.Add("geom2d_unavailable_in_isolated_visible");
+                    freshnessBlocks.Add("bbox2d_unavailable_in_isolated_visible");
 
                 if (probe.PartExternalRefCount < 0)
                 {
@@ -1905,9 +1998,9 @@ namespace ADDIN.Commands
                 ? string.Join(",", probe.ExternalRefs.Select(e => e.Status).Distinct())
                 : "none";
             string workerMeta = string.Format(CultureInfo.InvariantCulture,
-                "worker={0} geom2d={1}({2:F3}/{3:F3},arcs={4}) drawRebuild2={5} outOfDateViews={6} ",
+                "worker={0} bbox2d={1}({2:F3}/{3:F3},arcs={4}) drawRebuild2={5} outOfDateViews={6} ",
                 probe.WorkerMode ?? "LIVE_HIDDEN",
-                probe.Geom2DAvailable ? (probe.Geom2DVerified ? "PASS" : "FAIL") : "UNAVAIL",
+                probe.Geom2DAvailable ? (probe.Geom2DVerified ? "MATCH" : "MISMATCH") : "UNAVAIL",
                 probe.Geom2DDeltaWMm,
                 probe.Geom2DDeltaHMm,
                 probe.Geom2DArcCount,
@@ -2471,6 +2564,132 @@ namespace ADDIN.Commands
             }
         }
 
+        private static void CdAccumulate2DPoint(
+            DxfPoint pt,
+            ref double minX,
+            ref double maxX,
+            ref double minY,
+            ref double maxY,
+            ref bool hasAny)
+        {
+            if (double.IsNaN(pt.X) || double.IsInfinity(pt.X) ||
+                double.IsNaN(pt.Y) || double.IsInfinity(pt.Y))
+                return;
+
+            if (pt.X < minX) minX = pt.X;
+            if (pt.X > maxX) maxX = pt.X;
+            if (pt.Y < minY) minY = pt.Y;
+            if (pt.Y > maxY) maxY = pt.Y;
+            hasAny = true;
+        }
+
+        // Compute tight 2D edge bounds via curve evaluation & arc cardinal extrema.
+        // Do NOT read e.Bounds for ARC edges because DxfGeometry.Circle sets e.Bounds
+        // to the full-circle AABB rather than the swept arc AABB.
+        internal static void CdAccumulateTightEdgeBounds(
+            DxfEdge e,
+            ref double minX,
+            ref double maxX,
+            ref double minY,
+            ref double maxY,
+            ref bool hasAny)
+        {
+            if (e == null) return;
+
+            double eMinX = double.PositiveInfinity, eMinY = double.PositiveInfinity;
+            double eMaxX = double.NegativeInfinity, eMaxY = double.NegativeInfinity;
+            bool edgeAdded = false;
+
+            string edgeType = e.Type ?? "";
+            if (string.Equals(edgeType, "LINE", StringComparison.OrdinalIgnoreCase))
+            {
+                CdAccumulate2DPoint(e.Start, ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                CdAccumulate2DPoint(e.End, ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+            }
+            else if (string.Equals(edgeType, "ARC", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(edgeType, "CIRCLE", StringComparison.OrdinalIgnoreCase))
+            {
+                if (e.Evaluate != null)
+                {
+                    CdAccumulate2DPoint(e.At(0.0), ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                    CdAccumulate2DPoint(e.At(1.0), ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                }
+                else
+                {
+                    CdAccumulate2DPoint(e.Start, ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                    CdAccumulate2DPoint(e.End, ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                }
+
+                if (e.Radius > 0 && Math.Abs(e.Sweep) > 1e-12)
+                {
+                    const double halfPi = Math.PI / 2.0;
+                    double lo = Math.Min(e.StartAngle, e.StartAngle + e.Sweep);
+                    double hi = Math.Max(e.StartAngle, e.StartAngle + e.Sweep);
+                    int kStart = (int)Math.Ceiling(lo / halfPi - 1e-9);
+                    int kEnd = (int)Math.Floor(hi / halfPi + 1e-9);
+                    if (kEnd - kStart > 16) kEnd = kStart + 16;
+
+                    for (int k = kStart; k <= kEnd; k++)
+                    {
+                        double angle = k * halfPi;
+                        double t = (angle - e.StartAngle) / e.Sweep;
+                        if (t >= -1e-9 && t <= 1.0 + 1e-9)
+                        {
+                            double clampedT = Math.Max(0.0, Math.Min(1.0, t));
+                            DxfPoint cardinalPt = e.Evaluate != null
+                                ? e.At(clampedT)
+                                : new DxfPoint(
+                                    e.Center.X + Math.Cos(angle) * e.Radius,
+                                    e.Center.Y + Math.Sin(angle) * e.Radius);
+                            CdAccumulate2DPoint(cardinalPt, ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                        }
+                    }
+
+                    if (e.Evaluate != null)
+                    {
+                        const int arcSteps = 32;
+                        for (int s = 1; s < arcSteps; s++)
+                            CdAccumulate2DPoint(e.At(s / (double)arcSteps), ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                    }
+                }
+                else if (e.Evaluate != null)
+                {
+                    const int fallbackSteps = 64;
+                    for (int s = 0; s <= fallbackSteps; s++)
+                        CdAccumulate2DPoint(e.At(s / (double)fallbackSteps), ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+                }
+            }
+            else if (e.Evaluate != null)
+            {
+                const int curveSteps = 64;
+                for (int s = 0; s <= curveSteps; s++)
+                    CdAccumulate2DPoint(e.At(s / (double)curveSteps), ref eMinX, ref eMaxX, ref eMinY, ref eMaxY, ref edgeAdded);
+            }
+
+            if (!edgeAdded)
+            {
+                DxfBox b = e.Bounds;
+                if (!double.IsInfinity(b.MinX) && !double.IsInfinity(b.MaxX) &&
+                    !double.IsInfinity(b.MinY) && !double.IsInfinity(b.MaxY))
+                {
+                    eMinX = b.MinX;
+                    eMaxX = b.MaxX;
+                    eMinY = b.MinY;
+                    eMaxY = b.MaxY;
+                    edgeAdded = true;
+                }
+            }
+
+            if (edgeAdded)
+            {
+                if (eMinX < minX) minX = eMinX;
+                if (eMaxX > maxX) maxX = eMaxX;
+                if (eMinY < minY) minY = eMinY;
+                if (eMaxY > maxY) maxY = eMaxY;
+                hasAny = true;
+            }
+        }
+
         private static void CdVerifyView2DGeometryMatchesBody(
             SolidWorks.Interop.sldworks.View view,
             Body2 body,
@@ -2514,16 +2733,7 @@ namespace ADDIN.Commands
                 {
                     arcCount++;
                 }
-                DxfBox b = e.Bounds;
-                if (!double.IsInfinity(b.MinX) && !double.IsInfinity(b.MaxX) &&
-                    !double.IsInfinity(b.MinY) && !double.IsInfinity(b.MaxY))
-                {
-                    if (b.MinX < plcMinX) plcMinX = b.MinX;
-                    if (b.MaxX > plcMaxX) plcMaxX = b.MaxX;
-                    if (b.MinY < plcMinY) plcMinY = b.MinY;
-                    if (b.MaxY > plcMaxY) plcMaxY = b.MaxY;
-                    hasPlc = true;
-                }
+                CdAccumulateTightEdgeBounds(e, ref plcMinX, ref plcMaxX, ref plcMinY, ref plcMaxY, ref hasPlc);
             }
 
             probe.Geom2DArcCount = arcCount;
@@ -4929,6 +5139,68 @@ namespace ADDIN.Commands
             // Case 30: Policy tests for PR #62 pilot/fail-closed logic (synthetic, not COM verification)
             int policyCount = CdFlatSidePilotPolicy.RunSelfTests();
             LogDebug("[SELFTEST PASS] case=30_PR62_PILOT_POLICY assertions=" + policyCount);
+
+            // Case 31: Tight 2D bounding-box calculation for semicircular ARC (4365-04-TI-SA2-fr4 regression)
+            DxfEdge upperSemi = DxfGeometry.Circle(new DxfPoint(231.0, -543.5), 10.0, 0.0, Math.PI);
+            if (Math.Abs(upperSemi.Bounds.MinY - (-553.5)) > 1e-6)
+                throw new InvalidOperationException("Unexpected DxfGeometry.Circle bounds baseline");
+            double minX = double.PositiveInfinity, maxX = double.NegativeInfinity;
+            double minY = double.PositiveInfinity, maxY = double.NegativeInfinity;
+            bool hasTight = false;
+            CdAccumulateTightEdgeBounds(upperSemi, ref minX, ref maxX, ref minY, ref maxY, ref hasTight);
+            if (!hasTight ||
+                Math.Abs(minX - 221.0) > 1e-6 ||
+                Math.Abs(maxX - 241.0) > 1e-6 ||
+                Math.Abs(minY - (-543.5)) > 1e-6 ||
+                Math.Abs(maxY - (-533.5)) > 1e-6)
+            {
+                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                    "Fail case 31 upperSemi: got [{0:F3}..{1:F3}, {2:F3}..{3:F3}]", minX, maxX, minY, maxY));
+            }
+            DxfEdge rightSemiNeg = DxfGeometry.Circle(new DxfPoint(0.0, 0.0), 5.0, Math.PI / 2.0, -Math.PI);
+            minX = double.PositiveInfinity; maxX = double.NegativeInfinity;
+            minY = double.PositiveInfinity; maxY = double.NegativeInfinity;
+            hasTight = false;
+            CdAccumulateTightEdgeBounds(rightSemiNeg, ref minX, ref maxX, ref minY, ref maxY, ref hasTight);
+            if (!hasTight ||
+                Math.Abs(minX - 0.0) > 1e-6 ||
+                Math.Abs(maxX - 5.0) > 1e-6 ||
+                Math.Abs(minY - (-5.0)) > 1e-6 ||
+                Math.Abs(maxY - 5.0) > 1e-6)
+            {
+                throw new InvalidOperationException(string.Format(CultureInfo.InvariantCulture,
+                    "Fail case 31 negSweep: got [{0:F3}..{1:F3}, {2:F3}..{3:F3}]", minX, maxX, minY, maxY));
+            }
+            LogDebug("[SELFTEST PASS] case=31_ARC_TIGHT_BBOX_SA2_FR4_REGRESSION");
+
+            // Case 32: Fact 1 / Fact 2 / 2D BBOX MATCH Preview & Excel wording + Production const flags OFF
+            // Note: *OptInForTestsOnly fields default to false (verified by run_selftest.ps1)
+            // and may be toggled to true inside the isolated test harness during RunBatch().
+            if (CdEnableDirectFlatSideVerdict || CdEnableReviewedFlatSidePilot || CdEnableIsolatedVisibleVerification)
+            {
+                throw new InvalidOperationException("Fail case 32: All production flat-side const flags must be false.");
+            }
+            string previewText = CdFormatActualSideText(
+                "図面ﾋﾞｭｰ13", "表", null, true, false,
+                "DIRECT_PROMOTION_BLOCKED", "ISOLATED_VISIBLE_COPY",
+                true, true, "ExtRef chưa khóa (status=3) tới ASM bẩn: 4365-01-TI.SLDASM");
+            string fullMsg = CdBuildSeparatedFlatSideMessage(
+                "表", false, "Direct ok", "Working Copy blocked",
+                "DIRECT_PROMOTION_BLOCKED", "Insufficient independent evidence to use Direct Read.",
+                "ExtRef chưa khóa (status=3) tới ASM bẩn: 4365-01-TI.SLDASM",
+                "ISOLATED_VISIBLE_COPY", true, true, 0.0, 0.0);
+            if (!previewText.Contains("Fact 1=Bản sao Drawing: mặt màu (表) (khớp nhãn 表, 2D BBOX MATCH)") ||
+                !previewText.Contains("Fact 2=Đồng bộ WARNING") ||
+                previewText.Contains("2D Geom") ||
+                !fullMsg.Contains("[Fact 1 - Mặt 表/ウラ quan sát được]") ||
+                !fullMsg.Contains("[Fact 2 - Đồng bộ Drawing/Part/Assembly] WARNING (DIRECT_PROMOTION_BLOCKED):") ||
+                !fullMsg.Contains("2D BBOX MATCH") ||
+                !fullMsg.Contains("không khẳng định toàn bộ biên dạng") ||
+                !fullMsg.Contains("không copy Assembly"))
+            {
+                throw new InvalidOperationException("Fail case 32 text check: preview=" + previewText + " | msg=" + fullMsg);
+            }
+            LogDebug("[SELFTEST PASS] case=32_FACT1_FACT2_BBOX_PREVIEW_EXCEL_SYNC");
         }
 
         private static void RunWidthLengthSelfTests()
