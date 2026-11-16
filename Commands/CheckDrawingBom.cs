@@ -868,6 +868,12 @@ namespace ADDIN.Commands
             CdWorkingCopyBlockAssessment blockAssessment)
         {
             string code = decision != null ? (decision.Code ?? "") : "";
+            if (probe != null && probe.IsolatedWorkerAttempted && !probe.IsolatedWorkerSucceeded)
+            {
+                return string.IsNullOrWhiteSpace(probe.IsolatedWorkerErrorReason)
+                    ? "Isolated Worker thất bại"
+                    : probe.IsolatedWorkerErrorReason;
+            }
             if (code == "DIRTY_DRAWING_UNVERIFIED")
             {
                 return string.Format(CultureInfo.InvariantCulture,
@@ -938,6 +944,11 @@ namespace ADDIN.Commands
             isoProbe.PartExternalRefCount = liveProbe.PartExternalRefCount;
             isoProbe.ExternalRefs.Clear();
             isoProbe.ExternalRefs.AddRange(liveProbe.ExternalRefs);
+            isoProbe.IsolatedWorkerAttempted = true;
+            isoProbe.IsolatedWorkerSucceeded = true;
+            isoProbe.IsolatedWorkerErrorReason = "";
+            isoProbe.IsolatedWorkerSafetyViolation = false;
+            isoProbe.IsolatedWorkerQuarantinedPid = isoRes.QuarantinedWorkerPid;
 
             direct = isoRes.Result;
             probe = isoProbe;
@@ -1064,13 +1075,20 @@ namespace ADDIN.Commands
             if (directPink.HasValue)
             {
                 bool matchesLabel = CompareFlatSideMarker(expected, directPink) == DrawingBomCheckStatus.OK;
-                clarification = matchesLabel
-                    ? "Mặt quan sát khớp nhãn " + expected + " (Drawing không sai mặt; giữ WARNING chung do đồng bộ Model/Assembly)"
-                    : "Cảnh báo: mặt quan sát KHÔNG khớp nhãn " + expected + " (cần kiểm tra hướng nhìn/màu mặt)";
+                if (matchesLabel)
+                {
+                    clarification = isIso
+                        ? "Mặt quan sát trong bản sao Drawing khớp nhãn " + expected + "; chưa xác minh đồng bộ in-memory của Assembly hiện tại nên giữ WARNING chung"
+                        : "Mặt quan sát ở trạng thái hiện tại khớp nhãn " + expected + "; chưa đủ chứng cứ đồng bộ Model/Assembly nên giữ WARNING chung";
+                }
+                else
+                {
+                    clarification = "Cảnh báo: mặt quan sát KHÔNG khớp nhãn " + expected + " (cần kiểm tra hướng nhìn/màu mặt)";
+                }
             }
             else
             {
-                clarification = "Chưa xác định được mặt từ view hiện tại (không khẳng định Drawing bị sai mặt)";
+                clarification = "Chưa xác định được mặt từ view hiện tại; giữ WARNING (chưa đủ dữ liệu khẳng định Drawing đúng hay sai mặt)";
             }
 
             string syncDetail = !string.IsNullOrWhiteSpace(syncShort) &&
@@ -1086,6 +1104,102 @@ namespace ADDIN.Commands
                 syncDetail + provenanceNote +
                 " | Direct=" + (directMessage ?? "") +
                 " | Working Copy=" + (workingCopyMessage ?? "");
+        }
+
+        internal static bool? CdResolveAuditDirectPink(
+            FlatDrawingViewSideResult direct,
+            CdDirectFlatSideProbe probe)
+        {
+            if (probe != null && probe.IsolatedWorkerAttempted && !probe.IsolatedWorkerSucceeded)
+                return null;
+            return direct != null ? direct.PinkFacingViewer : null;
+        }
+
+        internal static FlatDrawingViewSideResult CdResolveViewSideOutcome(
+            string expected,
+            FlatDrawingViewSideResult direct,
+            FlatDrawingViewSideResult workingCopy,
+            CdDirectFlatSideProbe probe,
+            CdWorkingCopyBlockAssessment blockAssessment,
+            CdFlatSidePolicyDecision decision,
+            out bool isSeparatedWarning,
+            out string syncShort,
+            out string effectiveDecisionCode)
+        {
+            isSeparatedWarning = false;
+            syncShort = "";
+            effectiveDecisionCode = decision != null ? (decision.Code ?? "") : "";
+
+            bool isolatedFailed = probe != null && probe.IsolatedWorkerAttempted && !probe.IsolatedWorkerSucceeded;
+            if (isolatedFailed)
+            {
+                isSeparatedWarning = true;
+                effectiveDecisionCode = probe.IsolatedWorkerSafetyViolation
+                    ? "ISOLATED_WORKER_SAFETY_FAILED"
+                    : "ISOLATED_WORKER_FAILED";
+                syncShort = CdShortSyncReason(decision, probe, blockAssessment);
+                return new FlatDrawingViewSideResult
+                {
+                    ViewName = direct.ViewName,
+                    Configuration = direct.Configuration,
+                    DisplayState = direct.DisplayState,
+                    PinkFacingViewer = null,
+                    Message = CdBuildSeparatedFlatSideMessage(
+                        expected,
+                        null,
+                        direct.Message,
+                        workingCopy.Message,
+                        effectiveDecisionCode,
+                        "Isolated worker safety/cleanup failed (" + (probe.IsolatedWorkerErrorReason ?? "UNKNOWN") + "); forcing WARNING without promoting or falling back to OK.",
+                        syncShort,
+                        probe.WorkerMode,
+                        false,
+                        false,
+                        0.0,
+                        0.0)
+                };
+            }
+
+            if (decision != null && decision.Choice == CdFlatSideChoice.UseDirectRead)
+            {
+                FlatDrawingViewSideResult promoted = direct;
+                string geomInfo = probe != null && probe.Geom2DAvailable
+                    ? string.Format(CultureInfo.InvariantCulture,
+                        ", 2D BBOX MATCH (chỉ kiểm Bounding Box W/H) dW={0:F3}mm/dH={1:F3}mm",
+                        probe.Geom2DDeltaWMm, probe.Geom2DDeltaHMm)
+                    : "";
+                promoted.Message += " [PILOT direct-check (" + (probe != null ? probe.WorkerMode : "") + geomInfo + "); dependency freshness verified]";
+                return promoted;
+            }
+
+            if ((decision != null && decision.Choice == CdFlatSideChoice.Unknown) ||
+                !workingCopy.PinkFacingViewer.HasValue)
+            {
+                isSeparatedWarning = true;
+                syncShort = CdShortSyncReason(decision, probe, blockAssessment);
+                return new FlatDrawingViewSideResult
+                {
+                    ViewName = direct.ViewName,
+                    Configuration = direct.Configuration,
+                    DisplayState = direct.DisplayState,
+                    PinkFacingViewer = null,
+                    Message = CdBuildSeparatedFlatSideMessage(
+                        expected,
+                        direct.PinkFacingViewer,
+                        direct.Message,
+                        workingCopy.Message,
+                        effectiveDecisionCode,
+                        decision != null ? decision.Explanation : "",
+                        syncShort,
+                        probe != null ? probe.WorkerMode : "",
+                        probe != null && probe.Geom2DAvailable,
+                        probe != null && probe.Geom2DVerified,
+                        probe != null ? probe.Geom2DDeltaWMm : 0.0,
+                        probe != null ? probe.Geom2DDeltaHMm : 0.0)
+                };
+            }
+
+            return workingCopy;
         }
 
         private void AddFlatPatternSideChecks(DrawingCheckItemResult itemResult,
@@ -1203,8 +1317,18 @@ namespace ADDIN.Commands
                             }
                             else
                             {
+                                if (probe == null)
+                                    probe = new CdDirectFlatSideProbe();
+                                probe.IsolatedWorkerAttempted = true;
+                                probe.IsolatedWorkerSucceeded = false;
+                                probe.IsolatedWorkerErrorReason = isoRes != null ? (isoRes.ErrorReason ?? "UNKNOWN") : "NULL_ISOLATED_RESULT";
+                                probe.IsolatedWorkerSafetyViolation = isoRes != null && isoRes.SafetyViolation;
+                                probe.IsolatedWorkerQuarantinedPid = isoRes != null ? isoRes.QuarantinedWorkerPid : null;
+
                                 LogDebug("[CD ISO VERIFIER FAIL] view=" + name +
-                                    " err=" + (isoRes != null ? isoRes.ErrorReason : "null"));
+                                    " safety=" + probe.IsolatedWorkerSafetyViolation +
+                                    " quarantinedPid=" + (probe.IsolatedWorkerQuarantinedPid ?? 0) +
+                                    " err=" + probe.IsolatedWorkerErrorReason);
                             }
                         }
 
@@ -1264,56 +1388,24 @@ namespace ADDIN.Commands
                                 " fallbackMsg=" + workingCopy.Message);
                         }
 
-                        bool isSeparatedWarning = false;
-                        string syncShort = "";
-                        if (decision.Choice == CdFlatSideChoice.UseDirectRead)
-                        {
-                            side = direct;
-                            string geomInfo = probe.Geom2DAvailable
-                                ? string.Format(CultureInfo.InvariantCulture,
-                                    ", 2D BBOX MATCH (chỉ kiểm Bounding Box W/H) dW={0:F3}mm/dH={1:F3}mm",
-                                    probe.Geom2DDeltaWMm, probe.Geom2DDeltaHMm)
-                                : "";
-                            side.Message += " [PILOT direct-check (" + probe.WorkerMode + geomInfo + "); dependency freshness verified]";
-                        }
-                        else if (decision.Choice == CdFlatSideChoice.Unknown ||
-                                 !workingCopy.PinkFacingViewer.HasValue)
-                        {
-                            isSeparatedWarning = true;
-                            syncShort = CdShortSyncReason(decision, probe, blockAssessment);
-                            side = new FlatDrawingViewSideResult
-                            {
-                                ViewName = direct.ViewName,
-                                Configuration = direct.Configuration,
-                                DisplayState = direct.DisplayState,
-                                PinkFacingViewer = null,
-                                Message = CdBuildSeparatedFlatSideMessage(
-                                    expected,
-                                    direct.PinkFacingViewer,
-                                    direct.Message,
-                                    workingCopy.Message,
-                                    decision.Code,
-                                    decision.Explanation,
-                                    syncShort,
-                                    probe.WorkerMode,
-                                    probe.Geom2DAvailable,
-                                    probe.Geom2DVerified,
-                                    probe.Geom2DDeltaWMm,
-                                    probe.Geom2DDeltaHMm)
-                            };
-                        }
-                        else
-                        {
-                            side = workingCopy;
-                        }
+                        side = CdResolveViewSideOutcome(
+                            expected,
+                            direct,
+                            workingCopy,
+                            probe,
+                            blockAssessment,
+                            decision,
+                            out bool isSeparatedWarning,
+                            out string syncShort,
+                            out string effectiveDecisionCode);
 
                         auditEntry = new CdCachedSideAudit
                         {
                             Side = side,
                             SyncReason = syncShort,
-                            DecisionCode = decision.Code,
+                            DecisionCode = effectiveDecisionCode,
                             WorkerMode = probe.WorkerMode ?? "",
-                            DirectPink = direct.PinkFacingViewer,
+                            DirectPink = CdResolveAuditDirectPink(direct, probe),
                             GeomAvailable = probe.Geom2DAvailable,
                             GeomVerified = probe.Geom2DVerified,
                             IsSeparatedWarning = isSeparatedWarning
@@ -1592,6 +1684,11 @@ namespace ADDIN.Commands
             public int PartExternalRefCount { get; set; } = -1;
             public List<CdExternalRefRecord> ExternalRefs { get; } = new List<CdExternalRefRecord>();
             public List<string> FaceAuditSummary { get; } = new List<string>();
+            public bool IsolatedWorkerAttempted { get; set; }
+            public bool IsolatedWorkerSucceeded { get; set; }
+            public bool IsolatedWorkerSafetyViolation { get; set; }
+            public string IsolatedWorkerErrorReason { get; set; } = "";
+            public int? IsolatedWorkerQuarantinedPid { get; set; }
             public bool? VerdictPinkFacingViewer { get; set; }
             public string FailureReason { get; set; } = "";
         }
@@ -1916,6 +2013,8 @@ namespace ADDIN.Commands
                     freshnessBlocks.Add("bbox2d_mismatch(" + probe.Geom2DFailureReason + ")");
                 else if (string.Equals(probe.WorkerMode, "ISOLATED_VISIBLE_COPY", StringComparison.Ordinal) && !probe.Geom2DAvailable)
                     freshnessBlocks.Add("bbox2d_unavailable_in_isolated_visible");
+                if (probe.IsolatedWorkerAttempted && !probe.IsolatedWorkerSucceeded)
+                    freshnessBlocks.Add("isolated_worker_failed(" + (probe.IsolatedWorkerErrorReason ?? "UNKNOWN") + ")");
 
                 if (probe.PartExternalRefCount < 0)
                 {
@@ -5193,6 +5292,8 @@ namespace ADDIN.Commands
                 !previewText.Contains("Fact 2=Đồng bộ WARNING") ||
                 previewText.Contains("2D Geom") ||
                 !fullMsg.Contains("[Fact 1 - Mặt 表/ウラ quan sát được]") ||
+                !fullMsg.Contains("Mặt quan sát trong bản sao Drawing khớp nhãn 表") ||
+                fullMsg.Contains("Drawing không sai mặt") ||
                 !fullMsg.Contains("[Fact 2 - Đồng bộ Drawing/Part/Assembly] WARNING (DIRECT_PROMOTION_BLOCKED):") ||
                 !fullMsg.Contains("2D BBOX MATCH") ||
                 !fullMsg.Contains("không khẳng định toàn bộ biên dạng") ||
@@ -5201,6 +5302,437 @@ namespace ADDIN.Commands
                 throw new InvalidOperationException("Fail case 32 text check: preview=" + previewText + " | msg=" + fullMsg);
             }
             LogDebug("[SELFTEST PASS] case=32_FACT1_FACT2_BBOX_PREVIEW_EXCEL_SYNC");
+
+            RunIsolatedWorkerSafetySelfTests();
+        }
+
+        private static void RunIsolatedWorkerSafetySelfTests()
+        {
+            string tempDir = Path.Combine(
+                Path.GetTempPath(),
+                "ADDIN_CdIsoSelfTest_" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            Directory.CreateDirectory(tempDir);
+            string dummyDrawing = Path.Combine(tempDir, "dummy_test.SLDDRW");
+            File.WriteAllText(dummyDrawing, "dummy");
+
+            try
+            {
+                // 33a-1: COM GetDocuments() failure during beforeOpen must fail closed and quarantine worker.
+                var rtBeforeCom = new FakeCdWorkerRuntimeForSelfTest();
+                rtBeforeCom.OnGetDocuments = (pass, pid, itemDir) =>
+                    pass == 1
+                        ? (false, -1, null, "GetDocuments_ERR: COM 0x80010105")
+                        : (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtBeforeCom, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res.Success || !res.SafetyViolation || !res.ErrorReason.StartsWith("ISOLATED_DOC_AUDIT_FAILED_BEFORE_OPEN") ||
+                        !res.QuarantinedWorkerPid.HasValue || rtBeforeCom.QuitDocTargets.Count > 0 || rtBeforeCom.CloseDocTargets.Count > 0 ||
+                        rtBeforeCom.CloseAllCallCount > 0 || !rtBeforeCom.TerminatedPids.Contains(res.QuarantinedWorkerPid.Value))
+                    {
+                        throw new InvalidOperationException("Fail case 33a-1 beforeOpen COM fail: " + res.ErrorReason);
+                    }
+                }
+
+                // 33a-2: COM GetDocumentCount mismatch & per-doc ReadError during afterOpen must fail closed.
+                var rtAfterOpenCom = new FakeCdWorkerRuntimeForSelfTest();
+                rtAfterOpenCom.OnGetDocuments = (pass, pid, itemDir) =>
+                {
+                    if (pass == 1) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                    return (true, 1, new List<CdWorkerDocSnapshot>
+                    {
+                        new CdWorkerDocSnapshot
+                        {
+                            ReadSucceeded = false,
+                            ReadError = "GetPathName COM 0x800706BA",
+                            DocType = 3,
+                            Title = "bad.SLDDRW"
+                        }
+                    }, "");
+                };
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtAfterOpenCom, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res.Success || !res.SafetyViolation || !res.ErrorReason.StartsWith("ISOLATED_DOC_AUDIT_FAILED_AFTER_OPEN") ||
+                        rtAfterOpenCom.QuitDocTargets.Count > 0 || rtAfterOpenCom.CloseDocTargets.Count > 0 ||
+                        rtAfterOpenCom.TerminatedPids.Count != 1)
+                    {
+                        throw new InvalidOperationException("Fail case 33a-2 per-doc COM error: " + res.ErrorReason);
+                    }
+                }
+
+                // 33a-3: COM GetDocuments() failure at afterDelegate must fail closed & NEVER return inspect success.
+                var rtAfterDelegateCom = new FakeCdWorkerRuntimeForSelfTest();
+                rtAfterDelegateCom.OnGetDocuments = (pass, pid, itemDir) =>
+                {
+                    if (pass == 1) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                    if (pass == 2)
+                    {
+                        return (true, 1, new List<CdWorkerDocSnapshot>
+                        {
+                            new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 3, Path = Path.Combine(itemDir, "dummy_test.SLDDRW"), Title = "dummy_test.SLDDRW" }
+                        }, "");
+                    }
+                    return (false, -1, null, "DOC_COUNT_MISMATCH reported=2 enumerated=1");
+                };
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtAfterDelegateCom, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res.Success || !res.SafetyViolation || !res.ErrorReason.StartsWith("ISOLATED_DOC_AUDIT_FAILED_AFTER_DELEGATE") ||
+                        rtAfterDelegateCom.QuitDocTargets.Count > 0 || rtAfterDelegateCom.CloseDocTargets.Count > 0 ||
+                        rtAfterDelegateCom.TerminatedPids.Count != 1)
+                    {
+                        throw new InvalidOperationException("Fail case 33a-3 afterDelegate COM fail: " + res.ErrorReason);
+                    }
+                }
+
+                // 33b-1: Foreign doc outside temp or .SLDASM at afterOpen must NEVER be auto-closed.
+                var rtForeignOpen = new FakeCdWorkerRuntimeForSelfTest();
+                rtForeignOpen.OnGetDocuments = (pass, pid, itemDir) =>
+                {
+                    if (pass == 1) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                    return (true, 2, new List<CdWorkerDocSnapshot>
+                    {
+                        new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 3, Path = Path.Combine(itemDir, "dummy_test.SLDDRW"), Title = "dummy_test.SLDDRW" },
+                        new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 2, Path = @"D:\Production\Originals\RealAsm.SLDASM", Title = "RealAsm.SLDASM" }
+                    }, "");
+                };
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtForeignOpen, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res.Success || !res.SafetyViolation || !res.ErrorReason.StartsWith("ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_OPEN") ||
+                        !res.ErrorReason.Contains("RealAsm.SLDASM") ||
+                        rtForeignOpen.QuitDocTargets.Count > 0 || rtForeignOpen.CloseDocTargets.Count > 0 ||
+                        rtForeignOpen.CloseAllCallCount > 0 || rtForeignOpen.ExitAppCallCount > 0 ||
+                        rtForeignOpen.TerminatedPids.Count != 1)
+                    {
+                        throw new InvalidOperationException("Fail case 33b-1 foreign asm afterOpen: " + res.ErrorReason);
+                    }
+                    // Also prove unowned PID cannot be killed.
+                    bool unownedKilled = rtForeignOpen.TerminateOwnedProcessOnly(999999, new HashSet<int>(v.OwnedWorkerPidsForTestsOnly), null);
+                    if (unownedKilled)
+                        throw new InvalidOperationException("Fail case 33b-1 allowed unowned PID kill!");
+                }
+
+                // 33b-2: Unexpected foreign doc encountered during CloseAllWorkerDocuments must NOT be closed.
+                var rtForeignCleanup = new FakeCdWorkerRuntimeForSelfTest();
+                rtForeignCleanup.OnGetDocuments = (pass, pid, itemDir) =>
+                {
+                    if (pass == 1) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                    if (pass == 2 || pass == 3)
+                    {
+                        return (true, 1, new List<CdWorkerDocSnapshot>
+                        {
+                            new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 3, Path = Path.Combine(itemDir, "dummy_test.SLDDRW"), Title = "dummy_test.SLDDRW" }
+                        }, "");
+                    }
+                    // On cleanup pre-close check (pass == 4), foreign doc appeared.
+                    return (true, 1, new List<CdWorkerDocSnapshot>
+                    {
+                        new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 1, Path = @"D:\Production\Originals\OriginalPart.SLDPRT", Title = "OriginalPart.SLDPRT" }
+                    }, "");
+                };
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtForeignCleanup, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res.Success || !res.SafetyViolation || !res.ErrorReason.Contains("UNOWNED_OR_UNEXPECTED_DOC_IN_CLEANUP") ||
+                        !res.ErrorReason.Contains("OriginalPart.SLDPRT") ||
+                        rtForeignCleanup.QuitDocTargets.Count > 0 || rtForeignCleanup.CloseDocTargets.Count > 0 ||
+                        rtForeignCleanup.CloseAllCallCount > 0 || rtForeignCleanup.TerminatedPids.Count != 1)
+                    {
+                        throw new InvalidOperationException("Fail case 33b-2 foreign doc in cleanup: " + res.ErrorReason);
+                    }
+                }
+
+                // 33c-1: Cleanup post-close COM error (remainingDocs == -1) overrides inspect success,
+                // quarantines & kills worker PID, and prevents reusing that PID on next VerifyView.
+                var rtCleanupMinusOne = new FakeCdWorkerRuntimeForSelfTest();
+                rtCleanupMinusOne.OnGetDocuments = (pass, pid, itemDir) =>
+                {
+                    if (pid == 91001)
+                    {
+                        if (pass == 1) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                        if (pass >= 2 && pass <= 4)
+                        {
+                            return (true, 1, new List<CdWorkerDocSnapshot>
+                            {
+                                new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 3, Path = Path.Combine(itemDir, "dummy_test.SLDDRW"), Title = "dummy_test.SLDDRW" }
+                            }, "");
+                        }
+                        if (pass == 5) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                        return (false, -1, null, "POST_CLOSE_GetDocuments_COM_ERROR");
+                    }
+                    // Second clean worker PID 91002 closes cleanly to remainingDocs == 0.
+                    if (pass == 1 || pass >= 5) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                    return (true, 1, new List<CdWorkerDocSnapshot>
+                    {
+                        new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 3, Path = Path.Combine(itemDir, "dummy_test.SLDDRW"), Title = "dummy_test.SLDDRW" }
+                    }, "");
+                };
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtCleanupMinusOne, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res1 = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res1.Success || !res1.SafetyViolation || !res1.ErrorReason.StartsWith("ISOLATED_CLEANUP_FAILED") ||
+                        res1.QuarantinedWorkerPid != 91001 || !rtCleanupMinusOne.TerminatedPids.Contains(91001))
+                    {
+                        throw new InvalidOperationException("Fail case 33c-1 remainingDocs=-1: " + res1.ErrorReason);
+                    }
+
+                    CdIsolatedVerifyResult res2 = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (!res2.Success || rtCleanupMinusOne.StartedPids.Count != 2 ||
+                        rtCleanupMinusOne.LastInspectPid != 91002)
+                    {
+                        throw new InvalidOperationException("Fail case 33c-1 worker reuse check failed: starts=" +
+                            rtCleanupMinusOne.StartedPids.Count + " lastPid=" + rtCleanupMinusOne.LastInspectPid);
+                    }
+                }
+
+                // 33c-2: Cleanup non-zero remaining docs (> 0) must fail closed and quarantine worker.
+                var rtCleanupRemaining = new FakeCdWorkerRuntimeForSelfTest();
+                rtCleanupRemaining.OnGetDocuments = (pass, pid, itemDir) =>
+                {
+                    if (pass == 1) return (true, 0, new List<CdWorkerDocSnapshot>(), "");
+                    return (true, 1, new List<CdWorkerDocSnapshot>
+                    {
+                        new CdWorkerDocSnapshot { ReadSucceeded = true, DocType = 3, Path = Path.Combine(itemDir, "dummy_test.SLDDRW"), Title = "dummy_test.SLDDRW" }
+                    }, "");
+                };
+                using (var v = new CdIsolatedVisibleFlatSideVerifier(null, rtCleanupRemaining, "dummy_sw.exe"))
+                {
+                    CdIsolatedVerifyResult res = v.VerifyView(dummyDrawing, "Sheet1", "Drawing View1", "", null);
+                    if (res.Success || !res.SafetyViolation || !res.ErrorReason.StartsWith("ISOLATED_CLEANUP_FAILED") ||
+                        res.QuarantinedWorkerPid != 91001 || !rtCleanupRemaining.TerminatedPids.Contains(91001))
+                    {
+                        throw new InvalidOperationException("Fail case 33c-2 remainingDocs>0: " + res.ErrorReason);
+                    }
+                }
+
+                // 33d: CheckDrawingBom view verdict NEVER becomes OK when isolated audit/cleanup fails,
+                // even when Working Copy says OK, under both Pilot OFF and Pilot ON.
+                var failedIsoProbe = new CdDirectFlatSideProbe
+                {
+                    WorkerMode = "LIVE_HIDDEN",
+                    IsolatedWorkerAttempted = true,
+                    IsolatedWorkerSucceeded = false,
+                    IsolatedWorkerSafetyViolation = true,
+                    IsolatedWorkerErrorReason = "ISOLATED_CLEANUP_FAILED: POST_CLOSE_ENUM_FAILED",
+                    IsolatedWorkerQuarantinedPid = 91001
+                };
+                var wcCleanOk = new FlatDrawingViewSideResult
+                {
+                    ViewName = "Drawing View1",
+                    Configuration = "Default",
+                    DisplayState = "Default",
+                    PinkFacingViewer = false,
+                    Message = "WorkingCopy matched 表"
+                };
+                var directUnknown = new FlatDrawingViewSideResult
+                {
+                    ViewName = "Drawing View1",
+                    Configuration = "Default",
+                    DisplayState = "Default",
+                    PinkFacingViewer = null,
+                    Message = "Direct unknown"
+                };
+                var fakeDecisionPilotOn = CdFlatSidePolicyDecision.Of(
+                    CdFlatSideChoice.UseDirectRead,
+                    false,
+                    "PILOT_DIRECT_VERIFIED",
+                    "Synthetic decision");
+                var fakeDecisionPilotOff = CdFlatSidePolicyDecision.Of(
+                    CdFlatSideChoice.UseWorkingCopy,
+                    false,
+                    "SHADOW_LEGACY",
+                    "Synthetic shadow fallback");
+                var directHiddenColor = new FlatDrawingViewSideResult
+                {
+                    ViewName = "Drawing View1",
+                    Configuration = "Default",
+                    DisplayState = "Default",
+                    PinkFacingViewer = false,
+                    Message = "Direct hidden body matched 表"
+                };
+                foreach (CdFlatSidePolicyDecision dCase in new[] { fakeDecisionPilotOn, fakeDecisionPilotOff })
+                {
+                    FlatDrawingViewSideResult resolvedSide = CdResolveViewSideOutcome(
+                        "表",
+                        directUnknown,
+                        wcCleanOk,
+                        failedIsoProbe,
+                        new CdWorkingCopyBlockAssessment(),
+                        dCase,
+                        out bool sepWarn,
+                        out string syncShortCase,
+                        out string effCode);
+                    bool? auditDirectPink = CdResolveAuditDirectPink(directHiddenColor, failedIsoProbe);
+                    string actualFact1Text = CdFormatActualSideText(
+                        "Drawing View1",
+                        "表",
+                        resolvedSide.PinkFacingViewer,
+                        sepWarn,
+                        auditDirectPink,
+                        effCode,
+                        failedIsoProbe.WorkerMode,
+                        failedIsoProbe.Geom2DAvailable,
+                        failedIsoProbe.Geom2DVerified,
+                        syncShortCase);
+                    if (CompareFlatSideMarker("表", resolvedSide.PinkFacingViewer) != DrawingBomCheckStatus.Warning ||
+                        !sepWarn ||
+                        auditDirectPink.HasValue ||
+                        effCode != "ISOLATED_WORKER_SAFETY_FAILED" ||
+                        !resolvedSide.Message.Contains("ISOLATED_WORKER_SAFETY_FAILED") ||
+                        !actualFact1Text.Contains("chưa xác định mặt") ||
+                        actualFact1Text.Contains("khớp nhãn"))
+                    {
+                        throw new InvalidOperationException("Fail case 33d verdict block: status=" +
+                            CompareFlatSideMarker("表", resolvedSide.PinkFacingViewer) +
+                            " actual=" + actualFact1Text + " msg=" + resolvedSide.Message);
+                    }
+                }
+
+                LogDebug("[SELFTEST PASS] case=33_ISOLATED_WORKER_SAFETY_AUDIT_CLEANUP_GUARDS");
+            }
+            finally
+            {
+                try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+            }
+        }
+
+        private sealed class FakeCdWorkerRuntimeForSelfTest : ICdWorkerRuntime
+        {
+            private int _nextPid = 91000;
+            private int? _pid;
+            private int _getDocsCallInAttempt;
+            private string _currentItemDir = "";
+
+            public Func<int, int, string, (bool ok, int reportedCount, List<CdWorkerDocSnapshot> docs, string err)> OnGetDocuments { get; set; }
+            public List<int> StartedPids { get; } = new List<int>();
+            public List<int> TerminatedPids { get; } = new List<int>();
+            public List<string> QuitDocTargets { get; } = new List<string>();
+            public List<string> CloseDocTargets { get; } = new List<string>();
+            public int CloseAllCallCount { get; private set; }
+            public int ExitAppCallCount { get; private set; }
+            public int LastInspectPid { get; private set; }
+
+            public bool HasWorker => _pid.HasValue;
+            public int? WorkerPid => _pid;
+            public ISldWorks LiveApp => null;
+
+            public bool IsWorkerAlive() => _pid.HasValue;
+
+            public void EnsureWorker(string swExePath, Action<string> log, HashSet<int> ownedPids, Action<string> quarantineCallback)
+            {
+                if (!_pid.HasValue)
+                {
+                    _pid = ++_nextPid;
+                    ownedPids.Add(_pid.Value);
+                    StartedPids.Add(_pid.Value);
+                    _getDocsCallInAttempt = 0;
+                }
+            }
+
+            public bool TryGetDocuments(out int reportedCount, out List<CdWorkerDocSnapshot> docs, out string error)
+            {
+                _getDocsCallInAttempt++;
+                if (OnGetDocuments != null)
+                {
+                    var r = OnGetDocuments(_getDocsCallInAttempt, _pid ?? 0, _currentItemDir);
+                    reportedCount = r.reportedCount;
+                    docs = r.docs ?? new List<CdWorkerDocSnapshot>();
+                    error = r.err ?? "";
+                    return r.ok;
+                }
+                reportedCount = 0;
+                docs = new List<CdWorkerDocSnapshot>();
+                error = "";
+                return true;
+            }
+
+            public void CopyAndRepointPartDependencies(string origDrawingPath, string drwCopyPath, string itemTempDir, string expectedPartPath, out string expectedTempPartPath)
+            {
+                _currentItemDir = itemTempDir;
+                expectedTempPartPath = "";
+            }
+
+            public void SafeSetDocumentVisible(bool visible) { }
+            public void KeepWorkerWindowHidden() { }
+            public bool TrySetCurrentWorkingDirectory(string dirPath) => true;
+
+            public bool TryOpenDrawing(string drwCopyPath, out int openErr, out int openWarn, out string openErrorDetail)
+            {
+                _currentItemDir = Path.GetDirectoryName(drwCopyPath) ?? "";
+                openErr = 0;
+                openWarn = 0;
+                openErrorDetail = "";
+                return true;
+            }
+
+            public bool TryResolveAndInspect(
+                string sheetName, string viewName, string itemTempDir, string expectedTempPartPath,
+                CdIsolatedInspectDelegate inspectDelegate, Stopwatch stepSw, string drawingPath, Action<string> log,
+                out FlatDrawingViewSideResult sideResult, out CdDirectFlatSideProbe probe, out string errorReason, out bool isUnexpectedRefViolation)
+            {
+                LastInspectPid = _pid ?? 0;
+                errorReason = "";
+                isUnexpectedRefViolation = false;
+                probe = new CdDirectFlatSideProbe
+                {
+                    WorkerMode = "ISOLATED_VISIBLE_COPY",
+                    BodyResolutionMethod = "VISIBLE_ENTITIES2",
+                    Geom2DAvailable = true,
+                    Geom2DVerified = true
+                };
+                sideResult = new FlatDrawingViewSideResult
+                {
+                    ViewName = "Drawing View1",
+                    Configuration = "Default",
+                    DisplayState = "Default",
+                    PinkFacingViewer = false,
+                    Message = "Synthetic isolated inspect"
+                };
+                return true;
+            }
+
+            public bool TryQuitDoc(string title, out string error)
+            {
+                QuitDocTargets.Add(title ?? "");
+                error = "";
+                return true;
+            }
+
+            public bool TryCloseDoc(string title, out string error)
+            {
+                CloseDocTargets.Add(title ?? "");
+                error = "";
+                return true;
+            }
+
+            public bool TryCloseAllDocuments(bool includeUnsaved, out string error)
+            {
+                CloseAllCallCount++;
+                error = "";
+                return true;
+            }
+
+            public void GracefulExitIfClean()
+            {
+                ExitAppCallCount++;
+                _pid = null;
+            }
+
+            public void DetachComReferenceOnly()
+            {
+                _pid = null;
+            }
+
+            public bool TerminateOwnedProcessOnly(int pid, HashSet<int> ownedPids, Action<string> log)
+            {
+                if (pid <= 0 || ownedPids == null || !ownedPids.Contains(pid))
+                    return false;
+                TerminatedPids.Add(pid);
+                if (_pid == pid) _pid = null;
+                return true;
+            }
         }
 
         private static void RunWidthLengthSelfTests()

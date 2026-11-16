@@ -2,8 +2,57 @@
 
 **Repository:** `tbcphutai-bit/ADDIN-SolidWorks`  
 **Pull Request:** #62 (`fix/check-drawing-goban-display-retry-uraomote-20261108`)  
-**Phạm vi sửa đổi:** Chỉ trong `CHECK DRAWING` (`Commands/CheckDrawingBom.cs`, `Commands/CdIsolatedVisibleFlatSideVerifier.cs`, `Commands/CdFlatSidePilotPolicy.cs`, `ADDIN.csproj`, `docs/reports/CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md`). **Không sửa** `CheckUraOmote.cs`, `CheckPartWorkingCopy.cs`, `ExcelDrawingCheckExporter.cs`, `DxfCheckGeometry.cs` hay bất kỳ command nào khác.  
-**Trạng thái PR & Cờ Production:** **KHÔNG MERGE PR #62.** Tất cả 5 cờ feature/test giữ nguyên **`false`** mặc định. Live `C:\Tao moi\ADDIN.dll` giữ nguyên không ghi đè.
+**Phạm vi sửa đổi:** Chỉ trong `CHECK DRAWING` (`Commands/CheckDrawingBom.cs`, `Commands/CdIsolatedVisibleFlatSideVerifier.cs`, `Commands/CdFlatSidePilotPolicy.cs`, `docs/reports/CHECK_DRAWING_URA_OMOTE_PR62_REPORT.md`). **Không sửa** `ADDIN.csproj`, `CheckUraOmote.cs`, `CheckPartWorkingCopy.cs`, `ExcelDrawingCheckExporter.cs`, `DxfCheckGeometry.cs` hay bất kỳ command nào khác.  
+**Trạng thái PR & Cờ Production:** **KHÔNG MERGE PR #62.** Tất cả 5 cờ feature/test giữ nguyên **`false`** mặc định. Không ghi đè live `C:\Tao moi\ADDIN.dll` (trong toàn bộ đợt build và kiểm thử tối 15/11/2026 giữ nguyên `SHA-256: 20BB502B7E8F37B0853F1104CDDFC49A991E266FAA38FE1BF63A8458D4C07CF5`; sáng 16/11/2026 tệp không còn ở `C:\Tao moi\ADDIN.dll`).
+
+---
+
+## 0. Cập nhật hoàn thiện an toàn Isolated Worker (sau commit `34dbf21`)
+
+Tiếp nhận review trên commit `34dbf21` (`issuecomment-6893067875`), toàn bộ cơ chế an toàn cho Isolated Worker đã được gia cố fail-closed mà **không thay đổi thuật toán nhận diện `表/ウラ`**:
+
+### 0.1. Thay đổi mã nguồn (`Commands/CdIsolatedVisibleFlatSideVerifier.cs`, `Commands/CheckDrawingBom.cs`)
+1. **`AuditWorkerDocs()` fail-closed tường minh (`CdWorkerDocAuditResult`):**
+   - Không còn dùng ngưỡng đơn giản `outsideTemp == 0 && asmCount == 0` bỏ qua lỗi COM. Trả về `AuditSucceeded` dựa trên toàn bộ `GetDocumentCount()`, `GetDocuments()`, kiểm tra `reportedCount == enumeratedCount`, kiểm tra không có phần tử `null`, và đọc thuộc tính (`GetPathName`, `GetTitle`, `GetType`, `GetSaveFlag`, `IsOpenedReadOnly`) không phát sinh lỗi COM (`UNREADABLE_DOC_PROPERTY`).
+   - Áp dụng đồng bộ tại `beforeOpen`, `afterOpen`, `afterDelegate` và giai đoạn kiểm kê trước/sau đóng tài liệu.
+2. **`CloseAllWorkerDocuments()` kiểm tra quyền sở hữu trước khi đóng & xác nhận chính xác `remainingDocs == 0`:**
+   - Rà soát mọi tài liệu đang mở trong worker trước khi gọi `QuitDoc` / `CloseDoc` / `CloseAllDocuments`. Nếu có bất kỳ tài liệu ngoài `itemTempDir`, tài liệu `.SLDASM`, hoặc thuộc tính không đọc được (`UNOWNED_OR_UNEXPECTED_DOC_IN_CLEANUP`), **dừng an toàn ngay lập tức và KHÔNG gọi API đóng lên tài liệu chưa xác minh quyền sở hữu**.
+   - Yêu cầu nghiêm ngặt `remainingCount == 0 && enumeratedCount == 0`; mọi giá trị `-1`, `> 0`, hoặc lỗi COM enumerator (`POST_CLOSE_ENUM_FAILED`, `POST_CLOSE_NONZERO_REMAINING`) đều kết luận thất bại.
+   - Đưa `VerifyViewOnce` ghi nhận thất bại sau khối `finally`: nếu cleanup thất bại sau khi delegate thành công, kết quả của view vẫn bị ghi đè thành fail-closed.
+   - Reset thư mục làm việc (`_baseTempRoot`) trước `TryDeleteDirectory` để tránh tiến trình worker giữ khóa thư mục con vừa đóng.
+3. **Cách ly & chấm dứt chỉ đúng Worker PID sở hữu (`QuarantineAndTerminateOwnedWorker`):**
+   - Theo dõi PID worker trong `_ownedWorkerPids`. Khi phát hiện lỗi an toàn hoặc dọn dẹp, không dùng chung worker đó nữa (`SafetyViolation = true`, `QuarantinedWorkerPid`), không đóng tài liệu chưa rõ chủ và chỉ kill đúng tiến trình `SLDWORKS` thuộc `_ownedWorkerPids` (tuyệt đối không chạm phiên làm việc của user).
+4. **Ép `Warning` khi Isolated Worker lỗi & chuẩn hóa câu chữ `Fact 1` (`Commands/CheckDrawingBom.cs`):**
+   - Bổ sung trạng thái probe `IsolatedWorkerAttempted`, `IsolatedWorkerSucceeded`, `IsolatedWorkerSafetyViolation`, `IsolatedWorkerErrorReason`, `IsolatedWorkerQuarantinedPid`.
+   - Thêm `CdResolveViewSideOutcome` và `CdResolveAuditDirectPink`: bất cứ khi nào `IsolatedWorkerAttempted && !IsolatedWorkerSucceeded`, ép kết quả trường `表/ウラ ↔ 展開` về **`Warning`** (`ISOLATED_WORKER_SAFETY_FAILED` / `ISOLATED_WORKER_FAILED`), không nâng `OK` theo Pilot và không rơi về `OK` của Working Copy; đồng bộ cột `Drawing Value` (`ActualText`) và `Ghi chú` (`Message`) cùng thể hiện `Direct (ẩn): chưa xác định mặt`.
+   - Chuẩn hóa câu chữ `Fact 1` trong `CdBuildSeparatedFlatSideMessage`: thay `"Drawing không sai mặt"` bằng **`"Mặt quan sát trong bản sao Drawing khớp nhãn <expected>; chưa xác minh đồng bộ in-memory của Assembly hiện tại nên giữ WARNING chung"`**. Giữ `Warning` cho toàn bộ 34 ca Part có ExtRef `status=3` trỏ tới Assembly đang dirty.
+5. **Tách `ICdWorkerRuntime` & bổ sung Self-test `Case 33` (`RunIsolatedWorkerSafetySelfTests`):**
+   - Dùng `FakeCdWorkerRuntimeForSelfTest` tiêm lỗi để kiểm chứng trực tiếp: lỗi COM `beforeOpen` (`0x80010105`), lỗi đọc thuộc tính tài liệu `afterOpen`, lệch số lượng `GetDocumentCount` vs `GetDocuments` `afterDelegate`, nạp nhầm `.SLDASM` ngoài temp, tài liệu ngoài temp trong pha cleanup (xác minh `0` lệnh `QuitDoc`/`CloseDoc`/`CloseAllDocuments` được gọi lên tài liệu ngoài), lỗi enumerator hậu cleanup (`-1`), `remainingDocs == 1`, và ép `Warning` nhất quán trên Preview/Excel dù `Pilot ON/OFF` hay WC `OK`.
+
+### 0.2. Điều tra `QuitDoc` / `CloseDoc` & A/B Cleanup vs Event `0xc0000005` (`diag_ab`)
+Thử nghiệm A/B có kiểm soát qua `CdWorkerCleanupMode` (`CleanupModeForTestsOnly`) trên tập 6 bản vẽ cô lập (`SB1-ks1`, `SB1-ks3`, `FB1-ks3`, `SB2-ks1`, `SB2-ks3`, `SA2-fr4`):
+
+| Chế độ Cleanup thử nghiệm (`diag_ab`) | `CLEANUP WARN` | Worker PID | Win32 Event ID `1000` (`0xc0000005`) & Timing millisecond |
+| :--- | :---: | :---: | :--- |
+| `DefaultQuitThenClose` (`diag_ab_quit.log`) | `0` | — | `0` sự kiện trong lượt 6 file này (nhưng vẫn tái hiện ở batch 50 view bên dưới). |
+| `CloseDocFirst` (`diag_ab_closedoc.log`) | `0` | `0x65c8` | `1` sự kiện (`18:00:44`, `sldapiu.dll+0x9a9bb0`) + `2` `Id=1001`. |
+| `CloseDocFirst` + ms stage log (`diag_ab_closedoc_ms.log`) | `0` | `50764` (`0xc64c`) | `1` sự kiện **`sldapiu.dll+0x9a9bb0` lúc `18:07:24`**, xảy ra **`~2.94s` SAU khi `AFTER_CLOSE` của `SB1-ks1` đã hoàn tất ở `18:07:21.211` (`elapsedMs=39`, `remainingDocs=0`, `success=True`)** trong lúc không còn file nào mở. |
+| `CloseAllOwnedDocs` (`diag_ab_closeall.log`) | `0` | `0xc864` | `1` sự kiện (`18:02:56`, `sldapiu.dll+0x9a9bb0`) + `2` `Id=1001`. |
+
+- **Kết luận điều tra cleanup:** Việc đổi `QuitDoc` sang `CloseDoc` hoặc `CloseAllDocuments(true)` **không loại bỏ được `sldapiu.dll+0x9a9bb0` (`0xc0000005`)** (do ngoại lệ xảy ra nội bộ trong worker SOLIDWORKS kể cả khi mọi tài liệu đã đóng về `remainingDocs=0`). Vì vậy giữ nguyên mặc định `DefaultQuitThenClose` (ít rủi ro hộp thoại lưu file nhất) và kết hợp với hàng rào audit/quarantine fail-closed. Reset CWD về `_baseTempRoot` đã đưa `CLEANUP WARN` khóa thư mục tạm trong các lượt sạch xuống `0`.
+
+### 0.3. Kết quả build & kiểm thử mới nhất (Debug x64, bản build cuối sau chỉnh sửa cuối cùng)
+- **Build `ADDIN.csproj` (`/p:Configuration=Debug /p:Platform=x64 /p:OutputPath="bin\x64\Debug\"`):** `0` errors; Output `C:\Tao moi\ADDIN-CheckDrawing\bin\x64\Debug\ADDIN.dll` (`SHA-256: BBE4C85855EBB050134B0A48962AE3D4405E0751143487AFB06134C031268BE6`).
+- **Self-tests (`run_selftest.ps1`):** **Exit `0`** — PASS `RunGobanLinkSelfTests` (`Cases 1..33`, bao gồm `Case 33_ISOLATED_WORKER_SAFETY_AUDIT_CLEANUP_GUARDS` mới), `NormalizeFlatSideMarker`, `CompareFlatSideMarker`, `DEFAULT_FLAGS` (`5/5 = False`), `CdFlatSidePilotPolicy` (`15` assertions), `RunExcelAndPreviewSyncSelfTests`, `RunWidthLengthSelfTests`.
+- **Batch 55 trên bản sao cô lập `D:\CG1-ISOLATED-TEST-COPIES\4365`:**
+  - **`batch55` Shadow (cả 5 cờ OFF, `batch55_shadow_final2.log`):** `exit=0`, `99.4s`, Main SW `PID 2512`, `DOCS_BEFORE=0 -> DOCS_AFTER=75`, `SOURCE_FILES_UNCHANGED=20/20`, `SUMMARY_FLAT total=55 WC_OK=13 WC_NG=0 WC_WARNING=37 NO_FLAT_FIELD=5 DIRECT_OK=43 DIRECT_UNKNOWN=7 DISAGREE=0`, `50 SHADOW_LEGACY`, kết quả tổng hợp (`[DRAWING RESULT]`) **`OK=11 / NG=0 / Warning=44`**, Excel export `59,480 bytes`, `Fact 1=74`, `"Drawing không sai mặt"=0`. Win32 Event ID `1000`: `1` sự kiện (`slduiu.dll+0x1184d4a` trong main SW `PID 2512`).
+  - **`batch55_pilot_iso` (opt-in Pilot + Isolated cho test, `batch55_pilot_iso_final2.log`):** `exit=0`, `322.4s`, Main SW `PID 33276`, `DOCS_BEFORE=0 -> DOCS_AFTER=75`, `SOURCE_FILES_UNCHANGED=20/20`, `0` thư mục `ADDIN_CdIso_*` còn sót sau test.
+    - `SUMMARY_FLAT`: `total=55 WC_OK=13 WC_NG=0 WC_WARNING=37 NO_FLAT_FIELD=5 DIRECT_OK=43 DIRECT_UNKNOWN=7 DISAGREE=0`; phân loại Pilot: `34 DIRECT_PROMOTION_BLOCKED`, `12 LEGACY_CONFIRMED`, `3 DIRTY_DRAWING_UNVERIFIED`, `1 PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED`. Kết quả tổng hợp (`[DRAWING RESULT]`) **`OK=11 / NG=0 / Warning=44`**, Excel export `59,990 bytes`; `"Mặt quan sát trong bản sao Drawing khớp nhãn"=36`, `"Drawing không sai mặt"=0`.
+    - **Hành vi fail-closed thực tế trong runtime (`ROW 38 | 4365-04-TI-SA1-fr7`):** Tổng `50` view cần Isolated Worker (`2` lần khởi tạo worker: `PID 8960` rồi `PID 47500`). Worker `PID 8960` đã hoàn tất `37` view đầu và kiểm tra thành công `afterDelegate` cho `#38 SA1-fr7`, nhưng ở bước đóng tài liệu hậu kiểm tra đã gặp lỗi RPC **`GetDocumentCount_ERR: RPC サーバーを利用できません。 (0x800706BA)`** (`remainingDocs=-1`). Hệ thống lập tức **quarantine `PID 8960` (`ISOLATED_WORKER_SAFETY_FAILED`)**, **không dùng lại worker lỗi**, mở worker mới `PID 47500` hoàn tất `12` view còn lại (`49/50 ISO OK`, `49/50 2D BBOX MATCH`, `rt_auditOk=201`, `rt_auditFail=0`, `rt_remZero=49`, `rt_remFail=1`), đồng thời ép riêng `#38 SA1-fr7` sang **`Warning`** và đồng bộ cả `VAL` (`Fact 1=Direct (ẩn): chưa xác định mặt (chưa đủ dữ liệu view ẩn)`) lẫn cột `Ghi chú`. *(Ghi chú: file Excel đối chiếu XML trực tiếp `Batch55_PilotIso_Audit.xlsx` `60,001 bytes` được xuất ở lượt ngay trước bước đồng bộ `CdResolveAuditDirectPink`; trên bản build cuối `final2`, `EXCEL_EXPORT_TEST` tạo thành công `59,990 bytes` và log `ROW 38` xác nhận đồng bộ `Fact 1` đúng chuẩn.)*
+    - **Win32 Event ID `1000` (`0xc0000005`):** Ghi nhận **`3` sự kiện** trong `batch55_pilot_iso`: `1` sự kiện ở main SW `PID 33276` (`18:27:07`, `slduiu.dll+0x1184d4a`) và `2` sự kiện trên worker (`18:27:57` ở `PID 8960` và `18:31:52` ở `PID 47500`, đều là `sldapiu.dll+0x9a9bb0`). **Không tuyên bố đã loại bỏ crash native.**
+- **`Pr62Verify.exe targeted` (`1A..3E3`) trên bản build cuối:** Dừng ở ca `1C_FB1_fr3_NOPINK_SHADOW` do SW harness `PID 33548` gặp ngoại lệ heap native `ntdll.dll+0x112fc5 (0xc0000374)` -> `RPC 0x800706BA` tại `FindOpenDoc` của harness (`exit=1`; trước đó `1A` và `1B` hoạt động đúng, sau đó một lượt chạy lại bị treo do máy sleep qua đêm và đã được dọn sạch). Bộ ma trận `1A..3E3` đầy đủ nhất trước khi tách runtime Audit/Cleanup thuộc lượt `targeted` ở commit `34dbf21` (Mục 3.2 bên dưới).
+
+> Phần Mục 1–5 bên dưới giữ nguyên hồ sơ kiểm thử từ các mốc `9f0e28c` / `34dbf21`.
 
 ---
 

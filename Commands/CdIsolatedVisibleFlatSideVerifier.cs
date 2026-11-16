@@ -16,6 +16,13 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands
 {
+    internal enum CdWorkerCleanupMode
+    {
+        DefaultQuitThenClose = 0,
+        CloseDocFirst = 1,
+        CloseAllOwnedDocs = 2
+    }
+
     internal delegate FlatDrawingViewSideResult CdIsolatedInspectDelegate(
         ISldWorks workerApp,
         SolidWorks.Interop.sldworks.View view,
@@ -30,6 +37,90 @@ namespace ADDIN.Commands
         public FlatDrawingViewSideResult Result { get; set; }
         public CheckDrawingBom.CdDirectFlatSideProbe Probe { get; set; }
         public bool RestartedWorker { get; set; }
+        public bool SafetyViolation { get; set; }
+        public int? QuarantinedWorkerPid { get; set; }
+    }
+
+    internal sealed class CdWorkerDocSnapshot
+    {
+        public bool ReadSucceeded { get; set; }
+        public string ReadError { get; set; } = "";
+        public int DocType { get; set; } = -1;
+        public string Path { get; set; } = "";
+        public string Title { get; set; } = "";
+        public bool Dirty { get; set; }
+        public bool ReadOnly { get; set; }
+    }
+
+    internal sealed class CdWorkerDocAuditResult
+    {
+        public bool AuditSucceeded { get; set; }
+        public string AuditError { get; set; } = "";
+        public int ReportedDocCount { get; set; }
+        public int TotalCount { get; set; }
+        public int OutsideTempCount { get; set; }
+        public int AsmCount { get; set; }
+        public int UnreadableCount { get; set; }
+        public List<string> OffendingDocs { get; } = new List<string>();
+        public string Summary { get; set; } = "none";
+
+        public bool IsSafeForZeroDocs =>
+            AuditSucceeded && TotalCount == 0 && OutsideTempCount == 0 && AsmCount == 0 && UnreadableCount == 0;
+
+        public bool IsSafeForTempDocsOnly =>
+            AuditSucceeded && OutsideTempCount == 0 && AsmCount == 0 && UnreadableCount == 0;
+    }
+
+    internal sealed class CdWorkerCleanupResult
+    {
+        public bool Success { get; set; }
+        public int RemainingDocs { get; set; }
+        public string ErrorReason { get; set; } = "";
+        public List<string> UnownedDocsSkipped { get; } = new List<string>();
+        public int CloseCallsExecuted { get; set; }
+    }
+
+    internal interface ICdWorkerRuntime
+    {
+        bool HasWorker { get; }
+        int? WorkerPid { get; }
+        ISldWorks LiveApp { get; }
+        bool IsWorkerAlive();
+        void EnsureWorker(
+            string swExePath,
+            Action<string> log,
+            HashSet<int> ownedPids,
+            Action<string> quarantineCallback);
+        bool TryGetDocuments(out int reportedCount, out List<CdWorkerDocSnapshot> docs, out string error);
+        void CopyAndRepointPartDependencies(
+            string origDrawingPath,
+            string drwCopyPath,
+            string itemTempDir,
+            string expectedPartPath,
+            out string expectedTempPartPath);
+        void SafeSetDocumentVisible(bool visible);
+        void KeepWorkerWindowHidden();
+        bool TrySetCurrentWorkingDirectory(string dirPath);
+        bool TryOpenDrawing(string drwCopyPath, out int openErr, out int openWarn, out string openErrorDetail);
+        bool TryResolveAndInspect(
+            string sheetName,
+            string viewName,
+            string itemTempDir,
+            string expectedTempPartPath,
+            CdIsolatedInspectDelegate inspectDelegate,
+            Stopwatch stepSw,
+            string drawingPath,
+            Action<string> log,
+            out FlatDrawingViewSideResult sideResult,
+            out CheckDrawingBom.CdDirectFlatSideProbe probe,
+            out string errorReason,
+            out bool isUnexpectedRefViolation);
+        bool TryQuitDoc(string title, out string error);
+        bool TryCloseDoc(string title, out string error);
+        bool TryCloseAllDocuments(bool includeUnsaved, out string error);
+        void GracefulExitIfClean();
+        void DetachComReferenceOnly();
+        bool TerminateOwnedProcessOnly(int pid, HashSet<int> ownedPids, Action<string> log);
     }
 
     internal sealed class CdIsolatedVisibleFlatSideVerifier : IDisposable
@@ -38,10 +129,15 @@ namespace ADDIN.Commands
         private readonly string _swExePath;
         private readonly Action<string> _log;
         private readonly string _baseTempRoot;
+        private readonly ICdWorkerRuntime _runtime;
+        private readonly HashSet<int> _ownedWorkerPids = new HashSet<int>();
 
-        private ISldWorks _workerApp;
-        private int? _workerPid;
         private bool _disposed;
+
+        // Test-only opt-in hook for bounded cleanup A/B diagnostics & fault-injection self-tests.
+        internal CdWorkerCleanupMode CleanupModeForTestsOnly { get; set; } = CdWorkerCleanupMode.DefaultQuitThenClose;
+
+        internal IReadOnlyCollection<int> OwnedWorkerPidsForTestsOnly => _ownedWorkerPids;
 
         [DllImport("ole32.dll")]
         private static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable prot);
@@ -50,9 +146,20 @@ namespace ADDIN.Commands
         private static extern int CreateBindCtx(int reserved, out IBindCtx ppbc);
 
         public CdIsolatedVisibleFlatSideVerifier(Action<string> log = null)
+            : this(log, null, null)
+        {
+        }
+
+        internal CdIsolatedVisibleFlatSideVerifier(
+            Action<string> log,
+            ICdWorkerRuntime runtimeOverride,
+            string swExePathOverride)
         {
             _log = log;
-            _swExePath = ResolveSolidWorksExePath();
+            _swExePath = !string.IsNullOrWhiteSpace(swExePathOverride)
+                ? swExePathOverride
+                : ResolveSolidWorksExePath();
+            _runtime = runtimeOverride ?? new LiveCdWorkerRuntime(this);
             _baseTempRoot = Path.Combine(
                 Path.GetTempPath(),
                 "ADDIN_CdIso_" + Guid.NewGuid().ToString("N").Substring(0, 8));
@@ -67,13 +174,14 @@ namespace ADDIN.Commands
         {
             if (_disposed)
                 return Fail("DISPOSED");
-            if (inspectDelegate == null)
+            if (inspectDelegate == null && _runtime is LiveCdWorkerRuntime)
                 return Fail("NO_INSPECT_DELEGATE");
             if (string.IsNullOrWhiteSpace(drawingPath) || !File.Exists(drawingPath))
                 return Fail("DRAWING_FILE_MISSING");
             if (string.IsNullOrWhiteSpace(viewName))
                 return Fail("VIEW_NAME_MISSING");
-            if (string.IsNullOrWhiteSpace(_swExePath) || !File.Exists(_swExePath))
+            if (_runtime is LiveCdWorkerRuntime &&
+                (string.IsNullOrWhiteSpace(_swExePath) || !File.Exists(_swExePath)))
                 return Fail("SLDWORKS_EXE_NOT_FOUND");
 
             bool restarted = false;
@@ -95,24 +203,29 @@ namespace ADDIN.Commands
                     Log("[CD ISO VERIFIER] COM failure on attempt " + (attempt + 1)
                         + " hresult=0x" + comEx.HResult.ToString("X8")
                         + ": " + comEx.Message);
-                    KillWorkerProcessOnly();
+                    int? killedPid = QuarantineAndTerminateOwnedWorker("COM_EXCEPTION_0x" + comEx.HResult.ToString("X8"));
                     if (attempt == 0)
                     {
                         restarted = true;
                         continue;
                     }
-                    return Fail("WORKER_COM_EXCEPTION: 0x" + comEx.HResult.ToString("X8"));
+                    CdIsolatedVerifyResult failRes = Fail("WORKER_COM_EXCEPTION: 0x" + comEx.HResult.ToString("X8"));
+                    failRes.QuarantinedWorkerPid = killedPid;
+                    return failRes;
                 }
                 catch (Exception ex)
                 {
                     Log("[CD ISO VERIFIER] Error on attempt " + (attempt + 1) + ": " + ex.Message);
-                    if (!IsWorkerAlive() && attempt == 0)
+                    if (!_runtime.IsWorkerAlive() && attempt == 0)
                     {
-                        KillWorkerProcessOnly();
+                        QuarantineAndTerminateOwnedWorker("WORKER_DEAD_EXCEPTION: " + ex.Message);
                         restarted = true;
                         continue;
                     }
-                    return Fail("WORKER_EXCEPTION: " + ex.Message);
+                    int? killedPid = QuarantineAndTerminateOwnedWorker("WORKER_EXCEPTION: " + ex.Message);
+                    CdIsolatedVerifyResult failRes = Fail("WORKER_EXCEPTION: " + ex.Message);
+                    failRes.QuarantinedWorkerPid = killedPid;
+                    return failRes;
                 }
             }
 
@@ -126,7 +239,11 @@ namespace ADDIN.Commands
             string expectedPartPath,
             CdIsolatedInspectDelegate inspectDelegate)
         {
-            EnsureWorker();
+            _runtime.EnsureWorker(
+                _swExePath,
+                Log,
+                _ownedWorkerPids,
+                reason => QuarantineAndTerminateOwnedWorker(reason));
 
             Directory.CreateDirectory(_baseTempRoot);
             string itemTempDir = Path.Combine(
@@ -134,142 +251,165 @@ namespace ADDIN.Commands
                 Guid.NewGuid().ToString("N").Substring(0, 10));
             Directory.CreateDirectory(itemTempDir);
 
-            ModelDoc2 drwDoc = null;
             string drwCopyPath = Path.Combine(itemTempDir, Path.GetFileName(drawingPath));
+            CdIsolatedVerifyResult result = null;
+            bool skipDocCloseInFinally = false;
 
             try
             {
-                Stopwatch stepSw = Stopwatch.StartNew();
-                Log(FormatStageLog("BEFORE_REPOINT", drawingPath, stepSw));
-
-                File.Copy(drawingPath, drwCopyPath, true);
-                EnsureWritableNormal(drwCopyPath);
-
-                string expectedTempPartPath = "";
-                CopyAndRepointPartDependencies(
-                    _workerApp,
-                    drawingPath,
-                    drwCopyPath,
-                    itemTempDir,
-                    expectedPartPath,
-                    out expectedTempPartPath);
-
-                SafeSetDocumentVisible(_workerApp, true);
-
-                try
+                do
                 {
-                    _workerApp.SetCurrentWorkingDirectory(itemTempDir);
+                    Stopwatch stepSw = Stopwatch.StartNew();
+                    Log(FormatStageLog("BEFORE_REPOINT", drawingPath, stepSw));
+
+                    File.Copy(drawingPath, drwCopyPath, true);
+                    EnsureWritableNormal(drwCopyPath);
+
+                    // Verify zero stale/unexpected documents BEFORE opening anything or repointing in-session,
+                    // and NEVER auto-close unowned documents if beforeOpen fails.
+                    CdWorkerDocAuditResult beforeAudit = AuditWorkerDocs("beforeOpen", itemTempDir, allowZeroOnly: true);
+                    if (!beforeAudit.IsSafeForZeroDocs)
+                    {
+                        skipDocCloseInFinally = true;
+                        string reason = !beforeAudit.AuditSucceeded
+                            ? "ISOLATED_DOC_AUDIT_FAILED_BEFORE_OPEN: " + beforeAudit.AuditError
+                            : "ISOLATED_UNEXPECTED_DOC_PRESENT_BEFORE_OPEN: " + beforeAudit.Summary;
+                        int? qPid = QuarantineAndTerminateOwnedWorker(reason);
+                        result = FailSafety(reason, qPid);
+                        break;
+                    }
+
+                    _runtime.CopyAndRepointPartDependencies(
+                        drawingPath,
+                        drwCopyPath,
+                        itemTempDir,
+                        expectedPartPath,
+                        out string expectedTempPartPath);
+
+                    _runtime.SafeSetDocumentVisible(true);
+                    _runtime.TrySetCurrentWorkingDirectory(itemTempDir);
+
+                    Log(FormatStageLog("BEFORE_OPENDOC", drawingPath, stepSw));
+                    bool openOk = _runtime.TryOpenDrawing(drwCopyPath, out int openErr, out int openWarn, out string openDetail);
+                    Log(FormatStageLog("AFTER_OPENDOC", drawingPath, stepSw) +
+                        " ok=" + openOk + " err=" + openErr + " warn=" + openWarn +
+                        (string.IsNullOrEmpty(openDetail) ? "" : " detail=" + openDetail));
+
+                    if (!openOk)
+                    {
+                        result = Fail("ISOLATED_OPEN_DRAWING_FAILED err=" + openErr + " warn=" + openWarn);
+                        break;
+                    }
+
+                    _runtime.KeepWorkerWindowHidden();
+
+                    CdWorkerDocAuditResult openAudit = AuditWorkerDocs("afterOpen", itemTempDir, allowZeroOnly: false);
+                    if (!openAudit.IsSafeForTempDocsOnly)
+                    {
+                        skipDocCloseInFinally = true;
+                        string reason = !openAudit.AuditSucceeded
+                            ? "ISOLATED_DOC_AUDIT_FAILED_AFTER_OPEN: " + openAudit.AuditError
+                            : "ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_OPEN: " + openAudit.Summary;
+                        int? qPid = QuarantineAndTerminateOwnedWorker(reason);
+                        result = FailSafety(reason, qPid);
+                        break;
+                    }
+
+                    Log(FormatStageLog("BEFORE_DELEGATE", drawingPath, stepSw));
+                    bool inspected = _runtime.TryResolveAndInspect(
+                        sheetName,
+                        viewName,
+                        itemTempDir,
+                        expectedTempPartPath,
+                        inspectDelegate,
+                        stepSw,
+                        drawingPath,
+                        Log,
+                        out FlatDrawingViewSideResult sideResult,
+                        out CheckDrawingBom.CdDirectFlatSideProbe probe,
+                        out string inspectErr,
+                        out bool unexpectedRefViolation);
+                    Log(FormatStageLog("AFTER_DELEGATE", drawingPath, stepSw));
+
+                    if (!inspected)
+                    {
+                        if (unexpectedRefViolation)
+                        {
+                            skipDocCloseInFinally = true;
+                            int? qPid = QuarantineAndTerminateOwnedWorker(inspectErr);
+                            result = FailSafety(inspectErr, qPid);
+                        }
+                        else
+                        {
+                            result = Fail(inspectErr);
+                        }
+                        break;
+                    }
+
+                    Log(FormatStageLog("BEFORE_AUDIT_AFTER_DELEGATE", drawingPath, stepSw));
+                    CdWorkerDocAuditResult delAudit = AuditWorkerDocs("afterDelegate", itemTempDir, allowZeroOnly: false);
+                    Log(FormatStageLog("AFTER_AUDIT_AFTER_DELEGATE", drawingPath, stepSw) + " auditOk=" + delAudit.AuditSucceeded);
+                    if (!delAudit.IsSafeForTempDocsOnly)
+                    {
+                        skipDocCloseInFinally = true;
+                        string reason = !delAudit.AuditSucceeded
+                            ? "ISOLATED_DOC_AUDIT_FAILED_AFTER_DELEGATE: " + delAudit.AuditError
+                            : "ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_DELEGATE: " + delAudit.Summary;
+                        int? qPid = QuarantineAndTerminateOwnedWorker(reason);
+                        result = FailSafety(reason, qPid);
+                        break;
+                    }
+
+                    result = new CdIsolatedVerifyResult
+                    {
+                        Success = true,
+                        Result = sideResult,
+                        Probe = probe
+                    };
                 }
-                catch { }
-
-                AuditWorkerDocs("beforeOpen", itemTempDir, out int beforeOutside, out int beforeAsm, out string beforeSummary);
-                if (beforeOutside > 0 || beforeAsm > 0)
-                {
-                    CloseAllWorkerDocuments();
-                    AuditWorkerDocs("beforeOpenRetry", itemTempDir, out beforeOutside, out beforeAsm, out beforeSummary);
-                }
-
-                Log(FormatStageLog("BEFORE_OPENDOC", drawingPath, stepSw));
-                int openErr = 0;
-                int openWarn = 0;
-                drwDoc = _workerApp.OpenDoc6(
-                    drwCopyPath,
-                    (int)swDocumentTypes_e.swDocDRAWING,
-                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
-                    "",
-                    ref openErr,
-                    ref openWarn) as ModelDoc2;
-                Log(FormatStageLog("AFTER_OPENDOC", drawingPath, stepSw) +
-                    " ok=" + (drwDoc != null) + " err=" + openErr + " warn=" + openWarn);
-
-                if (drwDoc == null)
-                    return Fail("ISOLATED_OPEN_DRAWING_FAILED err=" + openErr + " warn=" + openWarn);
-
-                KeepWorkerWindowHidden(_workerApp);
-
-                AuditWorkerDocs("afterOpen", itemTempDir, out int openOutside, out int openAsm, out string openSummary);
-                if (openOutside > 0 || openAsm > 0)
-                    return Fail("ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_OPEN: " + openSummary);
-
-                try
-                {
-                    int actErr = 0;
-                    _workerApp.ActivateDoc3(
-                        drwDoc.GetTitle(),
-                        true,
-                        (int)swRebuildOnActivation_e.swDontRebuildActiveDoc,
-                        ref actErr);
-                }
-                catch { }
-
-                DrawingDoc drawing = drwDoc as DrawingDoc;
-                if (drawing == null)
-                    return Fail("NOT_A_DRAWING_DOC");
-
-                if (!string.IsNullOrWhiteSpace(sheetName))
-                {
-                    try { drawing.ActivateSheet(sheetName); }
-                    catch { }
-                }
-
-                SolidWorks.Interop.sldworks.View targetView = FindTargetView(drawing, sheetName, viewName);
-                if (targetView == null)
-                    return Fail("VIEW_NOT_FOUND_IN_ISOLATED_COPY: " + sheetName + "/" + viewName);
-
-                // Safety check: confirm the view's referenced part inside the worker resolves
-                // inside itemTempDir before allowing config/display-state activation.
-                ModelDoc2 refDoc = targetView.ReferencedDocument as ModelDoc2;
-                string actualRefPath = "";
-                try { actualRefPath = refDoc != null ? (refDoc.GetPathName() ?? "") : ""; }
-                catch { actualRefPath = ""; }
-
-                if (string.IsNullOrWhiteSpace(actualRefPath) ||
-                    !IsPathInsideDirectory(actualRefPath, itemTempDir) ||
-                    (!string.IsNullOrWhiteSpace(expectedTempPartPath) &&
-                     !string.Equals(SafeFullPath(actualRefPath), SafeFullPath(expectedTempPartPath), StringComparison.OrdinalIgnoreCase)))
-                {
-                    return Fail("ISOLATED_PATH_GUARD_BLOCKED: actualRef=" + actualRefPath + " expected=" + expectedTempPartPath);
-                }
-
-                string partPathForDelegate = !string.IsNullOrWhiteSpace(expectedTempPartPath)
-                    ? expectedTempPartPath
-                    : actualRefPath;
-
-                Log(FormatStageLog("BEFORE_DELEGATE", drawingPath, stepSw));
-                CheckDrawingBom.CdDirectFlatSideProbe probe;
-                FlatDrawingViewSideResult sideResult = inspectDelegate(
-                    _workerApp,
-                    targetView,
-                    drwDoc,
-                    partPathForDelegate,
-                    out probe);
-                Log(FormatStageLog("AFTER_DELEGATE", drawingPath, stepSw));
-
-                AuditWorkerDocs("afterDelegate", itemTempDir, out int delOutside, out int delAsm, out string delSummary);
-                if (delOutside > 0 || delAsm > 0)
-                    return Fail("ISOLATED_UNEXPECTED_DOC_LOADED_AFTER_DELEGATE: " + delSummary);
-
-                return new CdIsolatedVerifyResult
-                {
-                    Success = true,
-                    Result = sideResult,
-                    Probe = probe
-                };
+                while (false);
             }
             finally
             {
-                Log("[CD ISO VERIFIER STAGE] stage=BEFORE_CLOSE pid=" + (_workerPid ?? 0) + " file=" + Path.GetFileName(drawingPath));
-                int remainingDocs = CloseAllWorkerDocuments();
-                Log("[CD ISO VERIFIER STAGE] stage=AFTER_CLOSE pid=" + (_workerPid ?? 0) + " remainingDocs=" + remainingDocs);
-                if (remainingDocs > 0)
+                Stopwatch closeSw = Stopwatch.StartNew();
+                if (!skipDocCloseInFinally)
                 {
-                    AuditWorkerDocs("afterCloseNonZero", itemTempDir, out _, out _, out _);
+                    Log(FormatStageLog("BEFORE_CLOSE", drawingPath, closeSw) + " mode=" + CleanupModeForTestsOnly);
+                    CdWorkerCleanupResult cleanupRes = CloseAllWorkerDocuments(itemTempDir, closeSw, drawingPath);
+                    Log(FormatStageLog("AFTER_CLOSE", drawingPath, closeSw) +
+                        " remainingDocs=" + cleanupRes.RemainingDocs +
+                        " success=" + cleanupRes.Success +
+                        " closeCalls=" + cleanupRes.CloseCallsExecuted +
+                        " mode=" + CleanupModeForTestsOnly);
+
+                    if (!cleanupRes.Success)
+                    {
+                        if (cleanupRes.RemainingDocs > 0)
+                        {
+                            AuditWorkerDocs("afterCloseNonZero", itemTempDir, allowZeroOnly: false);
+                        }
+                        int? qPid = QuarantineAndTerminateOwnedWorker("ISOLATED_CLEANUP_FAILED: " + cleanupRes.ErrorReason);
+                        result = FailSafety("ISOLATED_CLEANUP_FAILED: " + cleanupRes.ErrorReason, qPid);
+                    }
                 }
+                else
+                {
+                    Log(FormatStageLog("SKIP_DOC_CLOSE_SAFETY_VIOLATION", drawingPath, closeSw));
+                }
+
+                // Release current working directory handle off itemTempDir before deleting the temp folder.
+                if (!skipDocCloseInFinally && _runtime.HasWorker)
+                {
+                    _runtime.TrySetCurrentWorkingDirectory(_baseTempRoot);
+                }
+
                 if (!TryDeleteDirectory(itemTempDir))
                 {
                     Log("[CD ISO VERIFIER CLEANUP WARN] Failed to delete itemTempDir=" + itemTempDir);
                 }
             }
+
+            return result ?? Fail("UNKNOWN");
         }
 
         private void CopyAndRepointPartDependencies(
@@ -477,266 +617,198 @@ namespace ADDIN.Commands
             return null;
         }
 
-        private void EnsureWorker()
-        {
-            if (IsWorkerAlive())
-                return;
-
-            KillWorkerProcessOnly();
-
-            var psi = new ProcessStartInfo(_swExePath)
-            {
-                UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-
-            Process proc = Process.Start(psi);
-            if (proc == null)
-                throw new InvalidOperationException("Failed to start isolated SLDWORKS.exe process.");
-
-            _workerPid = proc.Id;
-            string expectedMoniker = "SolidWorks_PID_" + proc.Id;
-            Log("[CD ISO VERIFIER] Starting hidden worker pid=" + proc.Id);
-
-            Stopwatch sw = Stopwatch.StartNew();
-            ISldWorks app = null;
-            while (sw.ElapsedMilliseconds < MaxStartupWaitMs)
-            {
-                if (proc.HasExited)
-                    throw new InvalidOperationException(
-                        "Isolated SLDWORKS.exe exited prematurely code=" + proc.ExitCode);
-
-                app = TryGetAppFromRot(expectedMoniker, proc.Id);
-                if (app != null)
-                {
-                    try
-                    {
-                        string rev = app.RevisionNumber();
-                        if (!string.IsNullOrEmpty(rev))
-                            break;
-                    }
-                    catch { }
-                    app = null;
-                }
-
-                Thread.Sleep(500);
-            }
-
-            if (app == null)
-            {
-                KillWorkerProcessOnly();
-                throw new TimeoutException("Timed out waiting for ROT moniker " + expectedMoniker);
-            }
-
-            _workerApp = app;
-            KeepWorkerWindowHidden(_workerApp);
-            try { _workerApp.UserControl = false; } catch { }
-            Log("[CD ISO VERIFIER] Worker ready pid=" + proc.Id);
-        }
-
-        private bool IsWorkerAlive()
-        {
-            if (_workerApp == null || !_workerPid.HasValue)
-                return false;
-            try
-            {
-                using (Process p = Process.GetProcessById(_workerPid.Value))
-                {
-                    if (p.HasExited)
-                        return false;
-                }
-                string rev = _workerApp.RevisionNumber();
-                return !string.IsNullOrEmpty(rev);
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private static ISldWorks TryGetAppFromRot(string expectedName, int expectedPid)
-        {
-            IRunningObjectTable table = null;
-            IBindCtx ctx = null;
-            IEnumMoniker enumerator = null;
-
-            try
-            {
-                if (GetRunningObjectTable(0, out table) != 0 || table == null)
-                    return null;
-                if (CreateBindCtx(0, out ctx) != 0 || ctx == null)
-                    return null;
-
-                table.EnumRunning(out enumerator);
-                if (enumerator == null)
-                    return null;
-
-                IMoniker[] monikers = new IMoniker[1];
-                while (enumerator.Next(1, monikers, IntPtr.Zero) == 0)
-                {
-                    IMoniker moniker = monikers[0];
-                    if (moniker == null)
-                        continue;
-                    try
-                    {
-                        string name;
-                        moniker.GetDisplayName(ctx, null, out name);
-                        string normalizedMoniker = (name ?? "").Trim().TrimStart('!');
-                        if (string.Equals(normalizedMoniker, expectedName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            object obj;
-                            if (table.GetObject(moniker, out obj) == 0 && obj is ISldWorks sw)
-                            {
-                                try
-                                {
-                                    if (sw.GetProcessID() == expectedPid)
-                                        return sw;
-                                }
-                                catch { }
-
-                                try
-                                {
-                                    if (Marshal.IsComObject(obj))
-                                        Marshal.ReleaseComObject(obj);
-                                }
-                                catch { }
-                            }
-                        }
-                    }
-                    catch { }
-                    finally
-                    {
-                        Marshal.ReleaseComObject(moniker);
-                    }
-                }
-            }
-            catch { }
-            finally
-            {
-                if (enumerator != null) Marshal.ReleaseComObject(enumerator);
-                if (ctx != null) Marshal.ReleaseComObject(ctx);
-                if (table != null) Marshal.ReleaseComObject(table);
-            }
-
-            return null;
-        }
-
         private string FormatStageLog(string stage, string drawingPath, Stopwatch sw)
         {
             return string.Format(
                 System.Globalization.CultureInfo.InvariantCulture,
                 "[CD ISO VERIFIER STAGE] stage={0} pid={1} t={2} elapsedMs={3} file={4}",
                 stage,
-                _workerPid ?? 0,
+                _runtime.WorkerPid ?? 0,
                 DateTime.Now.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture),
                 sw != null ? sw.ElapsedMilliseconds : 0,
                 Path.GetFileName(drawingPath ?? ""));
         }
 
-        private void AuditWorkerDocs(
-            string stage,
-            string itemTempDir,
-            out int outsideTempCount,
-            out int asmCount,
-            out string summary)
+        private CdWorkerDocAuditResult AuditWorkerDocs(string stage, string itemTempDir, bool allowZeroOnly)
         {
-            outsideTempCount = 0;
-            asmCount = 0;
-            summary = "none";
-            if (_workerApp == null)
-                return;
+            var result = new CdWorkerDocAuditResult();
+            int pid = _runtime.WorkerPid ?? 0;
 
-            var entries = new List<string>();
-            int total = 0;
-            try
+            if (!_runtime.HasWorker)
             {
-                Array docs = _workerApp.GetDocuments() as Array;
-                if (docs != null)
+                result.AuditSucceeded = false;
+                result.AuditError = "WORKER_UNAVAILABLE";
+                result.Summary = "audit_err=WORKER_UNAVAILABLE";
+                Log("[CD ISO VERIFIER DOC AUDIT] stage=" + stage + " pid=" + pid + " auditOk=False error=WORKER_UNAVAILABLE");
+                return result;
+            }
+
+            if (!_runtime.TryGetDocuments(out int reportedCount, out List<CdWorkerDocSnapshot> docs, out string enumError))
+            {
+                result.AuditSucceeded = false;
+                result.AuditError = string.IsNullOrWhiteSpace(enumError) ? "ENUM_FAILED" : enumError;
+                result.Summary = "audit_err=" + result.AuditError;
+                Log("[CD ISO VERIFIER DOC AUDIT] stage=" + stage + " pid=" + pid + " auditOk=False error=" + result.AuditError);
+                return result;
+            }
+
+            result.ReportedDocCount = reportedCount;
+            var entries = new List<string>();
+            if (docs != null)
+            {
+                foreach (CdWorkerDocSnapshot doc in docs)
                 {
-                    for (int i = docs.GetLowerBound(0); i <= docs.GetUpperBound(0); i++)
+                    result.TotalCount++;
+                    if (doc == null || !doc.ReadSucceeded)
                     {
-                        ModelDoc2 md = docs.GetValue(i) as ModelDoc2;
-                        if (md == null)
-                            continue;
-                        total++;
-                        int docType = -1;
-                        string path = "";
-                        string title = "";
-                        bool dirty = false;
-                        bool ro = false;
-                        try { docType = md.GetType(); } catch { }
-                        try { path = md.GetPathName() ?? ""; } catch { }
-                        try { title = md.GetTitle() ?? ""; } catch { }
-                        try { dirty = md.GetSaveFlag(); } catch { }
-                        try { ro = md.IsOpenedReadOnly(); } catch { }
-
-                        bool isAsm = docType == (int)swDocumentTypes_e.swDocASSEMBLY ||
-                            path.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase);
-                        bool insideTemp = !string.IsNullOrWhiteSpace(path) && IsPathInsideDirectory(path, itemTempDir);
-                        if (isAsm) asmCount++;
-                        if (!insideTemp) outsideTempCount++;
-
-                        entries.Add(string.Format(
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            "{0}:type={1}:inTemp={2}:asm={3}:dirty={4}:ro={5}:path={6}",
-                            title,
-                            docType,
-                            insideTemp,
-                            isAsm,
-                            dirty,
-                            ro,
-                            path));
+                        result.UnreadableCount++;
+                        string err = doc != null ? doc.ReadError : "null_snapshot";
+                        result.OffendingDocs.Add("unreadable:" + (doc != null ? doc.Title : "") + ":" + err);
+                        entries.Add("UNREADABLE:" + err);
+                        continue;
                     }
+
+                    bool isAsm = IsAssemblySnapshot(doc);
+                    bool insideTemp = !string.IsNullOrWhiteSpace(doc.Path) && IsPathInsideDirectory(doc.Path, itemTempDir);
+                    if (isAsm) result.AsmCount++;
+                    if (!insideTemp) result.OutsideTempCount++;
+                    if (allowZeroOnly || isAsm || !insideTemp)
+                    {
+                        result.OffendingDocs.Add(string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "{0}|asm={1}|inTemp={2}|path={3}",
+                            doc.Title,
+                            isAsm,
+                            insideTemp,
+                            doc.Path));
+                    }
+
+                    entries.Add(string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        "{0}:type={1}:inTemp={2}:asm={3}:dirty={4}:ro={5}:path={6}",
+                        doc.Title,
+                        doc.DocType,
+                        insideTemp,
+                        isAsm,
+                        doc.Dirty,
+                        doc.ReadOnly,
+                        doc.Path));
                 }
             }
-            catch (Exception ex)
+
+            if (result.UnreadableCount > 0)
             {
-                summary = "audit_err=" + ex.Message;
-                Log("[CD ISO VERIFIER DOC AUDIT] stage=" + stage + " pid=" + (_workerPid ?? 0) + " error=" + ex.Message);
-                return;
+                result.AuditSucceeded = false;
+                result.AuditError = "UNREADABLE_DOC_PROPERTY count=" + result.UnreadableCount;
+            }
+            else
+            {
+                result.AuditSucceeded = true;
             }
 
-            summary = entries.Count > 0 ? string.Join(" ; ", entries) : "none";
+            result.Summary = entries.Count > 0 ? string.Join(" ; ", entries) : "none";
             Log("[CD ISO VERIFIER DOC AUDIT] stage=" + stage +
-                " pid=" + (_workerPid ?? 0) +
-                " count=" + total +
-                " outsideTemp=" + outsideTempCount +
-                " asmCount=" + asmCount +
-                " docs=[" + summary + "]");
+                " pid=" + pid +
+                " auditOk=" + result.AuditSucceeded +
+                " count=" + result.TotalCount +
+                " outsideTemp=" + result.OutsideTempCount +
+                " asmCount=" + result.AsmCount +
+                " unreadable=" + result.UnreadableCount +
+                " docs=[" + result.Summary + "]");
+            return result;
         }
 
-        private int CloseAllWorkerDocuments()
+        private CdWorkerCleanupResult CloseAllWorkerDocuments(string ownedTempDir, Stopwatch closeSw, string drawingPath)
         {
-            if (_workerApp == null)
-                return 0;
+            var res = new CdWorkerCleanupResult();
+            if (!_runtime.HasWorker)
+            {
+                res.Success = true;
+                res.RemainingDocs = 0;
+                return res;
+            }
 
             for (int guard = 0; guard < 16; guard++)
             {
-                Array docs = null;
-                try { docs = _workerApp.GetDocuments() as Array; }
-                catch { break; }
+                if (!_runtime.TryGetDocuments(out int docCount, out List<CdWorkerDocSnapshot> docs, out string enumErr))
+                {
+                    res.Success = false;
+                    res.RemainingDocs = -1;
+                    res.ErrorReason = "PRE_CLOSE_ENUM_FAILED: " + enumErr;
+                    return res;
+                }
 
-                if (docs == null || docs.Length == 0)
+                if (docCount == 0 && (docs == null || docs.Count == 0))
                     break;
 
-                // Close Drawings before Assemblies and Assemblies before Parts via QuitDoc (close without saving)
-                // to mirror main batch cleanup order and avoid CloseDoc saving prompts or dependency traps.
-                var targets = new List<KeyValuePair<int, string>>();
-                for (int i = docs.GetLowerBound(0); i <= docs.GetUpperBound(0); i++)
+                // Ownership guard BEFORE closing anything: never call QuitDoc/CloseDoc/CloseAllDocuments
+                // if any open document is unreadable, is an Assembly, or sits outside ownedTempDir.
+                if (docs != null)
                 {
-                    ModelDoc2 md = docs.GetValue(i) as ModelDoc2;
-                    if (md == null) continue;
-                    int t = -1;
-                    string title = "";
-                    try { t = md.GetType(); } catch { }
-                    try { title = md.GetTitle() ?? ""; } catch { }
-                    if (string.IsNullOrWhiteSpace(title))
-                        continue;
+                    foreach (CdWorkerDocSnapshot doc in docs)
+                    {
+                        bool isAsm = doc == null || IsAssemblySnapshot(doc);
+                        bool insideOwned = doc != null &&
+                            doc.ReadSucceeded &&
+                            !string.IsNullOrWhiteSpace(doc.Path) &&
+                            IsPathInsideDirectory(doc.Path, ownedTempDir);
 
-                    int prio = t == (int)swDocumentTypes_e.swDocDRAWING ? 0
-                             : t == (int)swDocumentTypes_e.swDocASSEMBLY ? 1
-                             : t == (int)swDocumentTypes_e.swDocPART ? 2 : 3;
-                    targets.Add(new KeyValuePair<int, string>(prio, title));
+                        if (doc == null || !doc.ReadSucceeded || isAsm || !insideOwned)
+                        {
+                            string desc = doc == null
+                                ? "null_doc"
+                                : string.Format(
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    "title={0}|asm={1}|inTemp={2}|readOk={3}|path={4}|err={5}",
+                                    doc.Title,
+                                    isAsm,
+                                    insideOwned,
+                                    doc.ReadSucceeded,
+                                    doc.Path,
+                                    doc.ReadError);
+                            res.UnownedDocsSkipped.Add(desc);
+                        }
+                    }
+                }
+
+                if (res.UnownedDocsSkipped.Count > 0)
+                {
+                    res.Success = false;
+                    res.RemainingDocs = docs != null ? docs.Count : docCount;
+                    res.ErrorReason = "UNOWNED_OR_UNEXPECTED_DOC_IN_CLEANUP: " + string.Join("; ", res.UnownedDocsSkipped);
+                    Log("[CD ISO VERIFIER CLEANUP ABORT] pid=" + (_runtime.WorkerPid ?? 0) + " skippedUnowned=" + res.ErrorReason);
+                    return res;
+                }
+
+                if (CleanupModeForTestsOnly == CdWorkerCleanupMode.CloseAllOwnedDocs)
+                {
+                    Log(FormatStageLog("BEFORE_CLOSEALL", drawingPath, closeSw));
+                    bool okAll = _runtime.TryCloseAllDocuments(true, out string closeAllErr);
+                    res.CloseCallsExecuted++;
+                    Log(FormatStageLog("AFTER_CLOSEALL", drawingPath, closeSw) + " ok=" + okAll +
+                        (string.IsNullOrEmpty(closeAllErr) ? "" : " err=" + closeAllErr));
+                    break;
+                }
+
+                // Close Drawings before Parts (Assemblies were already rejected above).
+                var targets = new List<KeyValuePair<int, string>>();
+                if (docs != null)
+                {
+                    foreach (CdWorkerDocSnapshot doc in docs)
+                    {
+                        if (string.IsNullOrWhiteSpace(doc.Title))
+                        {
+                            res.Success = false;
+                            res.RemainingDocs = docs.Count;
+                            res.ErrorReason = "EMPTY_DOC_TITLE_IN_CLEANUP path=" + doc.Path;
+                            return res;
+                        }
+
+                        int prio = doc.DocType == (int)swDocumentTypes_e.swDocDRAWING ? 0
+                                 : doc.DocType == (int)swDocumentTypes_e.swDocASSEMBLY ? 1
+                                 : doc.DocType == (int)swDocumentTypes_e.swDocPART ? 2 : 3;
+                        targets.Add(new KeyValuePair<int, string>(prio, doc.Title));
+                    }
                 }
 
                 if (targets.Count == 0)
@@ -749,37 +821,88 @@ namespace ADDIN.Commands
                 {
                     if (targets[i].Key != topPriority)
                         break;
-                    try
-                    {
-                        _workerApp.QuitDoc(targets[i].Value);
+
+                    string title = targets[i].Value;
+                    bool closed = CloseSingleOwnedDoc(title, topPriority, closeSw, drawingPath, out string methodUsed);
+                    res.CloseCallsExecuted++;
+                    if (closed)
                         closedAny = true;
-                    }
-                    catch
-                    {
-                        try
-                        {
-                            _workerApp.CloseDoc(targets[i].Value);
-                            closedAny = true;
-                        }
-                        catch { }
-                    }
+                    else
+                        Log("[CD ISO VERIFIER CLEANUP WARN] Failed " + methodUsed + " target=" + title);
                 }
 
                 if (!closedAny)
                     break;
             }
 
-            try { SafeSetDocumentVisible(_workerApp, false); } catch { }
+            _runtime.SafeSetDocumentVisible(false);
 
-            try
+            if (!_runtime.TryGetDocuments(out int remCount, out List<CdWorkerDocSnapshot> remDocs, out string postErr))
             {
-                Array remaining = _workerApp.GetDocuments() as Array;
-                return remaining != null ? remaining.Length : 0;
+                res.Success = false;
+                res.RemainingDocs = -1;
+                res.ErrorReason = "POST_CLOSE_ENUM_FAILED: " + postErr;
+                return res;
             }
-            catch
+
+            int actualCount = remDocs != null ? remDocs.Count : 0;
+            res.RemainingDocs = remCount != 0 ? remCount : actualCount;
+            if (remCount != 0 || actualCount != 0)
             {
-                return -1;
+                res.Success = false;
+                res.ErrorReason = "POST_CLOSE_NONZERO_REMAINING reported=" + remCount + " enumerated=" + actualCount;
+                return res;
             }
+
+            res.Success = true;
+            res.RemainingDocs = 0;
+            return res;
+        }
+
+        private bool CloseSingleOwnedDoc(
+            string title,
+            int prio,
+            Stopwatch closeSw,
+            string drawingPath,
+            out string methodUsed)
+        {
+            Log(FormatStageLog("BEFORE_CLOSE_TARGET", drawingPath, closeSw) +
+                " mode=" + CleanupModeForTestsOnly + " prio=" + prio + " target=" + title);
+
+            bool ok;
+            if (CleanupModeForTestsOnly == CdWorkerCleanupMode.CloseDocFirst)
+            {
+                methodUsed = "CloseDoc";
+                ok = _runtime.TryCloseDoc(title, out _);
+                if (!ok)
+                {
+                    methodUsed = "QuitDocFallback";
+                    ok = _runtime.TryQuitDoc(title, out _);
+                }
+            }
+            else
+            {
+                methodUsed = "QuitDoc";
+                ok = _runtime.TryQuitDoc(title, out _);
+                if (!ok)
+                {
+                    methodUsed = "CloseDocFallback";
+                    ok = _runtime.TryCloseDoc(title, out _);
+                }
+            }
+
+            Log(FormatStageLog("AFTER_CLOSE_TARGET", drawingPath, closeSw) +
+                " method=" + methodUsed + " ok=" + ok + " target=" + title);
+            return ok;
+        }
+
+        private static bool IsAssemblySnapshot(CdWorkerDocSnapshot doc)
+        {
+            if (doc == null)
+                return false;
+            return doc.DocType == (int)swDocumentTypes_e.swDocASSEMBLY ||
+                (!string.IsNullOrWhiteSpace(doc.Path) && doc.Path.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(doc.Title) && doc.Title.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase));
         }
 
         private static void SafeSetDocumentVisible(ISldWorks app, bool visible)
@@ -795,35 +918,50 @@ namespace ADDIN.Commands
             try { app.Visible = false; } catch { }
         }
 
-        private void KillWorkerProcessOnly()
+        private int? QuarantineAndTerminateOwnedWorker(string reason)
         {
-            if (_workerApp != null)
+            int? pid = _runtime.WorkerPid;
+            if (_runtime.HasWorker || pid.HasValue)
             {
-                try { CloseAllWorkerDocuments(); } catch { }
-                try { _workerApp.ExitApp(); } catch { }
-                try { Marshal.FinalReleaseComObject(_workerApp); } catch { }
-                _workerApp = null;
+                Log("[CD ISO VERIFIER QUARANTINE] pid=" + (pid ?? 0) + " reason=" + (reason ?? "UNKNOWN"));
             }
 
-            if (_workerPid.HasValue)
+            // Never call CloseAllWorkerDocuments(), QuitDoc(), CloseDoc(), or ExitApp() on quarantine:
+            // detach COM references only and terminate ONLY verified owned child SLDWORKS PID.
+            _runtime.DetachComReferenceOnly();
+
+            if (pid.HasValue)
             {
-                int pid = _workerPid.Value;
-                _workerPid = null;
-                try
-                {
-                    using (Process proc = Process.GetProcessById(pid))
-                    {
-                        if (!proc.HasExited)
-                        {
-                            if (!proc.WaitForExit(4000))
-                            {
-                                proc.Kill();
-                                proc.WaitForExit(3000);
-                            }
-                        }
-                    }
-                }
-                catch { }
+                _runtime.TerminateOwnedProcessOnly(pid.Value, _ownedWorkerPids, Log);
+            }
+
+            return pid;
+        }
+
+        private void GracefulDisposeWorker()
+        {
+            if (!_runtime.HasWorker && !_runtime.WorkerPid.HasValue)
+                return;
+
+            if (!_runtime.HasWorker)
+            {
+                QuarantineAndTerminateOwnedWorker("DISPOSE_CLEANUP_ORPHAN_PID");
+                return;
+            }
+
+            CdWorkerDocAuditResult disposeAudit = AuditWorkerDocs("dispose", _baseTempRoot, allowZeroOnly: true);
+            if (!disposeAudit.IsSafeForZeroDocs)
+            {
+                QuarantineAndTerminateOwnedWorker("DISPOSE_UNSAFE_OR_NONZERO_DOCS: " +
+                    (!disposeAudit.AuditSucceeded ? disposeAudit.AuditError : disposeAudit.Summary));
+                return;
+            }
+
+            int? pid = _runtime.WorkerPid;
+            _runtime.GracefulExitIfClean();
+            if (pid.HasValue)
+            {
+                _runtime.TerminateOwnedProcessOnly(pid.Value, _ownedWorkerPids, Log);
             }
         }
 
@@ -898,12 +1036,23 @@ namespace ADDIN.Commands
             }
         }
 
-        private CdIsolatedVerifyResult Fail(string reason)
+        private static CdIsolatedVerifyResult Fail(string reason)
         {
             return new CdIsolatedVerifyResult
             {
                 Success = false,
                 ErrorReason = reason ?? "UNKNOWN"
+            };
+        }
+
+        private static CdIsolatedVerifyResult FailSafety(string reason, int? quarantinedPid)
+        {
+            return new CdIsolatedVerifyResult
+            {
+                Success = false,
+                ErrorReason = reason ?? "UNKNOWN",
+                SafetyViolation = true,
+                QuarantinedWorkerPid = quarantinedPid
             };
         }
 
@@ -924,8 +1073,523 @@ namespace ADDIN.Commands
             if (_disposed)
                 return;
             _disposed = true;
-            KillWorkerProcessOnly();
+            GracefulDisposeWorker();
             TryDeleteDirectory(_baseTempRoot);
+        }
+
+        private sealed class LiveCdWorkerRuntime : ICdWorkerRuntime
+        {
+            private readonly CdIsolatedVisibleFlatSideVerifier _owner;
+            private ISldWorks _workerApp;
+            private int? _workerPid;
+            private ModelDoc2 _openDrawingDoc;
+
+            public LiveCdWorkerRuntime(CdIsolatedVisibleFlatSideVerifier owner)
+            {
+                _owner = owner;
+            }
+
+            public bool HasWorker => _workerApp != null;
+            public int? WorkerPid => _workerPid;
+            public ISldWorks LiveApp => _workerApp;
+
+            public bool IsWorkerAlive()
+            {
+                if (_workerApp == null || !_workerPid.HasValue)
+                    return false;
+                try
+                {
+                    using (Process p = Process.GetProcessById(_workerPid.Value))
+                    {
+                        if (p.HasExited)
+                            return false;
+                    }
+                    string rev = _workerApp.RevisionNumber();
+                    return !string.IsNullOrEmpty(rev);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            public void EnsureWorker(
+                string swExePath,
+                Action<string> log,
+                HashSet<int> ownedPids,
+                Action<string> quarantineCallback)
+            {
+                if (IsWorkerAlive())
+                    return;
+
+                quarantineCallback?.Invoke("ENSURE_WORKER_REPLACE_DEAD");
+
+                var psi = new ProcessStartInfo(swExePath)
+                {
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Hidden
+                };
+
+                Process proc = Process.Start(psi);
+                if (proc == null)
+                    throw new InvalidOperationException("Failed to start isolated SLDWORKS.exe process.");
+
+                ownedPids.Add(proc.Id);
+                _workerPid = proc.Id;
+                string expectedMoniker = "SolidWorks_PID_" + proc.Id;
+                log?.Invoke("[CD ISO VERIFIER] Starting hidden worker pid=" + proc.Id);
+
+                Stopwatch sw = Stopwatch.StartNew();
+                ISldWorks app = null;
+                while (sw.ElapsedMilliseconds < MaxStartupWaitMs)
+                {
+                    if (proc.HasExited)
+                        throw new InvalidOperationException(
+                            "Isolated SLDWORKS.exe exited prematurely code=" + proc.ExitCode);
+
+                    app = TryGetAppFromRot(expectedMoniker, proc.Id);
+                    if (app != null)
+                    {
+                        try
+                        {
+                            string rev = app.RevisionNumber();
+                            if (!string.IsNullOrEmpty(rev))
+                                break;
+                        }
+                        catch { }
+                        app = null;
+                    }
+
+                    Thread.Sleep(500);
+                }
+
+                if (app == null)
+                {
+                    quarantineCallback?.Invoke("ENSURE_WORKER_STARTUP_TIMEOUT");
+                    throw new TimeoutException("Timed out waiting for ROT moniker " + expectedMoniker);
+                }
+
+                _workerApp = app;
+                CdIsolatedVisibleFlatSideVerifier.KeepWorkerWindowHidden(_workerApp);
+                try { _workerApp.UserControl = false; } catch { }
+                log?.Invoke("[CD ISO VERIFIER] Worker ready pid=" + proc.Id);
+            }
+
+            public bool TryGetDocuments(out int reportedCount, out List<CdWorkerDocSnapshot> docs, out string error)
+            {
+                reportedCount = -1;
+                docs = new List<CdWorkerDocSnapshot>();
+                error = "";
+                if (_workerApp == null)
+                {
+                    error = "WORKER_APP_NULL";
+                    return false;
+                }
+
+                try
+                {
+                    reportedCount = _workerApp.GetDocumentCount();
+                    if (reportedCount < 0)
+                    {
+                        error = "NEGATIVE_DOC_COUNT=" + reportedCount;
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    error = "GetDocumentCount_ERR: " + ex.Message;
+                    return false;
+                }
+
+                Array rawDocs;
+                try
+                {
+                    rawDocs = _workerApp.GetDocuments() as Array;
+                }
+                catch (Exception ex)
+                {
+                    error = "GetDocuments_ERR: " + ex.Message;
+                    return false;
+                }
+
+                if (rawDocs == null)
+                {
+                    if (reportedCount == 0)
+                        return true;
+                    error = "GetDocuments_NULL_WITH_COUNT=" + reportedCount;
+                    return false;
+                }
+
+                for (int i = rawDocs.GetLowerBound(0); i <= rawDocs.GetUpperBound(0); i++)
+                {
+                    ModelDoc2 md = rawDocs.GetValue(i) as ModelDoc2;
+                    if (md == null)
+                    {
+                        docs.Add(new CdWorkerDocSnapshot
+                        {
+                            ReadSucceeded = false,
+                            ReadError = "NULL_MODELDOC2_AT_" + i
+                        });
+                        continue;
+                    }
+
+                    var snap = new CdWorkerDocSnapshot();
+                    var errParts = new List<string>();
+                    try { snap.DocType = md.GetType(); } catch (Exception ex) { errParts.Add("GetType:" + ex.Message); }
+                    try { snap.Path = md.GetPathName() ?? ""; } catch (Exception ex) { errParts.Add("GetPathName:" + ex.Message); }
+                    try { snap.Title = md.GetTitle() ?? ""; } catch (Exception ex) { errParts.Add("GetTitle:" + ex.Message); }
+                    try { snap.Dirty = md.GetSaveFlag(); } catch (Exception ex) { errParts.Add("GetSaveFlag:" + ex.Message); }
+                    try { snap.ReadOnly = md.IsOpenedReadOnly(); } catch (Exception ex) { errParts.Add("IsOpenedReadOnly:" + ex.Message); }
+
+                    snap.ReadSucceeded = errParts.Count == 0;
+                    snap.ReadError = errParts.Count > 0 ? string.Join("; ", errParts) : "";
+                    docs.Add(snap);
+                }
+
+                if (docs.Count != reportedCount)
+                {
+                    error = "DOC_COUNT_MISMATCH reported=" + reportedCount + " enumerated=" + docs.Count;
+                    return false;
+                }
+
+                return true;
+            }
+
+            public void CopyAndRepointPartDependencies(
+                string origDrawingPath,
+                string drwCopyPath,
+                string itemTempDir,
+                string expectedPartPath,
+                out string expectedTempPartPath)
+            {
+                _owner.CopyAndRepointPartDependencies(
+                    _workerApp,
+                    origDrawingPath,
+                    drwCopyPath,
+                    itemTempDir,
+                    expectedPartPath,
+                    out expectedTempPartPath);
+            }
+
+            public void SafeSetDocumentVisible(bool visible)
+            {
+                CdIsolatedVisibleFlatSideVerifier.SafeSetDocumentVisible(_workerApp, visible);
+            }
+
+            public void KeepWorkerWindowHidden()
+            {
+                CdIsolatedVisibleFlatSideVerifier.KeepWorkerWindowHidden(_workerApp);
+            }
+
+            public bool TrySetCurrentWorkingDirectory(string dirPath)
+            {
+                if (_workerApp == null || string.IsNullOrWhiteSpace(dirPath))
+                    return false;
+                try
+                {
+                    return _workerApp.SetCurrentWorkingDirectory(dirPath);
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            public bool TryOpenDrawing(string drwCopyPath, out int openErr, out int openWarn, out string openErrorDetail)
+            {
+                openErr = 0;
+                openWarn = 0;
+                openErrorDetail = "";
+                _openDrawingDoc = null;
+                if (_workerApp == null)
+                {
+                    openErrorDetail = "WORKER_APP_NULL";
+                    return false;
+                }
+
+                _openDrawingDoc = _workerApp.OpenDoc6(
+                    drwCopyPath,
+                    (int)swDocumentTypes_e.swDocDRAWING,
+                    (int)swOpenDocOptions_e.swOpenDocOptions_Silent,
+                    "",
+                    ref openErr,
+                    ref openWarn) as ModelDoc2;
+                return _openDrawingDoc != null;
+            }
+
+            public bool TryResolveAndInspect(
+                string sheetName,
+                string viewName,
+                string itemTempDir,
+                string expectedTempPartPath,
+                CdIsolatedInspectDelegate inspectDelegate,
+                Stopwatch stepSw,
+                string drawingPath,
+                Action<string> log,
+                out FlatDrawingViewSideResult sideResult,
+                out CheckDrawingBom.CdDirectFlatSideProbe probe,
+                out string errorReason,
+                out bool isUnexpectedRefViolation)
+            {
+                sideResult = default;
+                probe = null;
+                errorReason = "";
+                isUnexpectedRefViolation = false;
+
+                ModelDoc2 drwDoc = _openDrawingDoc;
+                if (drwDoc == null)
+                {
+                    errorReason = "DRAWING_NOT_OPEN";
+                    return false;
+                }
+
+                try
+                {
+                    int actErr = 0;
+                    _workerApp.ActivateDoc3(
+                        drwDoc.GetTitle(),
+                        true,
+                        (int)swRebuildOnActivation_e.swDontRebuildActiveDoc,
+                        ref actErr);
+                }
+                catch { }
+
+                DrawingDoc drawing = drwDoc as DrawingDoc;
+                if (drawing == null)
+                {
+                    errorReason = "NOT_A_DRAWING_DOC";
+                    return false;
+                }
+
+                if (!string.IsNullOrWhiteSpace(sheetName))
+                {
+                    try { drawing.ActivateSheet(sheetName); }
+                    catch { }
+                }
+
+                SolidWorks.Interop.sldworks.View targetView = FindTargetView(drawing, sheetName, viewName);
+                if (targetView == null)
+                {
+                    errorReason = "VIEW_NOT_FOUND_IN_ISOLATED_COPY: " + sheetName + "/" + viewName;
+                    return false;
+                }
+
+                // Safety check: confirm the view's referenced part inside the worker resolves
+                // inside itemTempDir before allowing config/display-state activation.
+                ModelDoc2 refDoc = targetView.ReferencedDocument as ModelDoc2;
+                string actualRefPath = "";
+                try { actualRefPath = refDoc != null ? (refDoc.GetPathName() ?? "") : ""; }
+                catch { actualRefPath = ""; }
+
+                if (string.IsNullOrWhiteSpace(actualRefPath) ||
+                    !IsPathInsideDirectory(actualRefPath, itemTempDir) ||
+                    (!string.IsNullOrWhiteSpace(expectedTempPartPath) &&
+                     !string.Equals(SafeFullPath(actualRefPath), SafeFullPath(expectedTempPartPath), StringComparison.OrdinalIgnoreCase)))
+                {
+                    errorReason = "ISOLATED_PATH_GUARD_BLOCKED: actualRef=" + actualRefPath + " expected=" + expectedTempPartPath;
+                    isUnexpectedRefViolation = true;
+                    return false;
+                }
+
+                string partPathForDelegate = !string.IsNullOrWhiteSpace(expectedTempPartPath)
+                    ? expectedTempPartPath
+                    : actualRefPath;
+
+                sideResult = inspectDelegate(
+                    _workerApp,
+                    targetView,
+                    drwDoc,
+                    partPathForDelegate,
+                    out probe);
+                return true;
+            }
+
+            public bool TryQuitDoc(string title, out string error)
+            {
+                error = "";
+                if (_workerApp == null)
+                {
+                    error = "WORKER_APP_NULL";
+                    return false;
+                }
+                try
+                {
+                    _workerApp.QuitDoc(title);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+            }
+
+            public bool TryCloseDoc(string title, out string error)
+            {
+                error = "";
+                if (_workerApp == null)
+                {
+                    error = "WORKER_APP_NULL";
+                    return false;
+                }
+                try
+                {
+                    _workerApp.CloseDoc(title);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+            }
+
+            public bool TryCloseAllDocuments(bool includeUnsaved, out string error)
+            {
+                error = "";
+                if (_workerApp == null)
+                {
+                    error = "WORKER_APP_NULL";
+                    return false;
+                }
+                try
+                {
+                    return _workerApp.CloseAllDocuments(includeUnsaved);
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+            }
+
+            public void GracefulExitIfClean()
+            {
+                if (_workerApp == null)
+                    return;
+                try { _workerApp.ExitApp(); } catch { }
+                DetachComReferenceOnly();
+            }
+
+            public void DetachComReferenceOnly()
+            {
+                _openDrawingDoc = null;
+                if (_workerApp != null)
+                {
+                    try { Marshal.FinalReleaseComObject(_workerApp); } catch { }
+                    _workerApp = null;
+                }
+                _workerPid = null;
+            }
+
+            public bool TerminateOwnedProcessOnly(int pid, HashSet<int> ownedPids, Action<string> log)
+            {
+                int currentPid = Process.GetCurrentProcess().Id;
+                if (pid <= 0 || pid == currentPid || ownedPids == null || !ownedPids.Contains(pid))
+                {
+                    log?.Invoke("[CD ISO VERIFIER TERMINATE BLOCKED] Refused to terminate unverified/unowned pid=" + pid);
+                    return false;
+                }
+
+                try
+                {
+                    using (Process proc = Process.GetProcessById(pid))
+                    {
+                        if (!string.Equals(proc.ProcessName, "SLDWORKS", StringComparison.OrdinalIgnoreCase))
+                        {
+                            log?.Invoke("[CD ISO VERIFIER TERMINATE BLOCKED] Pid=" + pid + " processName=" + proc.ProcessName + " is not SLDWORKS.");
+                            return false;
+                        }
+
+                        if (!proc.HasExited)
+                        {
+                            if (!proc.WaitForExit(3000))
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                    }
+                    return true;
+                }
+                catch (ArgumentException)
+                {
+                    // Process already exited.
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    log?.Invoke("[CD ISO VERIFIER TERMINATE WARN] pid=" + pid + " err=" + ex.Message);
+                    return false;
+                }
+            }
+
+            private static ISldWorks TryGetAppFromRot(string expectedName, int expectedPid)
+            {
+                IRunningObjectTable table = null;
+                IBindCtx ctx = null;
+                IEnumMoniker enumerator = null;
+
+                try
+                {
+                    if (GetRunningObjectTable(0, out table) != 0 || table == null)
+                        return null;
+                    if (CreateBindCtx(0, out ctx) != 0 || ctx == null)
+                        return null;
+
+                    table.EnumRunning(out enumerator);
+                    if (enumerator == null)
+                        return null;
+
+                    IMoniker[] monikers = new IMoniker[1];
+                    while (enumerator.Next(1, monikers, IntPtr.Zero) == 0)
+                    {
+                        IMoniker moniker = monikers[0];
+                        if (moniker == null)
+                            continue;
+                        try
+                        {
+                            string name;
+                            moniker.GetDisplayName(ctx, null, out name);
+                            string normalizedMoniker = (name ?? "").Trim().TrimStart('!');
+                            if (string.Equals(normalizedMoniker, expectedName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                object obj;
+                                if (table.GetObject(moniker, out obj) == 0 && obj is ISldWorks sw)
+                                {
+                                    try
+                                    {
+                                        if (sw.GetProcessID() == expectedPid)
+                                            return sw;
+                                    }
+                                    catch { }
+
+                                    try
+                                    {
+                                        if (Marshal.IsComObject(obj))
+                                            Marshal.ReleaseComObject(obj);
+                                    }
+                                    catch { }
+                                }
+                            }
+                        }
+                        catch { }
+                        finally
+                        {
+                            Marshal.ReleaseComObject(moniker);
+                        }
+                    }
+                }
+                catch { }
+                finally
+                {
+                    if (enumerator != null) Marshal.ReleaseComObject(enumerator);
+                    if (ctx != null) Marshal.ReleaseComObject(ctx);
+                    if (table != null) Marshal.ReleaseComObject(table);
+                }
+
+                return null;
+            }
         }
     }
 }
