@@ -14,26 +14,44 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly CheckBox autoCount = new CheckBox { Text = "Auto count", Checked = true, AutoSize = true };
         private readonly CheckBox addOne = new CheckBox { Text = "Add +1", Checked = true, AutoSize = true };
         private readonly CheckBox flip = new CheckBox { Text = "Flip Side", AutoSize = true };
-        private readonly ComboBox smallMode = new ComboBox { Width = 177, DropDownStyle = ComboBoxStyle.DropDownList };
+        private readonly ComboBox smallMode = new ComboBox { Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
         private SmallEndSpacingMode SmallMode => smallMode.SelectedIndex == 1
             ? SmallEndSpacingMode.EqualPitch : SmallEndSpacingMode.TangentContact;
         private readonly Label total = new Label { AutoSize = true };
-        private readonly Label report = new Label { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+        private readonly TextBox report = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            TabStop = false,
+            BorderStyle = BorderStyle.None,
+            ScrollBars = ScrollBars.Vertical,
+            WordWrap = true,
+            BackColor = SystemColors.Control,
+            Margin = new Padding(0, 8, 0, 4)
+        };
         private readonly Button create = new Button { Text = "Create 3D Sketch", AutoSize = true, Enabled = false };
         private readonly Timer refresh = new Timer { Interval = 350 };
         private readonly Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze;
+        private readonly Action clearPreview;
+        private readonly Action<string> logLine;
         private readonly BoundaryRails rails;
         private bool previewed;
+        private bool previewInProgress;
         public TubeLayout Accepted { get; private set; }
         private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
 
-        public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails, Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze)
+        public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails,
+            Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze,
+            Action clearPreview = null, Action<string> logLine = null)
         {
             this.rails = rails;
             this.analyze = analyze;
+            this.clearPreview = clearPreview;
+            this.logLine = logLine;
             Text = "Circle Along Face";
             Font = SystemFonts.MessageBoxFont;
-            ClientSize = new Size(480, 355);
+            ClientSize = new Size(540, 425);
             AutoScaleMode = AutoScaleMode.Font;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.Manual;
@@ -41,8 +59,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             MaximizeBox = MinimizeBox = false;
 
             var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 9 };
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
             for (int i = 0; i < 7; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -144,12 +162,17 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
         private void InvalidatePreview()
         {
+            if (IsDisposed || Disposing) return;
             Accepted = null;
             create.Enabled = false;
+            if (previewed) clearPreview?.Invoke();
             quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
-            total.Text = Count.HasValue ? "Total axes: " + Count.Value +
-                "  ·  " + SmallMode : "Total axes: Auto (small end touching)";
-            report.Text = RailsText() + (previewed ? "\nUpdating preview…" : "\nChoose Preview to verify the layout.");
+            total.Text = Count.HasValue
+                ? F("Total axes: {0} ({1}{2}) · {3}", Count.Value, (int)quantity.Value,
+                    addOne.Checked ? "+1" : "", SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch")
+                : "Total axes: Auto (small end touching)";
+            report.Text = RailsText() + Environment.NewLine +
+                (previewed ? "Updating preview…" : "Choose Preview to verify the layout.");
             if (!previewed) return;
             refresh.Stop();
             refresh.Start();
@@ -159,33 +182,65 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
         private void Preview()
         {
+            if (IsDisposed || Disposing || previewInProgress) return;
             refresh.Stop();
+            previewInProgress = true;
             previewed = true;
             Accepted = null;
             create.Enabled = false;
             UseWaitCursor = true;
-            report.Text = RailsText() + "\nChecking 3D contact and sheet clearance…";
+            report.Text = RailsText() + Environment.NewLine + "Checking 3D contact, full-length clearance, and sheet BREP…";
             report.Refresh();
             try
             {
                 var mode = autoCount.Checked ? SmallEndSpacingMode.TangentContact : SmallMode;
+                logLine?.Invoke(F("UI_INPUT auto={0} base_count={1} add_one={2} effective_count={3} selected_mode={4} effective_mode={5} diameter_mm={6:F3} margin_mm={7:F3} flip={8}",
+                    autoCount.Checked, (int)quantity.Value, addOne.Checked, Count?.ToString() ?? "auto",
+                    SmallMode, mode, (double)diameter.Value, (double)margin.Value, flip.Checked));
                 var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm, flip.Checked, mode);
-                report.Text = RailsText() + F("\nLarge pitch {0:F3} mm · Small pitch {6:F3} mm · lift {1:F3} mm\nSmall-end adjacent 3D gaps {2:F4}–{3:F4} mm\nLarge cap margins {4:F3} / {5:F3} mm\n",
-                    result.LargePitch / Mm, result.Lift / Mm, result.MinimumContact / Mm, result.MaximumContact / Mm,
-                    result.LargeLeftClearance / Mm, result.LargeRightClearance / Mm, result.SmallPitch / Mm) +
-                    (result.SmallMode == SmallEndSpacingMode.EqualPitch
-                        ? F("Small cap margins {0:F3} / {1:F3} mm\n", result.SmallLeftClearance / Mm, result.SmallRightClearance / Mm)
-                        : "Small end: touching mode\n") +
-                    (result.Issue == null ? "Verified separation for every pair and the sheet." : "INFEASIBLE: " + result.Issue);
-                total.Text = "Total axes: " + result.Axes.Length + (autoCount.Checked && result.Axes.Length == MaximumCount ? " (limit)" : "");
+                if (IsDisposed || Disposing) return;
+                string smallLine = result.SmallMode == SmallEndSpacingMode.EqualPitch
+                    ? F("Small end: EqualPitch · pitch {0:F3} mm · cap margins L={1:F3} / R={2:F3} mm",
+                        result.SmallPitch / Mm, result.SmallLeftClearance / Mm, result.SmallRightClearance / Mm)
+                    : "Small end: Touching mode";
+                string largeLine = F("Large end: pitch {0:F3} mm · cap margins L={1:F3} / R={2:F3} mm",
+                    result.LargePitch / Mm, result.LargeLeftClearance / Mm, result.LargeRightClearance / Mm);
+                string pairTag = result.MinimumGapPairA > 0
+                    ? F(" (pair {0}-{1})", result.MinimumGapPairA, result.MinimumGapPairB)
+                    : "";
+                string interferenceTag = result.InterferingPairCount > 0
+                    ? F(" · interfering={0} (first {1}-{2})", result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB)
+                    : "";
+                string gapsLine = F("Adj small 3D gaps: {0:F4}–{1:F4} mm · Min full 3D gap: {2:F4} mm{3}{4}",
+                    result.MinimumContact / Mm, result.MaximumContact / Mm, result.MinimumGap / Mm, pairTag, interferenceTag);
+                string brepStatus = result.SheetClashCount == 0 && result.SheetInconclusiveCount == 0
+                    ? "Clear"
+                    : F("clashes={0}, inconclusive={1}", result.SheetClashCount, result.SheetInconclusiveCount);
+                string sheetLine = F("Sheet clearance: min {0:F3} mm · BREP: {1} · lift {2:F3} mm",
+                    result.MinimumSheetEstimate / Mm, brepStatus, result.Lift / Mm);
+                string statusLine = result.Issue == null
+                    ? "OK: Verified 3D separation for every pair and the sheet."
+                    : "INFEASIBLE: " + result.Issue;
+
+                report.Text = string.Join(Environment.NewLine,
+                    RailsText(), smallLine, largeLine, gapsLine, sheetLine, statusLine);
+                total.Text = autoCount.Checked
+                    ? F("Total axes: {0} (Auto{1})", result.Axes.Length, result.Axes.Length == MaximumCount ? ", limit" : "")
+                    : F("Total axes: {0} ({1}{2}) · {3}", result.Axes.Length, (int)quantity.Value,
+                        addOne.Checked ? "+1" : "", result.SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch");
                 Accepted = result;
                 create.Enabled = result.Issue == null;
             }
             catch (Exception ex)
             {
-                report.Text = RailsText() + "\n" + ex.Message;
+                if (!IsDisposed && !Disposing)
+                    report.Text = RailsText() + Environment.NewLine + ex.Message;
             }
-            finally { UseWaitCursor = false; }
+            finally
+            {
+                previewInProgress = false;
+                if (!IsDisposed && !Disposing) UseWaitCursor = false;
+            }
         }
 
         private static NumericUpDown Number(decimal value, decimal min, decimal max, int places) =>

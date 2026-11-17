@@ -76,6 +76,15 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         EnsureModel();
                         TubeLayout layout = geometry.Analyze(count, diameter, margin, flip, smallMode);
                         ShowPreview(geometry.Rails, layout);
+                        Log(F("PREVIEW_SUMMARY mode={0} count={1} small_pitch_mm={2:F6} large_pitch_mm={3:F6} small_left_mm={4:F6} small_right_mm={5:F6} large_left_mm={6:F6} large_right_mm={7:F6} small_gap_mm={8:F6}..{9:F6} min_full_mm={10:F6} min_full_pair={11}-{12} interfering_pairs={13} first_interfering_pair={14}-{15} sheet_min_mm={16:F6} sheet_clashes={17} sheet_inconclusive={18} lift_mm={19:F6}",
+                            layout.SmallMode, layout.Axes.Length, layout.SmallPitch / Mm, layout.LargePitch / Mm,
+                            layout.SmallLeftClearance / Mm, layout.SmallRightClearance / Mm,
+                            layout.LargeLeftClearance / Mm, layout.LargeRightClearance / Mm,
+                            layout.MinimumContact / Mm, layout.MaximumContact / Mm,
+                            layout.MinimumGap / Mm, layout.MinimumGapPairA, layout.MinimumGapPairB,
+                            layout.InterferingPairCount, layout.FirstInterferingPairA, layout.FirstInterferingPairB,
+                            layout.MinimumSheetEstimate / Mm, layout.SheetClashCount, layout.SheetInconclusiveCount,
+                            layout.Lift / Mm));
                         Log("PREVIEW_END result=" + (layout.Issue ?? "verified"));
                         return layout;
                     }
@@ -85,7 +94,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         ClearPreview();
                         throw;
                     }
-                }))
+                }, ClearPreview, Log))
                 {
                     if (dialog.ShowDialog(owner) != DialogResult.OK)
                     {

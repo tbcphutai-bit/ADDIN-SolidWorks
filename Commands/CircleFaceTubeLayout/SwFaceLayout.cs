@@ -70,7 +70,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             // lift. A bounded search deliberately rejects faces that require more.
             double lift = 0.01 * Mm;
             TubeLayout layout = null;
+            int clashes = 0;
             int uncertain = 0;
+            bool flippedSolidClash = false;
             for (int pass = 0; pass < 9 && lift <= 2 * diameter; pass++)
             {
                 if (count.HasValue)
@@ -92,7 +94,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         limit = layout.Axes.Length - 1;
                     }
                 }
-                int clashes = 0;
+                clashes = 0;
                 uncertain = 0;
                 layout.MinimumSheetEstimate = double.PositiveInfinity;
                 for (int i = 0; i < layout.Axes.Length; i++)
@@ -105,6 +107,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     if (check == SheetCheck.Inconclusive) uncertain++;
                     log(F("SHEET axis={0} sampled_min_mm={1:F6} brep={2}", i + 1, estimate / Mm, check));
                 }
+                layout.SheetClashCount = clashes;
+                layout.SheetInconclusiveCount = uncertain;
                 log(F("LIFT pass={0} offset_mm={1:F6} clashes={2} signed_sample_min_mm={3:F6} inconclusive={4}",
                     pass + 1, lift / Mm, clashes, layout.MinimumSheetEstimate / Mm, uncertain));
                 if (clashes == 0 && uncertain == 0 && layout.MinimumSheetEstimate >= -0.02 * Mm) return layout;
@@ -112,13 +116,17 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 {
                     // On a solid, the opposite normal points into material. A
                     // flipped solution is allowed only if the body check is clear.
+                    flippedSolidClash = true;
                     log("FLIPPED_SOLID: selected side may be inside the sheet material.");
                 }
                 lift += Math.Max(Math.Max(0.05 * Mm, lift * 0.5), -layout.MinimumSheetEstimate + 0.02 * Mm);
             }
-            layout.Issue = uncertain > 0
+            string sheetIssue = uncertain > 0
                 ? "SolidWorks could not verify all tube-to-sheet checks within the allowed lift."
-                : "The solver could not clear the sheet while staying close to the selected side.";
+                : flippedSolidClash
+                    ? "The solver could not clear the sheet while staying close to the selected side (the flipped direction points into solid material)."
+                    : "The solver could not clear the sheet while staying close to the selected side.";
+            AddIssue(layout, sheetIssue);
             return layout;
         }
 
@@ -312,16 +320,19 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             distances[intervals] = length;
             Point3 At(double station)
             {
-                double target = forward ? station : length - station;
+                double target = Math.Max(0, Math.Min(length, forward ? station : length - station));
                 int pos = Array.BinarySearch(distances, target);
                 if (pos >= 0) return Point3.Read(curve.Evaluate2(lo + (hi - lo) * pos / intervals, 0));
                 pos = ~pos;
+                if (pos <= 0) return Point3.Read(curve.Evaluate2(lo, 0));
+                if (pos > intervals) return Point3.Read(curve.Evaluate2(hi, 0));
                 double min = lo + (hi - lo) * (pos - 1) / intervals, max = lo + (hi - lo) * pos / intervals;
                 double minLength = distances[pos - 1], maxLength = distances[pos];
-                for (int i = 0; i < 28; i++)
+                for (int i = 0; i < 56; i++)
                 {
                     double fraction = (target - minLength) / (maxLength - minLength);
-                    double u = min + (max - min) * (i == 0 ? fraction : Math.Max(0.2, Math.Min(0.8, fraction)));
+                    double step = i == 0 ? fraction : ((i & 3) == 3 ? 0.5 : Math.Max(0.1, Math.Min(0.9, fraction)));
+                    double u = min + (max - min) * step;
                     double l = curve.GetLength3(lo, u);
                     if (Math.Abs(l - target) <= 1e-8) return Point3.Read(curve.Evaluate2(u, 0));
                     if (l < target) { min = u; minLength = l; } else { max = u; maxLength = l; }

@@ -38,6 +38,7 @@ internal static class GeometryTests
             Summary("twisted_flip", flipped);
             Require(flipped.Axes[20].A.Z < twisted.Axes[20].A.Z, "flip offsets on opposite sides");
             ExpectFailure(() => Layout(50, 0, false, Quiet), "insufficient small-end room");
+            ExpectFailure(() => Layout(MaximumCount + 1, 0, false, Quiet), "exceeding MaximumCount must fail");
             ExpectFailure(() => Solve(_ => new RailStation(), 1, _ => new RailStation(new Point3(1, 0, 0), new Point3(0, 0, 1)),
                 0.001, 41, Diameter, 0.005, 0, Quiet), "invalid/insufficient large rail");
             Console.WriteLine("PASS all geometry tests");
@@ -54,38 +55,140 @@ internal static class GeometryTests
     {
         const double shortRail = 0.81135, longRail = 1.42197, margin = 0.005;
         var normal = new Point3(0, 0, 1);
-        RailStation Small(double s) => new RailStation(new Point3(s, 0, 0), normal);
-        RailStation Large(double s) => new RailStation(new Point3(s, 1, 0), normal);
-        var layout = Solve(Small, shortRail, Large, longRail, 20, Diameter, margin,
-            0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
-        Require(layout.Issue == null, layout.Issue ?? "equal custom should be feasible");
-        foreach (int customCount in new[] { 30, 40 })
+
+        // 1. Low-taper straight rails verify exact nominal pitch formula up to N=40 and rejection at N=41.
+        const double nearParallelLong = 0.820;
+        RailStation StraightSmall(double s) => new RailStation(new Point3(s - shortRail / 2, 0, 0), normal);
+        RailStation StraightLarge(double s) => new RailStation(new Point3(s - nearParallelLong / 2, 2.0, 0), normal);
+        foreach (int customCount in new[] { 20, 30, 40 })
         {
-            TubeLayout custom = Solve(Small, shortRail, Large, longRail, customCount, Diameter,
+            TubeLayout custom = Solve(StraightSmall, shortRail, StraightLarge, nearParallelLong, customCount, Diameter,
                 margin, 0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
-            Require(custom.Issue == null, "Equal-pitch custom " + customCount + ": " + custom.Issue);
-            double smallPitch = (shortRail - Diameter - 2 * margin) / (customCount - 1);
-            double largePitch = (longRail - Diameter - 2 * margin) / (customCount - 1);
-            Require(Math.Abs(custom.SmallPitch - smallPitch) < 0.00002 &&
-                Math.Abs(custom.LargePitch - largePitch) < 0.00002,
-                "Independent pitches for Custom " + customCount);
-            Require(Math.Abs(custom.SmallLeftClearance - margin) < 0.00002 &&
-                Math.Abs(custom.SmallRightClearance - margin) < 0.00002,
-                "Balanced small-end margins for Custom " + customCount);
+            Require(custom.Issue == null, "Equal-pitch low-taper custom " + customCount + ": " + custom.Issue);
+            Require(custom.SmallMode == SmallEndSpacingMode.EqualPitch, "equal-pitch mode persisted");
+            double nominalSmallPitch = (shortRail - Diameter - 2 * margin) / (customCount - 1);
+            double nominalLargePitch = (nearParallelLong - Diameter - 2 * margin) / (customCount - 1);
+            Require(Math.Abs(custom.SmallPitch - nominalSmallPitch) < 0.00002 &&
+                Math.Abs(custom.LargePitch - nominalLargePitch) < 0.00002,
+                "Independent pitches for low-taper Custom " + customCount);
+            AssertEqualPitchLayout(custom, customCount, margin);
         }
-        Require(layout.SmallMode == SmallEndSpacingMode.EqualPitch, "equal-pitch mode persisted");
-        Require(Math.Abs(layout.SmallPitch - (shortRail - Diameter - 2 * margin) / 19) < 0.00002,
-            "independent small-end pitch");
-        Require(Math.Abs(layout.LargePitch - (longRail - Diameter - 2 * margin) / 19) < 0.00002,
-            "independent large-end pitch");
-        Require(Math.Abs(layout.SmallLeftClearance - margin) < 0.00002 &&
-            Math.Abs(layout.SmallRightClearance - margin) < 0.00002, "symmetric small cap margins");
-        Require(Math.Abs(layout.LargeLeftClearance - margin) < 0.00002 &&
-            Math.Abs(layout.LargeRightClearance - margin) < 0.00002, "symmetric large cap margins");
-        var tooMany = Solve(Small, shortRail, Large, longRail, 41, Diameter, margin,
+        TubeLayout lowTaper41 = Solve(StraightSmall, shortRail, StraightLarge, nearParallelLong, 41, Diameter,
+            margin, 0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(lowTaper41.Issue != null && lowTaper41.InterferingPairCount > 0,
+            "low-taper N=41 (pitch 19.534 mm < 20 mm) must be rejected");
+
+        // 2. Reference curved & twisted sheet (R3247 L=811.35 mm -> R4323.16 L=1421.97 mm, OD=20, M=5):
+        //    N=20 and N=30 pass cleanly with nonzero small-end gap and balanced L/R cap margins;
+        //    N=40 and N=41 must be rejected because 3D tilted outer pairs interfere (< 20 mm perpendicular).
+        foreach (double twist in new[] { 0.0, 0.07 })
+        {
+            foreach (int n in new[] { 20, 30 })
+            {
+                TubeLayout ok = SolveEqualArc(n, Diameter, margin, twist, false, Quiet);
+                Require(ok.Issue == null, F("Equal-pitch arc twist={0} N={1} failed: {2}", twist, n, ok.Issue));
+                AssertEqualPitchLayout(ok, n, margin);
+                Require(ok.MinimumContact > Diameter / 20, "EqualPitch allows nonzero small-end gap");
+            }
+            foreach (int n in new[] { 40, 41 })
+            {
+                TubeLayout clash = SolveEqualArc(n, Diameter, margin, twist, false, Quiet);
+                Require(clash.Issue != null && clash.InterferingPairCount > 0 &&
+                    clash.MinimumGap <= TubeDistance.Resolution,
+                    F("Equal-pitch arc twist={0} N={1} must detect 3D interference", twist, n));
+            }
+        }
+
+        // Flip Side in EqualPitch on twisted arc (N=30) must place axes on opposite sides cleanly.
+        TubeLayout twisted30 = SolveEqualArc(30, Diameter, margin, 0.07, false, Quiet);
+        TubeLayout twisted30Flip = SolveEqualArc(30, Diameter, margin, 0.07, true, Quiet);
+        Require(twisted30Flip.Issue == null, twisted30Flip.Issue ?? "flipped equal-pitch N=30 failed");
+        AssertEqualPitchLayout(twisted30Flip, 30, margin);
+        Require(twisted30Flip.Axes[15].A.Z < twisted30.Axes[15].A.Z, "EqualPitch Flip Side reverses offset direction");
+
+        // 3. Feasible N=40 with 811.35 / 1421.97 rails when margin=0 mm (or long 5.5 m span with margin=5 mm),
+        //    while N=41 still fails.
+        TubeLayout arc40Margin0 = SolveEqualArc(40, Diameter, 0.0, 0.07, false, Quiet);
+        Require(arc40Margin0.Issue == null, arc40Margin0.Issue ?? "twisted arc N=40 with 0mm margin should fit");
+        AssertEqualPitchLayout(arc40Margin0, 40, 0.0);
+        TubeLayout arc41Margin0 = SolveEqualArc(41, Diameter, 0.0, 0.07, false, Quiet);
+        Require(arc41Margin0.Issue != null && arc41Margin0.InterferingPairCount > 0,
+            "twisted arc N=41 with 0mm margin still exceeds small-end 3D fit");
+
+        RailStation SpanSmall(double s) => new RailStation(new Point3(s - shortRail / 2, 0, 0), normal);
+        RailStation SpanLarge(double s) => new RailStation(new Point3(s - longRail / 2, 5.5, 0), normal);
+        TubeLayout span40 = Solve(SpanSmall, shortRail, SpanLarge, longRail, 40, Diameter, margin,
             0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
-        Require(tooMany.Issue != null, "overcrowded equal small rail must be rejected");
-        Console.WriteLine("PASS custom equal-pitch small/large ends and dense-count collision rejection");
+        Require(span40.Issue == null, span40.Issue ?? "low-angle 811.35/1421.97 N=40 should fit");
+        AssertEqualPitchLayout(span40, 40, margin);
+        TubeLayout span41 = Solve(SpanSmall, shortRail, SpanLarge, longRail, 41, Diameter, margin,
+            0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(span41.Issue != null && span41.InterferingPairCount > 0,
+            "low-angle 811.35/1421.97 N=41 must fail 3D clearance");
+
+        // 4. Varied diameters, margins, minimum count N=2, and insufficient rail length guards.
+        TubeLayout smallDia = Solve(StraightSmall, shortRail, StraightLarge, nearParallelLong, 2, 0.016,
+            0.010, 0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(smallDia.Issue == null, smallDia.Issue ?? "N=2 OD=16 M=10 failed");
+        AssertEqualPitchLayout(smallDia, 2, 0.010);
+
+        TubeLayout zeroMargin = Solve(StraightSmall, shortRail, StraightLarge, nearParallelLong, 20, 0.025,
+            0.0, 0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(zeroMargin.Issue == null, zeroMargin.Issue ?? "N=20 OD=25 M=0 failed");
+        AssertEqualPitchLayout(zeroMargin, 20, 0.0);
+
+        ExpectFailure(() => Solve(StraightSmall, 0.030, StraightLarge, 0.100, 2, Diameter, 0.005, 0.00001, Quiet,
+            smallMode: SmallEndSpacingMode.EqualPitch), "EqualPitch smallLength == D + 2M");
+        ExpectFailure(() => Solve(StraightSmall, 0.025, StraightLarge, 0.100, 2, Diameter, 0.005, 0.00001, Quiet,
+            smallMode: SmallEndSpacingMode.EqualPitch), "EqualPitch smallLength < D + 2M");
+        ExpectFailure(() => Solve(StraightSmall, 0.100, StraightLarge, 0.030, 2, Diameter, 0.005, 0.00001, Quiet,
+            smallMode: SmallEndSpacingMode.EqualPitch), "EqualPitch largeLength == D + 2M");
+
+        // 5. VerifyExact must catch exact-station discrepancies (margins or collisions).
+        TubeLayout tampered = SolveEqualArc(30, Diameter, margin, 0.07, false, Quiet);
+        tampered.SmallStations[0] = 0.001; // force exact small left cap margin violation
+        VerifyExact(tampered, s => ArcStation(s / SmallLength, false, 0.07, false),
+            s => ArcStation(s / LargeLength, true, 0.07, false), LargeLength, Diameter, margin, Quiet);
+        Require(tampered.Issue != null, "VerifyExact must reject out-of-tolerance small cap margin");
+
+        Console.WriteLine("PASS custom equal-pitch small/large ends, balanced margins, twist/flip, and 3D collision checks");
+    }
+
+    private static RailStation ArcStation(double fraction, bool outer, double twist, bool flip)
+    {
+        Point3 Small(double s) => Arc(SmallRadius, SmallLength, s, 0);
+        Point3 Large(double s) => Arc(LargeRadius, LargeLength, s, twist);
+        Point3 p = Small(fraction * SmallLength), q = Large(fraction * LargeLength);
+        double length = outer ? LargeLength : SmallLength;
+        Func<double, Point3> point = outer ? (Func<double, Point3>)Large : Small;
+        double sVal = length * fraction;
+        var tangent = point(sVal + 1e-7) - point(sVal - 1e-7);
+        return new RailStation(outer ? q : p, (q - p).Cross(tangent).Unit() * (flip ? -1 : 1));
+    }
+
+    private static TubeLayout SolveEqualArc(int count, double diameter, double margin, double twist, bool flip, Action<string> log)
+    {
+        return Solve(s => ArcStation(s / SmallLength, false, twist, flip), SmallLength,
+            s => ArcStation(s / LargeLength, true, twist, flip), LargeLength,
+            count, diameter, margin, 0.00001, log, smallMode: SmallEndSpacingMode.EqualPitch);
+    }
+
+    private static void AssertEqualPitchLayout(TubeLayout layout, int count, double margin)
+    {
+        Require(layout.Axes.Length == count, "axis count matches requested count");
+        Require(layout.MinimumGap > TubeDistance.Resolution && layout.InterferingPairCount == 0,
+            "all tubes have proven 3D separation");
+        Require(Math.Abs(layout.SmallLeftClearance - margin) <= 0.00002 &&
+            Math.Abs(layout.SmallRightClearance - margin) <= 0.00002,
+            "symmetric small cap margins");
+        Require(Math.Abs(layout.LargeLeftClearance - margin) <= 0.00002 &&
+            Math.Abs(layout.LargeRightClearance - margin) <= 0.00002,
+            "symmetric large cap margins");
+        for (int i = 1; i < count; i++)
+        {
+            double step = layout.SmallStations[i] - layout.SmallStations[i - 1];
+            Require(step > 0 && Math.Abs(step - layout.SmallPitch) < 1e-9, "strictly equal increasing small stations");
+        }
     }
 
     private static void TestCylinders()
@@ -112,7 +215,20 @@ internal static class GeometryTests
         Gap arc = TubeDistance.Between(new TubeAxis(p, p + new Point3(0, 0, 1)),
             new TubeAxis(q, q + new Point3(0, 0, 1)), 0.010);
         Require((p - q).Length < Diameter && arc.Lower == 0, "20 mm arc pitch does not certify contact");
-        Console.WriteLine("PASS finite caps, crossing, 3D separation bounds, arc/chord regression");
+
+        // Two tilted parallel cylinders spaced 20.04 mm along X but tilted 10 deg in XY
+        // have perpendicular distance 20.04 * cos(10 deg) = 19.735 mm < 20 mm -> collision.
+        double dx = Math.Sin(10 * Math.PI / 180), dy = Math.Cos(10 * Math.PI / 180);
+        var t0 = new TubeAxis(new Point3(0, 0, 0), new Point3(dx, dy, 0));
+        var t1 = new TubeAxis(new Point3(0.02004, 0, 0), new Point3(0.02004 + dx, dy, 0));
+        Gap tiltedClash = TubeDistance.Between(t0, t1, 0.010);
+        Require(tiltedClash.Upper <= TubeDistance.Resolution && tiltedClash.Lower == 0,
+            "tilted cylinders with 20.04 mm edge pitch still collide in 3D");
+
+        // Near-touching parallel cylinders with 0.001 mm gap must prove separation > Resolution.
+        Gap tightClear = TubeDistance.Between(a, Axis(0.020001, 0, 1), 0.010);
+        Require(tightClear.Lower > TubeDistance.Resolution, "0.001 mm parallel separation proven");
+        Console.WriteLine("PASS finite caps, crossing, 3D separation bounds, tilted overlap, arc/chord regression");
     }
 
     private static TubeAxis Axis(double x, double from, double to) =>
@@ -141,9 +257,15 @@ internal static class GeometryTests
         var rectangle = new[] { new Point3(0, 0, 0), new Point3(0, 1, 0), new Point3(1, 1, 0), new Point3(1, 0, 0) };
         ExpectFailure(() => BoundaryRails.Find(Enumerable.Range(0, 4)
             .Select(i => Line(rectangle[i], rectangle[(i + 1) % 4])).ToList(), Quiet), "ambiguous rectangle");
+        var triangle = new[] { new Point3(0, 0, 0), new Point3(0.5, 1, 0), new Point3(1, 0, 0) };
+        ExpectFailure(() => BoundaryRails.Find(Enumerable.Range(0, 3)
+            .Select(i => Line(triangle[i], triangle[(i + 1) % 3])).ToList(), Quiet), "3-sided face");
+        var pentagon = new[] { new Point3(0, 0, 0), new Point3(0, 0.6, 0), new Point3(0.5, 1, 0), new Point3(1, 0.6, 0), new Point3(1, 0, 0) };
+        ExpectFailure(() => BoundaryRails.Find(Enumerable.Range(0, 5)
+            .Select(i => Line(pentagon[i], pentagon[(i + 1) % 5])).ToList(), Quiet), "5-sided face");
         ExpectFailure(() => BoundaryRails.Find(pieces.Take(5).ToList(), Quiet), "disconnected loop");
         ExpectFailure(() => Piece(0, small), "zero-length edge");
-        Console.WriteLine("PASS topology splits, reverse orientation, ambiguous and degenerate boundaries");
+        Console.WriteLine("PASS topology splits, reverse orientation, non-four-sided, ambiguous and degenerate boundaries");
     }
 
     private static BoundaryPiece Line(Point3 a, Point3 b)
