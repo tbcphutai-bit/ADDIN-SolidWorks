@@ -59,6 +59,20 @@ internal static class GeometryTests
         var layout = Solve(Small, shortRail, Large, longRail, 20, Diameter, margin,
             0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
         Require(layout.Issue == null, layout.Issue ?? "equal custom should be feasible");
+        foreach (int customCount in new[] { 30, 40 })
+        {
+            TubeLayout custom = Solve(Small, shortRail, Large, longRail, customCount, Diameter,
+                margin, 0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+            Require(custom.Issue == null, "Equal-pitch custom " + customCount + ": " + custom.Issue);
+            double smallPitch = (shortRail - Diameter - 2 * margin) / (customCount - 1);
+            double largePitch = (longRail - Diameter - 2 * margin) / (customCount - 1);
+            Require(Math.Abs(custom.SmallPitch - smallPitch) < 0.00002 &&
+                Math.Abs(custom.LargePitch - largePitch) < 0.00002,
+                "Independent pitches for Custom " + customCount);
+            Require(Math.Abs(custom.SmallLeftClearance - margin) < 0.00002 &&
+                Math.Abs(custom.SmallRightClearance - margin) < 0.00002,
+                "Balanced small-end margins for Custom " + customCount);
+        }
         Require(layout.SmallMode == SmallEndSpacingMode.EqualPitch, "equal-pitch mode persisted");
         Require(Math.Abs(layout.SmallPitch - (shortRail - Diameter - 2 * margin) / 19) < 0.00002,
             "independent small-end pitch");
