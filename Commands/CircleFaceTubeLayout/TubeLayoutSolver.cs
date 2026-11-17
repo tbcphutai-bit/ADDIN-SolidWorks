@@ -74,7 +74,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact)
         {
             return SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, log, verify, smallMode)
-                ?? throw new LayoutException("INFEASIBLE: no small-end contact sequence fits within the rail.");
+                ?? throw new LayoutException(smallMode == SmallEndSpacingMode.EqualPitch
+                    ? "INFEASIBLE: equal-pitch Custom layout could not fit on the small end."
+                    : "INFEASIBLE: no small-end contact sequence fits within the rail.");
         }
 
         private static TubeLayout SolveCore(Func<double, RailStation> small, double smallLength,
@@ -83,6 +85,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         {
             if (smallMode != SmallEndSpacingMode.TangentContact && smallMode != SmallEndSpacingMode.EqualPitch)
                 throw new LayoutException("Unsupported small-end spacing mode.");
+            log(F("SPACING_MODE mode={0} count={1} small_length_mm={2:F6} large_length_mm={3:F6} diameter_mm={4:F3} margin_mm={5:F3}",
+                smallMode, count, smallLength / Mm, largeLength / Mm, diameter / Mm, margin / Mm));
             double radius = diameter / 2;
             if (count < 2 || !(diameter > 0) || !(smallLength > 0) || !(margin >= 0) || !(lift >= 0))
                 throw new LayoutException("Invalid layout dimensions.");
