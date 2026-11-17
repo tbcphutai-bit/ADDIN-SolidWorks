@@ -88,6 +88,30 @@ Thử nghiệm A/B có kiểm soát qua `CdWorkerCleanupMode` (`CleanupModeForTe
 4. **Dữ liệu dump/WER:** `HKLM\...\LocalDumps\sldworks.exe` cấu hình sẵn `DumpType=1` tại `C:\Users\SGN26\AppData\Local\SolidWorks\CXPD` nhưng thư mục này trống (không giữ `.dmp`); toàn bộ dấu vết thu được đến từ `Report.wer` (`Sig[3]=StackHash_ad45/a576`, `Sig[6]=c0000374`, `Sig[7]=PCH_CC_FROM_ntdll+0x0000000000166F34`, `LoadedModule[0]=SLDWORKS.exe`, `LoadedModule[1]=ntdll.dll`).
 5. **Quyết định code:** Giữ nguyên code production từ commit `2eae326` (không sửa thuật toán `表/ウラ`, giữ 34 WARNING do ExtRef `status=3`, giữ cả 5 cờ `= False`); phần `crash_triage` chỉ nằm trong test harness ngoài repo.
 
+### 0.5. Thu thập Native Minidump, Call Stack & So sánh Single vs Multi-View Worker (sau review `061f635`)
+Theo yêu cầu review trên `061f635`, đã gắn debugger native cục bộ (`SwNativeDebug.cs` dùng `DebugActiveProcess` + `dbghelp.dll MiniDumpWriteDump` / `StackWalk64` **chỉ lên PID test, không sửa bất kỳ Registry/cấu hình SOLIDWORKS người dùng**) để thu `.dmp` và phân tách hai vấn đề độc lập:
+
+#### A. Lỗi `0xC0000374` khi SOLIDWORKS gọi `ExitApp()` (5 `.dmp` thu được cục bộ, không upload raw `.dmp`)
+| Bài thử (`SwNativeDebug` attached) | Kết quả | `rc` / Thời lượng | `EV1000` / `.dmp` | Call Stack & Dấu vết xác minh |
+| :--- | :---: | :---: | :---: | :--- |
+| `startup_only` (`PID 45928`, Hidden, có add-ins `Startup=1`) | `FAIL_WITH_EV1000` | `0` / `29.7s` | `1` / `2 .dmp` (`fc1` & `fc0`, `1.79 MB`) | `ExitApp()` -> `slduiu!clrAssemblyLoader_c::clrAssemblyLoader_c+0x52` -> `clr!CoEEShutDownCOM+0xCE` -> `slduiu!uiBaseDoc_c` -> `auCmdTarget_c::objectFromDispatch` -> `swTaskpaneView_c::getAuDispatch` -> `uiOpenDocumentValidator_c` -> `free_base+0x1B` -> `ntdll!RtlFreeHeap+0x67A` (`0xC0000374`). |
+| `unload_hidden` (`PID 45476`, Hidden, gọi `UnloadAddIn` x3 trả `rc=0`) | `FAIL_WITH_EV1000` | `0` / `25.3s` | `1` / `1 .dmp` (`0xC0000005`, `1.64 MB`) | Sau `UnloadAddIn` x3 (`rc=0`), `0.9s` sau nổ `0xC0000005` tại `+0x2B4AEB` qua `slduiu!appNotificationMessage_c::get_Icon` -> `slduiu!uiApiTaskPaneView_c::GetThisClass+0x954` -> `clr!DllCanUnloadNowInternal+0x5A09`. |
+| `unload_visible` (`PID 2572`, Visible, gọi `UnloadAddIn` x3 trả `rc=0`) | `FAIL_WITH_EV1000` | `0` / `21.9s` | `1` / `2 .dmp` (`0xC0000374`, `1.61 MB`) | Lúc `ExitApp()` nổ `0xC0000374` tại `ntdll!RtlFreeHeap+0x67A` <- `free_base` <- `slduiu!CSwAddinManager::isPW2DllLoaded+0x12A9` <- `slduiu!CSwAddinManager::loadAllAddins+0x22A` <- `slduiu!CAmApp::startup_loadAddIns+0xCA`. |
+| `no_exitapp_r2` (Hidden, idle 15s, **không gọi `ExitApp()`**) | **`PASS`** | `0` / `32.4s` | **`0` / `0`** | Lặp đối chứng lần 2: bỏ qua `ExitApp()` giữ nguyên `0` EV1000. |
+
+- **Kiểm tra module & registry `AddInsStartup` (chỉ đọc):** `HKCU\Software\SolidWorks\AddInsStartup` đang bật `Startup=1` cho `XToolKCC` (`XToolProParallelTest.DLL`), `KIKUKAWA CAD V1` (`KIKUKAWA CAD V1.DLL`), và `TAI TOOL` (`C:/Tao moi/ADDIN.DLL` — hiện không có file ở gốc). Do không được sửa cấu hình SOLIDWORKS người dùng, bài thử đối chứng tắt add-in ngay lúc runtime bằng `UnloadAddIn(...)` đã trả `rc=0` (không gỡ được chuỗi `CSwAddinManager::loadAllAddins`). Ngoài ra, danh sách module ngoài Windows/SOLIDWORKS luôn ghi nhận hook của `Cybereason ActiveProbe\Powereason_64\crsi.dll` và `SWCEF` (`libcef.dll`).
+- **Nguyên nhân đã chứng minh:** Call stack trong `.dmp` chứng minh `0xC0000374` tại `ExitApp()` nằm ở đường teardown COM/.NET add-in nội bộ của SOLIDWORKS (`CSwAddinManager::loadAllAddins -> clrAssemblyLoader_c -> clr!CoEEShutDownCOM -> swTaskpaneView_c / uiApiTaskPaneView_c -> RtlFreeHeap`), **không nằm trong code `CHECK DRAWING`** (xảy ra kể cả khi không mở Drawing và không nạp `ADDIN.dll`).
+- **Giả thuyết còn lại / hướng xử lý:** Cần một môi trường test sạch tắt hoàn toàn các add-in `Startup=1` trong `HKCU\Software\SolidWorks\AddInsStartup` (hoặc thử phiên không cài `crsi.dll` / test dưới tài khoản Windows riêng) để xác định add-in thứ ba nào trong bộ `XToolKCC` / `KIKUKAWA CAD V1` làm hỏng heap khi `CoEEShutDownCOM`. Đối với test harness, tránh dùng `ExitApp()` sau khi đã `QuitDoc`/`remainingDocs=0` (hoặc chạy trên profile sạch add-in).
+
+#### B. Lỗi `0xC0000005` trong Isolated Worker: So sánh 1 View vs Nhiều View liên tiếp (`SwNativeDebug` gắn trên worker PID)
+| Bài thử (`PR62_ATTACH_WORKER_DBG=1`) | Số view | Kết quả | `rc` / Thời lượng | `EV1000` / Exception trên Worker |
+| :--- | :---: | :---: | :---: | :--- |
+| `worker_single` (worker `PID 51768`) | `1` (`SB1-ks1`) | **`PASS`** | `0` / `33.1s` | `0` EV1000, `0` first-chance `0xC0000005`, `ok=True safety=False`. |
+| `worker_multi8` (worker `PID 36356`) | `8` (`SB1-ks1..SA1-fr6`, gồm `SA2-fr4` & `SA1-fr7`) | **`PASS`** | `0` / `83.4s` | `0` EV1000, `8/8 ok=True safety=False`, worker thoát `exitCode=0x00000000`. |
+| `worker_multi20` (worker `PID 37964`) | `20` view liên tiếp (lặp lại 8 mẫu trên, gồm `SA1-fr7`) | **`PASS`** | `0` / `229.3s` | `0` EV1000, `20/20 ok=True safety=False`, `0` exception trên `sldapiu.dll`. |
+
+- **Kết luận cho Isolated Worker:** Khi chạy độc lập chỉ Isolated Worker tới **20 view liên tiếp** (`worker_multi20`, gắn `SwNativeDebug` trên worker `PID 37964`), **không tái hiện** `sldapiu.dll+0x9a9bb0 (0xC0000005)` (lỗi này chỉ từng xuất hiện trong lúc chạy batch 55 đầy đủ `RunBatch` khi Host SOLIDWORKS mở đồng thời nhiều `.SLDASM` dirty). Vì chưa bắt được `.dmp` của riêng `sldapiu.dll+0x9a9bb0` ở môi trường cô lập đơn, tiếp tục **giữ nguyên hàng rào fail-closed (`AuditWorkerDocs`, `CloseAllWorkerDocuments`, `QuarantineAndTerminateOwnedWorker`, ép `Warning`)** và **giữ toàn bộ 5 cờ OFF**.
+
 > Phần Mục 1–5 bên dưới giữ nguyên hồ sơ kiểm thử từ các mốc `9f0e28c` / `34dbf21`.
 
 ---
