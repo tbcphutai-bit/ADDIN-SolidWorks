@@ -14,6 +14,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly CheckBox autoCount = new CheckBox { Text = "Auto count", Checked = true, AutoSize = true };
         private readonly CheckBox addOne = new CheckBox { Text = "Add +1", Checked = true, AutoSize = true };
         private readonly CheckBox flip = new CheckBox { Text = "Flip Side", AutoSize = true };
+        private readonly CheckBox allowOverhang = new CheckBox
+        { Text = "Allow symmetric overhang (V3)", AutoSize = true, Checked = false };
+        private readonly NumericUpDown maxOverhang = Number(12, 0, 40, 2);
         private readonly ComboBox smallMode = new ComboBox { Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
         private SmallEndSpacingMode SmallMode => smallMode.SelectedIndex == 1
             ? SmallEndSpacingMode.EqualPitch : SmallEndSpacingMode.TangentContact;
@@ -32,7 +35,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         };
         private readonly Button create = new Button { Text = "Create 3D Sketch", AutoSize = true, Enabled = false };
         private readonly Timer refresh = new Timer { Interval = 350 };
-        private readonly Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze;
+        private readonly Func<int?, double, double, bool, SmallEndSpacingMode, bool, double, TubeLayout> analyze;
+        private bool OverhangActive => !autoCount.Checked &&
+            SmallMode == SmallEndSpacingMode.EqualPitch && allowOverhang.Checked;
         private readonly Action clearPreview;
         private readonly Action<string> logLine;
         private readonly BoundaryRails rails;
@@ -43,7 +48,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
 
         public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails,
-            Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze,
+            Func<int?, double, double, bool, SmallEndSpacingMode, bool, double, TubeLayout> analyze,
             Action clearPreview = null, Action<string> logLine = null)
         {
             this.rails = rails;
@@ -52,17 +57,17 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             this.logLine = logLine;
             Text = "Circle Along Face";
             Font = SystemFonts.MessageBoxFont;
-            ClientSize = new Size(540, 425);
+            ClientSize = new Size(560, 480);
             AutoScaleMode = AutoScaleMode.Font;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
             MaximizeBox = MinimizeBox = false;
 
-            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 9 };
+            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 11 };
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
-            for (int i = 0; i < 7; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            for (int i = 0; i < 9; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(grid);
@@ -78,13 +83,15 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             grid.Controls.Add(total, 1, 4);
 
             Row(grid, 5, "Small-end mode (Custom)", smallMode);
+            grid.Controls.Add(allowOverhang, 0, 6);
+            Row(grid, 7, "Max cap overhang (mm)", maxOverhang);
             var legend = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
             legend.Controls.Add(new Label { Text = "● Small end", ForeColor = Color.DeepSkyBlue, AutoSize = true });
             legend.Controls.Add(new Label { Text = "● Large end", ForeColor = Color.DarkGoldenrod, AutoSize = true });
             legend.Controls.Add(new Label { Text = "● Verified axes", ForeColor = Color.ForestGreen, AutoSize = true });
-            grid.Controls.Add(legend, 0, 6);
+            grid.Controls.Add(legend, 0, 8);
             grid.SetColumnSpan(legend, 2);
-            grid.Controls.Add(report, 0, 7);
+            grid.Controls.Add(report, 0, 9);
             grid.SetColumnSpan(report, 2);
 
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
@@ -92,7 +99,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             var debug = new Button { Text = "Open Debug Log", AutoSize = true };
             var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
             buttons.Controls.AddRange(new Control[] { preview, create, debug, cancel });
-            grid.Controls.Add(buttons, 0, 8);
+            grid.Controls.Add(buttons, 0, 10);
             grid.SetColumnSpan(buttons, 2);
             CancelButton = cancel;
             AcceptButton = preview;
@@ -108,12 +115,12 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, Text); }
             };
             refresh.Tick += (sender, args) => Preview();
-            foreach (NumericUpDown control in new[] { diameter, quantity, margin })
+            foreach (NumericUpDown control in new[] { diameter, quantity, margin, maxOverhang })
             {
                 control.ValueChanged += (sender, args) => InvalidatePreview();
                 control.TextChanged += (sender, args) => InvalidatePendingText();
             }
-            foreach (CheckBox control in new[] { autoCount, addOne, flip })
+            foreach (CheckBox control in new[] { autoCount, addOne, flip, allowOverhang })
                 control.CheckedChanged += (sender, args) => InvalidatePreview();
             smallMode.SelectedIndexChanged += (sender, args) => InvalidatePreview();
             FormClosed += (sender, args) => refresh.Stop();
@@ -181,6 +188,11 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             create.Enabled = false;
             if (previewed) clearPreview?.Invoke();
             quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
+            allowOverhang.Enabled = !autoCount.Checked && SmallMode == SmallEndSpacingMode.EqualPitch;
+            maxOverhang.Enabled = OverhangActive;
+            if (maxOverhang.Maximum != diameter.Value)
+                maxOverhang.Maximum = diameter.Value; // Center extrapolation stays bounded.
+
             total.Text = Count.HasValue
                 ? F("Total axes: {0} ({1}{2}) · {3}", Count.Value, (int)quantity.Value,
                     addOne.Checked ? "+1" : "", SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch")
@@ -209,10 +221,13 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             try
             {
                 var mode = autoCount.Checked ? SmallEndSpacingMode.TangentContact : SmallMode;
-                logLine?.Invoke(F("UI_INPUT auto={0} base_count={1} add_one={2} effective_count={3} selected_mode={4} effective_mode={5} diameter_mm={6:F3} margin_mm={7:F3} flip={8}",
+                bool activeOverhang = OverhangActive;
+                logLine?.Invoke(F("UI_INPUT auto={0} base_count={1} add_one={2} effective_count={3} selected_mode={4} effective_mode={5} diameter_mm={6:F3} margin_mm={7:F3} flip={8} allow_overhang={9} max_cap_overhang_mm={10:F3}",
                     autoCount.Checked, (int)quantity.Value, addOne.Checked, Count?.ToString() ?? "auto",
-                    SmallMode, mode, (double)diameter.Value, (double)margin.Value, flip.Checked));
-                var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm, flip.Checked, mode);
+                    SmallMode, mode, (double)diameter.Value, (double)margin.Value, flip.Checked,
+                    activeOverhang, (double)maxOverhang.Value));
+                var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm,
+                    flip.Checked, mode, activeOverhang, (double)maxOverhang.Value * Mm);
                 if (IsDisposed || Disposing || version != previewVersion) return;
                 string smallLine = result.SmallMode == SmallEndSpacingMode.EqualPitch
                     ? F("Small end: EqualPitch · pitch {0:F3} mm · cap margins L={1:F3} / R={2:F3} mm",
@@ -233,12 +248,18 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     : F("clashes={0}, inconclusive={1}", result.SheetClashCount, result.SheetInconclusiveCount);
                 string sheetLine = F("Sheet clearance: min {0:F3} mm · BREP: {1} · lift {2:F3} mm",
                     result.MinimumSheetEstimate / Mm, brepStatus, result.Lift / Mm);
+                string overhangLine = activeOverhang
+                    ? F("Smart Overhang: cap protrusion {0:F3} mm each side; center extension max {1:F3} mm; attempts {2}; {3}",
+                        result.AppliedOverhang / Mm, result.MaximumCenterExtension / Mm,
+                        result.OverhangSearchAttempts,
+                        result.CenterExtrapolated ? "EXTRAPOLATED center outside selected face" : "centers on selected rails")
+                    : "Smart Overhang: OFF";
                 string statusLine = result.Issue == null
                     ? "OK: Verified 3D separation for every pair and the sheet."
                     : "INFEASIBLE: " + result.Issue;
 
                 report.Text = string.Join(Environment.NewLine,
-                    RailsText(), smallLine, largeLine, gapsLine, sheetLine, statusLine);
+                    RailsText(), smallLine, largeLine, overhangLine, gapsLine, sheetLine, statusLine);
                 total.Text = autoCount.Checked
                     ? F("Total axes: {0} (Auto{1})", result.Axes.Length, result.Axes.Length == MaximumCount ? ", limit" : "")
                     : F("Total axes: {0} ({1}{2}) · {3}", result.Axes.Length, (int)quantity.Value,
