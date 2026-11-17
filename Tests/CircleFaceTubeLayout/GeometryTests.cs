@@ -16,6 +16,7 @@ internal static class GeometryTests
         {
             TestCylinders();
             TestRails();
+            TestEqualPitchCustom();
             var flat = Layout(41, 0, false, Console.WriteLine);
             AssertLayout(flat, 41);
             Require(Math.Abs(flat.LargePitch / Mm - 34.79925) < 0.01, "reference large-end pitch");
@@ -47,6 +48,30 @@ internal static class GeometryTests
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static void TestEqualPitchCustom()
+    {
+        const double shortRail = 0.81135, longRail = 1.42197, margin = 0.005;
+        var normal = new Point3(0, 0, 1);
+        RailStation Small(double s) => new RailStation(new Point3(s, 0, 0), normal);
+        RailStation Large(double s) => new RailStation(new Point3(s, 1, 0), normal);
+        var layout = Solve(Small, shortRail, Large, longRail, 20, Diameter, margin,
+            0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(layout.Issue == null, layout.Issue ?? "equal custom should be feasible");
+        Require(layout.SmallMode == SmallEndSpacingMode.EqualPitch, "equal-pitch mode persisted");
+        Require(Math.Abs(layout.SmallPitch - (shortRail - Diameter - 2 * margin) / 19) < 0.00002,
+            "independent small-end pitch");
+        Require(Math.Abs(layout.LargePitch - (longRail - Diameter - 2 * margin) / 19) < 0.00002,
+            "independent large-end pitch");
+        Require(Math.Abs(layout.SmallLeftClearance - margin) < 0.00002 &&
+            Math.Abs(layout.SmallRightClearance - margin) < 0.00002, "symmetric small cap margins");
+        Require(Math.Abs(layout.LargeLeftClearance - margin) < 0.00002 &&
+            Math.Abs(layout.LargeRightClearance - margin) < 0.00002, "symmetric large cap margins");
+        var tooMany = Solve(Small, shortRail, Large, longRail, 41, Diameter, margin,
+            0.00001, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(tooMany.Issue != null, "overcrowded equal small rail must be rejected");
+        Console.WriteLine("PASS custom equal-pitch small/large ends and dense-count collision rejection");
     }
 
     private static void TestCylinders()
