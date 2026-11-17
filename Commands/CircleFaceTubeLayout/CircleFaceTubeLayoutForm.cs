@@ -38,6 +38,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly BoundaryRails rails;
         private bool previewed;
         private bool previewInProgress;
+        private int previewVersion;
         public TubeLayout Accepted { get; private set; }
         private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
 
@@ -108,7 +109,10 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             };
             refresh.Tick += (sender, args) => Preview();
             foreach (NumericUpDown control in new[] { diameter, quantity, margin })
+            {
                 control.ValueChanged += (sender, args) => InvalidatePreview();
+                control.TextChanged += (sender, args) => InvalidatePendingText();
+            }
             foreach (CheckBox control in new[] { autoCount, addOne, flip })
                 control.CheckedChanged += (sender, args) => InvalidatePreview();
             smallMode.SelectedIndexChanged += (sender, args) => InvalidatePreview();
@@ -160,9 +164,19 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             base.Dispose(disposing);
         }
 
+        private void InvalidatePendingText()
+        {
+            if (IsDisposed || Disposing) return;
+            previewVersion++;
+            Accepted = null;
+            create.Enabled = false;
+            if (previewed) clearPreview?.Invoke();
+        }
+
         private void InvalidatePreview()
         {
             if (IsDisposed || Disposing) return;
+            previewVersion++;
             Accepted = null;
             create.Enabled = false;
             if (previewed) clearPreview?.Invoke();
@@ -184,6 +198,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         {
             if (IsDisposed || Disposing || previewInProgress) return;
             refresh.Stop();
+            int version = ++previewVersion;
             previewInProgress = true;
             previewed = true;
             Accepted = null;
@@ -198,7 +213,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     autoCount.Checked, (int)quantity.Value, addOne.Checked, Count?.ToString() ?? "auto",
                     SmallMode, mode, (double)diameter.Value, (double)margin.Value, flip.Checked));
                 var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm, flip.Checked, mode);
-                if (IsDisposed || Disposing) return;
+                if (IsDisposed || Disposing || version != previewVersion) return;
                 string smallLine = result.SmallMode == SmallEndSpacingMode.EqualPitch
                     ? F("Small end: EqualPitch · pitch {0:F3} mm · cap margins L={1:F3} / R={2:F3} mm",
                         result.SmallPitch / Mm, result.SmallLeftClearance / Mm, result.SmallRightClearance / Mm)

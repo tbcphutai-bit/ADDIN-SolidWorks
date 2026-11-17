@@ -278,54 +278,66 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             Point3 end = Point3.Read(same == range.Sense ? range.EndPoint : range.StartPoint);
             double a = range.UMinValue, b = range.UMaxValue;
             const double joinTolerance = 0.00002;
-            bool TryDomain(double u0, double u1, out bool increasing)
+            bool TryDomain(Func<double, int, object> eval, double u0, double u1, out bool increasing, string tag)
             {
-                Point3 low = Point3.Read(curve.Evaluate2(u0, 0)), high = Point3.Read(curve.Evaluate2(u1, 0));
+                Point3 low = Point3.Read(eval(u0, 0)), high = Point3.Read(eval(u1, 0));
                 increasing = (low - start).Length + (high - end).Length < (high - start).Length + (low - end).Length;
-                log(F("CURVE_DOMAIN coedge={0} sense={1}/{2} raw_u0={3:R} raw_u1={4:R} tried_u0={5:R} tried_u1={6:R} expected_start_m={7} expected_end_m={8} eval_low_m={9} eval_high_m={10}",
-                    index, range.Sense, same, a, b, u0, u1, start, end, low, high));
+                log(F("{0} coedge={1} sense={2}/{3} raw_u0={4:R} raw_u1={5:R} tried_u0={6:R} tried_u1={7:R} expected_start_m={8} expected_end_m={9} eval_low_m={10} eval_high_m={11}",
+                    tag, index, range.Sense, same, a, b, u0, u1, start, end, low, high));
                 return ((increasing ? low : high) - start).Length <= joinTolerance &&
                     ((increasing ? high : low) - end).Length <= joinTolerance && u1 > u0;
             }
 
             double lo = Math.Min(a, b), hi = Math.Max(a, b);
             bool forward;
-            if (!TryDomain(lo, hi, out forward))
+            bool useEdgeSpace = false;
+            Func<double, int, object> evaluate = (u, d) => curve.Evaluate2(u, d);
+            if (!TryDomain(evaluate, lo, hi, out forward, "CURVE_DOMAIN"))
             {
                 // Some edge ranges are reported in reversed parameter space.
                 // Accept a domain only when its evaluated endpoints agree.
                 double opposite = -lo;
                 lo = -hi;
                 hi = opposite;
-                if (!TryDomain(lo, hi, out forward))
-                    throw new LayoutException("Coedge " + index + " does not match its evaluated curve endpoints.");
+                if (!TryDomain(evaluate, lo, hi, out forward, "CURVE_DOMAIN"))
+                {
+                    // Edge.GetCurveParams3() bounds can belong to Edge parameter space
+                    // rather than the underlying untrimmed Curve (e.g. CIRCLE_TYPE/LINE_TYPE).
+                    lo = Math.Min(a, b);
+                    hi = Math.Max(a, b);
+                    useEdgeSpace = true;
+                    evaluate = (u, d) => edge.Evaluate2(u, d);
+                    if (!TryDomain(evaluate, lo, hi, out forward, "EDGE_DOMAIN_FALLBACK"))
+                        throw new LayoutException("Coedge " + index + " does not match its evaluated curve endpoints.");
+                }
             }
 
-            double length = curve.GetLength3(lo, hi);
-            Point3 t0 = Point3.Read(curve.Evaluate2(forward ? lo : hi, 1), 3) * (forward ? 1 : -1);
-            Point3 t1 = Point3.Read(curve.Evaluate2(forward ? hi : lo, 1), 3) * (forward ? 1 : -1);
-            log(F("COEDGE index={0} type={1} curve_sense={2} coedge_sense={3} forward={4} u0={5:R} u1={6:R} start_m={7} end_m={8} length_mm={9:F6}",
-                index, range.CurveType, range.Sense, same, forward, lo, hi, start, end, length / Mm));
-
-            // Index the monotone length function to avoid a full domain bisection
-            // for every trial station. Each returned station uses the true curve.
             const int intervals = 32;
             var distances = new double[intervals + 1];
-            for (int i = 1; i < intervals; i++)
+            for (int i = 1; i <= intervals; i++)
             {
-                distances[i] = curve.GetLength3(lo, lo + (hi - lo) * i / intervals);
-                if (!(distances[i] > distances[i - 1] && distances[i] < length))
+                double uPrev = lo + (hi - lo) * (i - 1) / intervals;
+                double uCurr = lo + (hi - lo) * i / intervals;
+                distances[i] = useEdgeSpace
+                    ? distances[i - 1] + EdgeSegmentLength(edge, uPrev, uCurr, 4)
+                    : curve.GetLength3(lo, uCurr);
+                if (!(distances[i] > distances[i - 1]))
                     throw new LayoutException("Coedge arc length is not monotone.");
             }
-            distances[intervals] = length;
+            double length = distances[intervals];
+            Point3 t0 = Point3.Read(evaluate(forward ? lo : hi, 1), 3) * (forward ? 1 : -1);
+            Point3 t1 = Point3.Read(evaluate(forward ? hi : lo, 1), 3) * (forward ? 1 : -1);
+            log(F("COEDGE index={0} type={1} curve_sense={2} coedge_sense={3} forward={4} edge_space={5} u0={6:R} u1={7:R} start_m={8} end_m={9} length_mm={10:F6}",
+                index, range.CurveType, range.Sense, same, forward, useEdgeSpace, lo, hi, start, end, length / Mm));
+
             Point3 At(double station)
             {
                 double target = Math.Max(0, Math.Min(length, forward ? station : length - station));
                 int pos = Array.BinarySearch(distances, target);
-                if (pos >= 0) return Point3.Read(curve.Evaluate2(lo + (hi - lo) * pos / intervals, 0));
+                if (pos >= 0) return Point3.Read(evaluate(lo + (hi - lo) * pos / intervals, 0));
                 pos = ~pos;
-                if (pos <= 0) return Point3.Read(curve.Evaluate2(lo, 0));
-                if (pos > intervals) return Point3.Read(curve.Evaluate2(hi, 0));
+                if (pos <= 0) return Point3.Read(evaluate(lo, 0));
+                if (pos > intervals) return Point3.Read(evaluate(hi, 0));
                 double min = lo + (hi - lo) * (pos - 1) / intervals, max = lo + (hi - lo) * pos / intervals;
                 double minLength = distances[pos - 1], maxLength = distances[pos];
                 for (int i = 0; i < 56; i++)
@@ -333,8 +345,10 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     double fraction = (target - minLength) / (maxLength - minLength);
                     double step = i == 0 ? fraction : ((i & 3) == 3 ? 0.5 : Math.Max(0.1, Math.Min(0.9, fraction)));
                     double u = min + (max - min) * step;
-                    double l = curve.GetLength3(lo, u);
-                    if (Math.Abs(l - target) <= 1e-8) return Point3.Read(curve.Evaluate2(u, 0));
+                    double l = useEdgeSpace
+                        ? minLength + EdgeSegmentLength(edge, min, u, 2)
+                        : curve.GetLength3(lo, u);
+                    if (Math.Abs(l - target) <= 1e-8) return Point3.Read(evaluate(u, 0));
                     if (l < target) { min = u; minLength = l; } else { max = u; maxLength = l; }
                 }
                 throw new LayoutException("Arc-length inversion did not converge.");
@@ -349,6 +363,25 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 GC.KeepAlive(coedge);
                 return point;
             });
+        }
+
+        private static double EdgeSegmentLength(Edge edge, double u0, double u1, int panels)
+        {
+            if (u1 <= u0) return 0;
+            double[] x = { -0.906179845938664, -0.538469310105683, 0.0, 0.538469310105683, 0.906179845938664 };
+            double[] w = { 0.236926885056189, 0.478628670499366, 0.568888888888889, 0.478628670499366, 0.236926885056189 };
+            double total = 0;
+            double h = (u1 - u0) / panels;
+            for (int p = 0; p < panels; p++)
+            {
+                double a = u0 + p * h, mid = a + 0.5 * h, half = 0.5 * h;
+                for (int k = 0; k < 5; k++)
+                {
+                    var d = Point3.Read(edge.Evaluate2(mid + half * x[k], 1), 3);
+                    total += w[k] * half * d.Length;
+                }
+            }
+            return total;
         }
     }
 }
