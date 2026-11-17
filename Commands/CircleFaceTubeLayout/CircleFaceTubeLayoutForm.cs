@@ -14,52 +14,58 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly CheckBox autoCount = new CheckBox { Text = "Auto count", Checked = true, AutoSize = true };
         private readonly CheckBox addOne = new CheckBox { Text = "Add +1", Checked = true, AutoSize = true };
         private readonly CheckBox flip = new CheckBox { Text = "Flip Side", AutoSize = true };
+        private readonly ComboBox smallMode = new ComboBox { Width = 177, DropDownStyle = ComboBoxStyle.DropDownList };
+        private SmallEndSpacingMode SmallMode => smallMode.SelectedIndex == 1
+            ? SmallEndSpacingMode.EqualPitch : SmallEndSpacingMode.TangentContact;
         private readonly Label total = new Label { AutoSize = true };
         private readonly Label report = new Label { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
         private readonly Button create = new Button { Text = "Create 3D Sketch", AutoSize = true, Enabled = false };
         private readonly Timer refresh = new Timer { Interval = 350 };
-        private readonly Func<int?, double, double, bool, TubeLayout> analyze;
+        private readonly Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze;
         private readonly BoundaryRails rails;
         private bool previewed;
         public TubeLayout Accepted { get; private set; }
         private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
 
-        public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails, Func<int?, double, double, bool, TubeLayout> analyze)
+        public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails, Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze)
         {
             this.rails = rails;
             this.analyze = analyze;
             Text = "Circle Along Face";
             Font = SystemFonts.MessageBoxFont;
-            ClientSize = new Size(430, 308);
+            ClientSize = new Size(480, 355);
             AutoScaleMode = AutoScaleMode.Font;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
             MaximizeBox = MinimizeBox = false;
 
-            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 8 };
+            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 9 };
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
-            for (int i = 0; i < 6; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            for (int i = 0; i < 7; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(grid);
 
             Row(grid, 0, "Tube outside diameter (mm)", diameter);
             Row(grid, 1, "Base count", quantity);
-            Row(grid, 2, "Large-end edge margin (mm)", margin);
+            Row(grid, 2, "Both-end edge margin (mm)", margin);
+            smallMode.Items.AddRange(new object[] { "Touch at small end (existing)", "Equal pitch at both ends" });
+            smallMode.SelectedIndex = 0;
             grid.Controls.Add(addOne, 0, 3);
             grid.Controls.Add(flip, 1, 3);
             grid.Controls.Add(autoCount, 0, 4);
             grid.Controls.Add(total, 1, 4);
 
+            Row(grid, 5, "Small-end mode (Custom)", smallMode);
             var legend = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
             legend.Controls.Add(new Label { Text = "● Small end", ForeColor = Color.DeepSkyBlue, AutoSize = true });
             legend.Controls.Add(new Label { Text = "● Large end", ForeColor = Color.DarkGoldenrod, AutoSize = true });
             legend.Controls.Add(new Label { Text = "● Verified axes", ForeColor = Color.ForestGreen, AutoSize = true });
-            grid.Controls.Add(legend, 0, 5);
+            grid.Controls.Add(legend, 0, 6);
             grid.SetColumnSpan(legend, 2);
-            grid.Controls.Add(report, 0, 6);
+            grid.Controls.Add(report, 0, 7);
             grid.SetColumnSpan(report, 2);
 
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
@@ -67,7 +73,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             var debug = new Button { Text = "Open Debug Log", AutoSize = true };
             var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
             buttons.Controls.AddRange(new Control[] { preview, create, debug, cancel });
-            grid.Controls.Add(buttons, 0, 7);
+            grid.Controls.Add(buttons, 0, 8);
             grid.SetColumnSpan(buttons, 2);
             CancelButton = cancel;
             AcceptButton = preview;
@@ -87,6 +93,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 control.ValueChanged += (sender, args) => InvalidatePreview();
             foreach (CheckBox control in new[] { autoCount, addOne, flip })
                 control.CheckedChanged += (sender, args) => InvalidatePreview();
+            smallMode.SelectedIndexChanged += (sender, args) => InvalidatePreview();
             FormClosed += (sender, args) => refresh.Stop();
             InvalidatePreview();
         }
@@ -139,8 +146,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         {
             Accepted = null;
             create.Enabled = false;
-            quantity.Enabled = addOne.Enabled = !autoCount.Checked;
-            total.Text = Count.HasValue ? "Total axes: " + Count.Value : "Total axes: Auto";
+            quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
+            total.Text = Count.HasValue ? "Total axes: " + Count.Value +
+                "  ·  " + SmallMode : "Total axes: Auto (small end touching)";
             report.Text = RailsText() + (previewed ? "\nUpdating preview…" : "\nChoose Preview to verify the layout.");
             if (!previewed) return;
             refresh.Stop();
@@ -160,9 +168,14 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             report.Refresh();
             try
             {
-                var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm, flip.Checked);
-                report.Text = RailsText() + F("\nLarge-end pitch {0:F3} mm  ·  lift {1:F3} mm\nSmall-end 3D gap {2:F4}–{3:F4} mm\nLarge cap margins {4:F3} / {5:F3} mm\n",
-                    result.LargePitch / Mm, result.Lift / Mm, result.MinimumContact / Mm, result.MaximumContact / Mm, result.LargeLeftClearance / Mm, result.LargeRightClearance / Mm) +
+                var mode = autoCount.Checked ? SmallEndSpacingMode.TangentContact : SmallMode;
+                var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm, flip.Checked, mode);
+                report.Text = RailsText() + F("\nLarge pitch {0:F3} mm · Small pitch {6:F3} mm · lift {1:F3} mm\nSmall-end adjacent 3D gaps {2:F4}–{3:F4} mm\nLarge cap margins {4:F3} / {5:F3} mm\n",
+                    result.LargePitch / Mm, result.Lift / Mm, result.MinimumContact / Mm, result.MaximumContact / Mm,
+                    result.LargeLeftClearance / Mm, result.LargeRightClearance / Mm, result.SmallPitch / Mm) +
+                    (result.SmallMode == SmallEndSpacingMode.EqualPitch
+                        ? F("Small cap margins {0:F3} / {1:F3} mm\n", result.SmallLeftClearance / Mm, result.SmallRightClearance / Mm)
+                        : "Small end: touching mode\n") +
                     (result.Issue == null ? "Verified separation for every pair and the sheet." : "INFEASIBLE: " + result.Issue);
                 total.Text = "Total axes: " + result.Axes.Length + (autoCount.Checked && result.Axes.Length == MaximumCount ? " (limit)" : "");
                 Accepted = result;
