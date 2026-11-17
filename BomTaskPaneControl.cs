@@ -345,6 +345,7 @@ namespace ADDIN
 
             EnsureCheckDxfButtons();
             EnsureDrawingBomDxfExportButton();
+            EnsureKadaiMacroButton();
 
             EnsureMakeHolePaintNameControls();
 
@@ -359,6 +360,7 @@ namespace ADDIN
             WireEvents();
 
             InitBomCommandToolTips();
+            SetBomCommandToolTip(btnKadai, "Kadai: tham số thanh Sheet Metal. P0 chỉ xem layout; chưa tạo model 3D.");
 
             InitComponentDrawingTimer();
 
@@ -2582,7 +2584,8 @@ namespace ADDIN
 
                 btnVCutPropertySetup,
 
-                btnCheckDxfMacro
+                btnCheckDxfMacro,
+                btnKadai
 
             };
 
@@ -5811,6 +5814,7 @@ namespace ADDIN
 
         {
 
+            CloseKadaiForm();
             ShutdownFromSolidWorks();
 
             if (bomCommandToolTip != null)
@@ -7256,6 +7260,9 @@ namespace ADDIN
 
         private bool IsModelMacroSupported(Control button, int documentType)
         {
+            if (ReferenceEquals(button, btnKadai))
+                return documentType == (int)swDocumentTypes_e.swDocPART ||
+                    documentType == (int)swDocumentTypes_e.swDocASSEMBLY;
             if (ReferenceEquals(button, btnCheckAssemblyHole))
                 return documentType == (int)swDocumentTypes_e.swDocASSEMBLY;
             if (ReferenceEquals(button, btnMirrorPart) || ReferenceEquals(button, btnCheckBendMinimum))
@@ -7292,6 +7299,7 @@ namespace ADDIN
             UpdateModelMacroButton(btnRepair3DSpline, documentType, "Part");
             UpdateModelMacroButton(btnVCutPropertySetup, documentType, "Part");
             UpdateModelMacroButton(btnCheckBendMinimum, documentType, "Part hoặc Assembly");
+            UpdateModelMacroButton(btnKadai, documentType, "Part hoặc Assembly");
             // CHECK DXF works on files in a folder, independent of the active SW document.
             if (btnCheckDxfMacro != null) btnCheckDxfMacro.Enabled = true;
         }
