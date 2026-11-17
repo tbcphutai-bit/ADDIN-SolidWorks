@@ -61,6 +61,33 @@ Thử nghiệm A/B có kiểm soát qua `CdWorkerCleanupMode` (`CleanupModeForTe
       - `p4` (`540s`): đã hoàn thành `3A` (`Warning`), `3B` (`Warning`), `3C` (`Warning`); chưa kịp tới `3D1`, `3D2`.
       - `p4_3e` (`360s`): đã hoàn thành `3E1` (`OK`), `3E2` (`OK`); chưa kịp tới `3E3`.
 
+### 0.4. Điều tra tách pha lỗi native (`0xc0000374`, `0xc0000005`, RPC) bằng bài thử tối giản (`crash_triage`)
+Để không lặp lại các lượt chạy marathon kéo dài hàng giờ, đã tách 9 bài thử độc lập tối giản trong `Pr62Verify.exe crash_triage` trên bản build `BBE4C8...`, ghi timestamp từng chặng (`Startup -> Open -> ReadView -> Cleanup -> DisposeWorker -> ExitApp`) và đối chiếu Win32 Event ID `1000` + WER `Report.wer`:
+
+| Bài thử (`crash_triage`) | Kết quả | `rc` / Thời lượng | `EV1000` / `WER` | Chặng xảy ra & Dấu vết xác minh |
+| :--- | :---: | :---: | :---: | :--- |
+| `startup_only` (SW ẩn, không mở file, `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `28.8s` | `1` / `1` | Idle 15s sạch; nổ `EV1000` **`0.942s` sau `BEFORE_EXITAPP`** (`PID 54984`, `c0000374`, `PCH_CC_FROM_ntdll+0x0000000000166F34`, `StackHash_ad45`). `Report.wer` xác nhận **không nạp `ADDIN.dll`**. |
+| `startup_visible` (SW hiện `Normal`, không mở file, `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `31.9s` | `1` / `1` | Idle 15s sạch; nổ `EV1000` **`0.883s` sau `BEFORE_EXITAPP`** (`PID 42588`, `c0000374`, `PCH_CC_FROM_ntdll+0x0000000000166F34`, `StackHash_a576`). |
+| `startup_no_exitapp` (SW ẩn, idle 15s, **bỏ qua `ExitApp`**) | **`PASS`** | `0` / `30.0s` | **`0` / `0`** | Chứng minh đối chứng: không gọi `ExitApp()` -> **0 crash / 0 WER**. |
+| `open_close_only` (mở/đóng `SB1-fr8` + `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `21.4s` | `1` / `1` | `OpenDoc` (`5.26s`), `QuitDoc` (`0.22s`, `docs=0`) sạch; nổ `c0000374` **`0.940s` sau `BEFORE_EXITAPP`** (`PID 31464`). |
+| `direct_only` (`CdTryFlatSideReadOnly` trên `SB1-fr8` + `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `116.6s` | `1` / `1` | Direct Read & `QuitDoc` sạch (`docs=0`); nổ `c0000374` **`0.992s` sau `BEFORE_EXITAPP`** (`PID 36024`). |
+| `workingcopy_only` (`CheckFlatDrawingView` trên `SB1-fr8` + `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `31.7s` | `1` / `1` | Working Copy (`8.3s`) & `QuitDoc` sạch (`docs=0`); nổ `c0000374` **`0.994s` sau `BEFORE_EXITAPP`** (`PID 41624`). |
+| `isolated_single` (`CheckOneDrawing` `SB1-ks1` + `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `64.4s` | `1` / `1` | Đường `LIVE_HIDDEN` đọc trực tiếp sạch; nổ `c0000374` **`0.985s` sau `BEFORE_EXITAPP`** (`PID 45804`). |
+| `4332a_cleanup` (`4332-04-TI-P-1-l1` + `CloseAllDocsSafe` x2 + `ExitApp`) | `FAIL_WITH_EV1000` | `0` / `20.5s` | `1` / `1` | `OpenDoc` (`3.87s`), `CloseAllDocsSafe` lần 1 (`0.86s`), lần 2 (`1ms`, `docs=0`) sạch; nổ `c0000374` **`0.875s` sau `BEFORE_EXITAPP`** (`PID 38892`, `StackHash_a576`). |
+| `isolated_verifier_direct` (gọi trực tiếp `CdIsolatedVisibleFlatSideVerifier.VerifyView` trên `SB1-ks1` -> `GracefulDisposeWorker`, `PR62_NO_EXITAPP=1` cho harness) | **`PASS`** | `0` / `25.9s` | **`0` / `0`** | Worker `PID 40224`: `beforeOpen -> OpenDoc (1.65s) -> delegate (3.73s) -> QuitDoc (remainingDocs=0, 37ms) -> dispose auditOk=True -> GracefulExitIfClean` **thoát sạch hoàn toàn (`0` EV1000 / `0` WER)**. *(Ghi chú: ở 2 lượt sửa reflection harness trước đó, harness FAIL ngay trước khi gọi `VerifyView` với `ev1000=0`.)* |
+
+**Nguyên nhân xác minh được cho 3 nhóm lỗi:**
+1. **`0xc0000374` (`PCH_CC_FROM_ntdll+0x0000000000166F34`, `StackHash_ad45`/`StackHash_a576`) trong các pha đơn lẻ:**
+   - **Không** phải do `ADDIN.dll`, **không** do `WindowStyle.Hidden`, **không** do `Direct Read` / `Working Copy` / `CloseAllDocsSafe`. Đây là lỗi heap teardown xảy ra **đúng `0.88–0.99s` sau khi test harness gọi `NativeSession.ShutdownOwned -> swApp.ExitApp()`** (nơi cài đặt SOLIDWORKS 2024 SP5.0 trên máy đang bật sẵn các add-in startup khác như `XToolKCC`, `KIKUKAWA CAD V1`, `TAI TOOL`, còn `GracefulExitIfClean` của worker đã `FinalReleaseComObject` thoát êm ở `isolated_verifier_direct`).
+   - Ngoài ra, ở lượt `targeted` gộp (`task-6011`), mở/đóng liên tiếp nhiều bản vẽ trong cùng 1 SW vẫn có rủi ro heap corruption `ntdll.dll+0x112fc5 (0xc0000374)`.
+2. **`0xc0000005` (`sldapiu.dll+0x9a9bb0` và `slduiu.dll+0x1184d4a`):**
+   - `slduiu.dll+0x1184d4a`: phát sinh nội bộ ~12–13s sau khi mở SW ẩn rồi chạy `RunBatch` (`batch55` Shadow tắt Worker vẫn có `1` lần).
+   - `sldapiu.dll+0x9a9bb0`: phát sinh trong worker khi xử lý nhiều view liên tiếp (`diag_ab_closedoc_ms.log`: `2.94s` sau `AFTER_CLOSE` của `SB1-ks1` khi `remainingDocs=0`; `batch55_pilot_iso`: `PID 8960` và `PID 47500`), nhưng không xuất hiện trong ca đơn lẻ `isolated_verifier_direct`.
+3. **Lỗi RPC (`0x800706BA` / `0x80010105`) khi cleanup:**
+   - Là hệ quả thứ cấp khi tiến trình SW / Worker vừa gặp ngoại lệ native (`0xc0000374` hoặc `0xc0000005`) làm kênh COM/RPC mất kết nối trước lệnh `GetDocumentCount()` / `GetDocuments()` / `QuitDoc()`. Chuỗi `AuditWorkerDocs -> CloseAllWorkerDocuments -> QuarantineAndTerminateOwnedWorker -> CdResolveViewSideOutcome` đã chặn được toàn bộ đường fail-open (như đã chứng minh tại `#38 SA1-fr7`).
+4. **Dữ liệu dump/WER:** `HKLM\...\LocalDumps\sldworks.exe` cấu hình sẵn `DumpType=1` tại `C:\Users\SGN26\AppData\Local\SolidWorks\CXPD` nhưng thư mục này trống (không giữ `.dmp`); toàn bộ dấu vết thu được đến từ `Report.wer` (`Sig[3]=StackHash_ad45/a576`, `Sig[6]=c0000374`, `Sig[7]=PCH_CC_FROM_ntdll+0x0000000000166F34`, `LoadedModule[0]=SLDWORKS.exe`, `LoadedModule[1]=ntdll.dll`).
+5. **Quyết định code:** Giữ nguyên code production từ commit `2eae326` (không sửa thuật toán `表/ウラ`, giữ 34 WARNING do ExtRef `status=3`, giữ cả 5 cờ `= False`); phần `crash_triage` chỉ nằm trong test harness ngoài repo.
+
 > Phần Mục 1–5 bên dưới giữ nguyên hồ sơ kiểm thử từ các mốc `9f0e28c` / `34dbf21`.
 
 ---
