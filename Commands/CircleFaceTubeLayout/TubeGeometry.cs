@@ -84,7 +84,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             double lower = 0;
             double upper = simplex[0].Length;
             var closest = simplex[0];
-            for (int i = 0; i < 96; i++)
+            for (int i = 0; i < 128; i++)
             {
                 if (upper <= Resolution) return new Gap(0, upper);
                 var normal = closest * (1 / upper);
