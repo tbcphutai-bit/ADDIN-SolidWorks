@@ -360,7 +360,7 @@ namespace ADDIN
             WireEvents();
 
             InitBomCommandToolTips();
-            SetBomCommandToolTip(btnKadai, "Kadai: tham số thanh Sheet Metal. P0 chỉ xem layout; chưa tạo model 3D.");
+            SetBomCommandToolTip(btnKadai, "Kadai: bố trí thanh và Preview 3D theo mặt panel. Apply chưa nghiệm thu.");
 
             InitComponentDrawingTimer();
 
@@ -483,6 +483,7 @@ namespace ADDIN
         public void ShutdownFromSolidWorks()
 
         {
+            CloseKadaiForm();
             assemblyHoleChecker?.CloseResults();
             assemblyHoleChecker = null;
 

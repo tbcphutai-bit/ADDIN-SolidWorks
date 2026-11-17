@@ -1,4 +1,4 @@
-// KADAI P0 - API contract only. No writing, preview bodies, drawing or DXF yet.
+// Kadai CAD contracts. All lengths crossing the CAD boundary are in meters.
 using System;
 using System.Collections.Generic;
 using SolidWorks.Interop.sldworks;
@@ -11,6 +11,7 @@ namespace ADDIN.Commands.Kadai
         public string Configuration;
         public object SelectedFaceTransient; // do not persist COM RCW across sessions
         public string PersistentReferenceEncoded; // must be implemented by Codex
+        public ModelDoc2 DocumentTransient;
     }
 
     internal sealed class KadaiProfile3D
@@ -20,6 +21,10 @@ namespace ADDIN.Commands.Kadai
         public readonly List<double[]> PointsWorldMeters = new List<double[]>();
         public bool Closed;
         public string ValidationMessage;
+        public double ThicknessMeters;
+        public double[] ExtrusionDirection;
+        public double[] AlongDirection;
+        public double[] HeightDirection;
     }
 
     internal sealed class KadaiPartResult

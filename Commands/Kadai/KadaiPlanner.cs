@@ -24,6 +24,13 @@ namespace ADDIN.Commands.Kadai
         public double LongSlotExtraMm = 0.2; // TOTAL extra width in notch on long rib
         public double CrossSlotExtraMm = 0.2; // TOTAL extra width in notch on cross rib
         public double GapToPanelMm = 0;
+        // Explicit principal-axis datum for P2. No inferred assembly transforms.
+        public int HeightAxis = 1; // 0=X, 1=Y, 2=Z; U/V are the other two axes
+        public double OriginUmm = 0;
+        public double OriginVmm = 0;
+        public double BottomMm = 0;
+        public double PreviewChordToleranceMm = 0.05;
+        internal KadaiRequest Snapshot() { return (KadaiRequest)MemberwiseClone(); }
 
         public static KadaiRequest ForPreset(string name)
         {
@@ -77,12 +84,13 @@ namespace ADDIN.Commands.Kadai
             s.AppendLine("Longitudinal: " + LongRibs.Count + " / Transverse: " + CrossRibs.Count);
             s.AppendLine("Candidate intersections: " + CrossingCount);
             s.AppendLine("Potential notch regions (2 per crossing): " + CandidateSlots.Count);
+            s.AppendLine("3D positions identify rib CENTER planes; calibrate datum/margins against the selected panel.");
             s.AppendLine("Long notch width: " + F(Settings.CrossThicknessMm + Settings.LongSlotExtraMm) + " mm");
             s.AppendLine("Cross notch width: " + F(Settings.LongThicknessMm + Settings.CrossSlotExtraMm) + " mm");
             s.AppendLine("Long positions (mm): " + string.Join(", ", LongRibs.Select(p => F(p.CoordinateMm))));
             s.AppendLine("Cross positions (mm): " + string.Join(", ", CrossRibs.Select(p => F(p.CoordinateMm))));
             foreach (var w in Warnings) s.AppendLine("WARNING: " + w);
-            s.AppendLine("Profile, Slot Cut-Extrude, Flat Pattern, Drawing and DXF: NOT IMPLEMENTED.");
+            s.AppendLine("Layout contains no CAD profiles/cuts. Use Preview 3D; production Apply/Export remain locked.");
             return s.ToString();
         }
         private static string F(double n) { return n.ToString("0.###", CultureInfo.InvariantCulture); }
@@ -93,6 +101,7 @@ namespace ADDIN.Commands.Kadai
         public static KadaiPlan Build(KadaiRequest settings)
         {
             if (settings == null) throw new ArgumentNullException("settings");
+            settings = settings.Snapshot();
             Positive(settings.LengthXmm, "LengthXmm");
             Positive(settings.LengthZmm, "LengthZmm");
             Positive(settings.LongThicknessMm, "LongThicknessMm");
@@ -102,6 +111,12 @@ namespace ADDIN.Commands.Kadai
             Nonnegative(settings.LongSlotExtraMm, "LongSlotExtraMm");
             Nonnegative(settings.CrossSlotExtraMm, "CrossSlotExtraMm");
             Nonnegative(settings.GapToPanelMm, "GapToPanelMm");
+            Positive(settings.PreviewChordToleranceMm, "PreviewChordToleranceMm");
+            if (settings.HeightAxis < 0 || settings.HeightAxis > 2)
+                throw new ArgumentOutOfRangeException("HeightAxis");
+            foreach (double coordinate in new[] { settings.OriginUmm, settings.OriginVmm, settings.BottomMm })
+                if (double.IsNaN(coordinate) || double.IsInfinity(coordinate))
+                    throw new ArgumentException("Datum coordinates must be finite.");
             if (settings.LongRibCount < 1 || settings.CrossRibCount < 1
                 || settings.LongRibCount > 100 || settings.CrossRibCount > 100)
                 throw new ArgumentOutOfRangeException("count", "Count must be 1..100.");

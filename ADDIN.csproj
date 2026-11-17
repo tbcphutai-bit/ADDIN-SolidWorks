@@ -102,6 +102,8 @@
     <Compile Include="UI\KadaiForm.cs" />
     <Compile Include="Commands\Kadai\KadaiPlanner.cs" />
     <Compile Include="Commands\Kadai\KadaiCadContracts.cs" />
+    <Compile Include="Commands\Kadai\KadaiPreviewBackend.cs" />
+    <Compile Include="Commands\Kadai\KadaiNativePrototype.cs" />
     <Compile Include="UI\MakeHolePageValues.cs" />
     <Compile Include="UI\MakeHolePropertyManagerPage.cs" />
     <Compile Include="UI\MakeHoleNativeWorkflow.cs">

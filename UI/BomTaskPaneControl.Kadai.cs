@@ -22,7 +22,11 @@ namespace ADDIN
         private void btnKadai_Click(object sender, EventArgs e)
         {
             if (!CanRunModelMacro(btnKadai)) return;
-            if (kadaiForm != null && !kadaiForm.IsDisposed) { kadaiForm.Activate(); return; }
+            if (kadaiForm != null && !kadaiForm.IsDisposed)
+            {
+                if (kadaiForm.WindowState == FormWindowState.Minimized) kadaiForm.WindowState = FormWindowState.Normal;
+                kadaiForm.Activate(); return;
+            }
             kadaiForm = new KadaiForm(swApp);
             kadaiForm.FormClosed += (s, args) => { kadaiForm = null; };
             kadaiForm.Show(this);

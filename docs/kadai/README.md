@@ -38,4 +38,8 @@ C:\Users\SGN26\Desktop\4315\4315
 - tools/kadai_test_layout.py: kiểm tra số học độc lập; không phải build C# hay kiểm tra CAD.
 
 ## Trạng thái thành thật
-P0 đã đẩy lên branch: nút Macro Kadai + form tính layout và warning, chưa có Preview 3D hay Feature Cut thật. Chưa biên dịch trên Windows x64/SolidWorks; chưa tạo Sheet Metal/FlatPattern/Drawing/DXF. **Không merge main** trước khi kiểm thử trên file gốc và duyệt Preview.
+Đã tiếp tục bằng SolidWorks 2024 SP5.0: build Debug/Release x64, audit native, nút Model → Macro → Kadai và temporary-solid Preview theo face thật. Có laboratory prototype 3+1 với native Sheet Metal/Cut/Flat, Drawing, DXF, Assembly và CSV BOM. Writer prototype không được nối vào nút Apply.
+
+**Apply/Export vẫn khóa.** P4 regeneration giữ Feature chưa triển khai; P6 chưa đạt ổn định do các lần native heap corruption trong audit. Preview hiện là polyline approximation trên một face trong Part, chưa phải production contour. Không merge main hoặc dùng prototype để gia công. Xem [báo cáo thực hiện](../../KADAI_IMPLEMENTATION_REPORT.md) để phân biệt PASS, prototype và phần chưa làm.
+
+Code mới: `Commands/Kadai/KadaiPreviewBackend.cs`, `KadaiNativePrototype.cs`; công cụ audit/CAD validation và test C# trong `tools/Kadai*`. Chạy build cô lập bằng `tools/Test-Kadai.ps1 -OutputDirectory <NEW_LOCAL_FOLDER>`; script tắt production-copy post-build. CAD/ảnh/JSON nội bộ được giữ ngoài Git trong `kadai-local/`.
