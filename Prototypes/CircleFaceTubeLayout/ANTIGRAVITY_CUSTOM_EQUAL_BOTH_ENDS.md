@@ -9,7 +9,7 @@ Parent draft PR: https://github.com/tbcphutai-bit/ADDIN-SolidWorks/pull/63
 
 - **Think first**: inspect all related sources and report any actual design flaw before changing code. Do not rewrite the entire feature if an existing implementation satisfies the requirement.
 - Start from working branch above, not main. Do not merge either PR.
-- **Only change** \`Commands/CircleFaceTubeLayout/*\`, \`Tests/CircleFaceTubeLayout/*\` and closely related dedicated documentation. Avoid modifying CheckDrawingBom, CheckSamePart, CheckHole, unrelated classes, or existing command callbacks. If wiring is already present, do not touch Task Pane or ADDIN.csproj.
+- **Only change** `Commands/CircleFaceTubeLayout/*`, `Tests/CircleFaceTubeLayout/*` and closely related dedicated documentation. Avoid modifying CheckDrawingBom, CheckSamePart, CheckHole, unrelated classes, or existing command callbacks. If wiring is already present, do not touch Task Pane or ADDIN.csproj.
 - Keep C# compatible with SolidWorks 2024 COM and .NET Framework 4.8 / C# 7.3 x64.
 - Work in a duplicate of any customer Part before creating geometry. Do not place, save, or modify customer binary models in the repository.
 - Source changes on PR #64 are NOT yet verified by a SolidWorks build or runtime test. Your job is to fix, build, test, debug, document — not claim success before evidence.
@@ -22,8 +22,8 @@ The operator chooses:
 
 - Auto count: old touching-small-end behavior is unchanged.
 - Custom count N: two optional submodes:
-  - \`TangentContact\`: small-end tubes near-touch; long-end stations evenly distributed (OLD).
-  - \`EqualPitch\`: both short and long ends are **independently** divided into N equally spaced arc-length stations; actual 3D end-cap margins at both sides are balanced (NEW). Small-end tubes are *not required to touch* in this mode.
+  - `TangentContact`: small-end tubes near-touch; long-end stations evenly distributed (OLD).
+  - `EqualPitch`: both short and long ends are **independently** divided into N equally spaced arc-length stations; actual 3D end-cap margins at both sides are balanced (NEW). Small-end tubes are *not required to touch* in this mode.
 - Existing Add +1, Flip Side, Preview, Cancel, Create 3D Sketch, Open Debug Log continue to work.
 
 **No tube solids yet.** Explicit Create generates only 3D construction axes. Cancel and failed validation must not change the model.
@@ -36,12 +36,12 @@ The operator chooses:
 
 Read these complete files **before editing**:
 
-1. \`Commands/CircleFaceTubeLayout/TubeLayoutSolver.cs\`: \`SmallEndSpacingMode\`, \`Solve\`, \`SolveCore\`, \`SolveEqualStations\`, \`SolveStations\`, \`VerifyExact\`, \`VerifyTubes\`.
-2. \`Commands/CircleFaceTubeLayout/SwFaceLayout.cs\`: face/rail acquisition, normals, \`Analyze\`, sheet clearance and BREP checks.
-3. \`Commands/CircleFaceTubeLayout/CircleFaceTubeLayoutForm.cs\`: controls, invalidating preview, button states, modeless-ish preview timer and dialog lifecycle.
-4. \`Commands/CircleFaceTubeLayout/CircleFaceTubeLayoutCommand.cs\`: face selection, preview, COM graphics cleanup, create/undo 3D sketch, log path.
-5. \`Commands/CircleFaceTubeLayout/TubeGeometry.cs\`, \`BoundaryRails.cs\`.
-6. \`Tests/CircleFaceTubeLayout/GeometryTests.cs\`.
+1. `Commands/CircleFaceTubeLayout/TubeLayoutSolver.cs`: `SmallEndSpacingMode`, `Solve`, `SolveCore`, `SolveEqualStations`, `SolveStations`, `VerifyExact`, `VerifyTubes`.
+2. `Commands/CircleFaceTubeLayout/SwFaceLayout.cs`: face/rail acquisition, normals, `Analyze`, sheet clearance and BREP checks.
+3. `Commands/CircleFaceTubeLayout/CircleFaceTubeLayoutForm.cs`: controls, invalidating preview, button states, modeless-ish preview timer and dialog lifecycle.
+4. `Commands/CircleFaceTubeLayout/CircleFaceTubeLayoutCommand.cs`: face selection, preview, COM graphics cleanup, create/undo 3D sketch, log path.
+5. `Commands/CircleFaceTubeLayout/TubeGeometry.cs`, `BoundaryRails.cs`.
+6. `Tests/CircleFaceTubeLayout/GeometryTests.cs`.
 
 The code already implements the new mode. **Use the code as your starting point**; fix it if necessary. Do not duplicate the same solver in a second class.
 
@@ -49,7 +49,7 @@ The code already implements the new mode. **Use the code as your starting point*
 
 The current enum and Solve signature must remain source compatible:
 
-\`\`\`csharp
+```csharp
 internal enum SmallEndSpacingMode
 {
     TangentContact,
@@ -62,13 +62,13 @@ public static TubeLayout Solve(
     int count, double diameter, double margin, double lift,
     Action<string> log, bool verify = true,
     SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact)
-\`\`\`
+```
 
-In \`SwFaceLayout.Analyze(...)\`, when Custom N is used, pass \`smallMode\` into \`Solve\`. When Auto N is used, retain \`SolveAutomatic\` and \`TangentContact\`. The UI passes the option through its \`analyze\` delegate into the command and face analyzer.
+In `SwFaceLayout.Analyze(...)`, when Custom N is used, pass `smallMode` into `Solve`. When Auto N is used, retain `SolveAutomatic` and `TangentContact`. The UI passes the option through its `analyze` delegate into the command and face analyzer.
 
 Reference formula for nominal station placement (everything is **meters** inside SolidWorks API):
 
-\`\`\`csharp
+```csharp
 double firstShort = diameter * 0.5 + margin;
 double lastShort  = diameter * 0.5 + margin;
 double shortPitch = (shortLength - firstShort - lastShort) / (count - 1);
@@ -93,13 +93,13 @@ for (int i = 0; i < count; i++)
 
     // Store these endpoints and station distances for preview/debug/3D sketch.
 }
-\`\`\`
+```
 
-**These formulas are only the nominal starting approximation.** When axes are tilted, the end-cap radial projection onto each edge direction changes. The existing \`CapClearance\` and iterative \`SolveEqualStations\` / \`SolveCore\` must correct first/last station positions independently to make actual **projected cap clearance** as close to the requested margin as permitted by the current tolerance. Re-evaluate on exact SolidWorks geometry in \`VerifyExact\` and reject any unsuccessful correction. Do not claim "5 mm" from nominal arc-center distances.
+**These formulas are only the nominal starting approximation.** When axes are tilted, the end-cap radial projection onto each edge direction changes. The existing `CapClearance` and iterative `SolveEqualStations` / `SolveCore` must correct first/last station positions independently to make actual **projected cap clearance** as close to the requested margin as permitted by the current tolerance. Re-evaluate on exact SolidWorks geometry in `VerifyExact` and reject any unsuccessful correction. Do not claim "5 mm" from nominal arc-center distances.
 
 Preserve these safety guards:
 
-\`\`\`csharp
+```csharp
 if (count < 2 || diameter <= 0 || margin < 0 || lift < 0)
     throw new LayoutException("Invalid tube layout settings.");
 
@@ -114,7 +114,7 @@ if (layout.SmallMode == SmallEndSpacingMode.TangentContact &&
 
 // ALWAYS check full 3D finite-cylinder collisions in both modes.
 // "Uncertain" distance/solid interference is NOT "verified clear".
-\`\`\`
+```
 
 If an early guard is only a conservative pre-check, document that clearly; do not turn nominal pitch < diameter alone into a false 3D certification or false collision result. The existing solver uses GJK distance bounds for finite cylinders. Verify its lower/upper-bound interpretation under tests. Reject unproven cases safely.
 
@@ -122,7 +122,7 @@ If an early guard is only a conservative pre-check, document that clearly; do no
 
 Retain:
 
-\`\`\`csharp
+```csharp
 private readonly ComboBox smallMode =
     new ComboBox { Width = 177, DropDownStyle = ComboBoxStyle.DropDownList };
 
@@ -130,17 +130,17 @@ private SmallEndSpacingMode SmallMode =>
     smallMode.SelectedIndex == 1
         ? SmallEndSpacingMode.EqualPitch
         : SmallEndSpacingMode.TangentContact;
-\`\`\`
+```
 
 On form initialization, add:
-\`\`\`csharp
+```csharp
 smallMode.Items.AddRange(new object[]
 {
     "Touch at small end (existing)",
     "Equal pitch at both ends"
 });
 smallMode.SelectedIndex = 0;
-\`\`\`
+```
 
 Enable the selector **only** when Auto count is unchecked. If the user changes count, diameter, margin, Add +1, Flip Side, spacing mode, or Auto/Custom toggle, cancel previous acceptance, clear old preview, rerun validation and keep Create disabled until verified. In Auto, force the effective solver mode to TangentContact regardless of the selector's previous state. Ensure no Timer reentrancy or use-after-dispose.
 
@@ -149,7 +149,7 @@ Enable the selector **only** when Auto count is unchecked. If the user changes c
 Preview and debug must include:
 - selected Face identity, Part/configuration, short/long rail lengths;
 - count N, base count and Add +1, D, margin, Flip Side, chosen spacing mode;
-- short/long stations \`s[i]\`, short/long pitches;
+- short/long stations `s[i]`, short/long pitches;
 - true 3D left/right cap margins on BOTH ends in EqualPitch mode;
 - each axis 3D endpoints, tube length;
 - minimum adjacent small-end gap (nonzero OK in EqualPitch);
@@ -158,7 +158,7 @@ Preview and debug must include:
 - failure reason, even if Create remains disabled.
 
 Log directory already used by code:
-\`%LOCALAPPDATA%\TAI_TOOL\CircleFaceTubeLayout\`.
+`%LOCALAPPDATA%\TAI_TOOL\CircleFaceTubeLayout`.
 
 ## 4. Regression fixture, expected nominal results
 
@@ -184,7 +184,7 @@ Add/retain tests for:
 - Preview Cancel and failure leaves no Sketch, Preview alone is non-destructive.
 - Original Add +1 still adds exactly one, no double count, N never exceeds MaximumCount.
 - Face with multiple coedge pieces per rail, reverse coedge orientation, ambiguous/non-four-sided topology.
-- SolidWorks 2024 on a real copy of \`4313-04-HU-H1.SLDPRT\` if available locally. Otherwise clearly state this runtime test was not performed.
+- SolidWorks 2024 on a real copy of `4313-04-HU-H1.SLDPRT` if available locally. Otherwise clearly state this runtime test was not performed.
 
 ## 5. Work sequence for Anti
 
@@ -196,7 +196,7 @@ Add/retain tests for:
 6. Test real sheet/twisted part with a copy and save debug logs. Report which tests were not possible.
 7. Make one consolidated set of fixes based on the whole analysis; avoid incremental random edits.
 8. Commit only related changes on the branch, update PR #64. Do NOT merge.
-9. Produce \`Prototypes/CircleFaceTubeLayout/ANTI_IMPLEMENTATION_REPORT.md\`: changed paths, commit hash, build commands/results, actual executed test outcomes, geometry logic, collision findings, log paths, unresolved issues, next actions for Codex/ChatGPT. If a requirement cannot be met without violating 3D geometry, explain the exact constraint and alternatives. Do not silently change count or geometry.
+9. Produce `Prototypes/CircleFaceTubeLayout/ANTI_IMPLEMENTATION_REPORT.md`: changed paths, commit hash, build commands/results, actual executed test outcomes, geometry logic, collision findings, log paths, unresolved issues, next actions for Codex/ChatGPT. If a requirement cannot be met without violating 3D geometry, explain the exact constraint and alternatives. Do not silently change count or geometry.
 
 ## 6. Acceptance criteria
 
@@ -213,4 +213,4 @@ Add/retain tests for:
 
 ## 7. Handoff to Codex after Anti
 
-Codex should review Anti's \`ANTI_IMPLEMENTATION_REPORT.md\`, commits and debug logs, audit collision/normal math independently, propose the final corrective approach if needed and only then approve merging.
+Codex should review Anti's `ANTI_IMPLEMENTATION_REPORT.md`, commits and debug logs, audit collision/normal math independently, propose the final corrective approach if needed and only then approve merging.
