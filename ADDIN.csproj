@@ -98,6 +98,10 @@
       <DependentUpon>BomTaskPaneControl.cs</DependentUpon>
     </Compile>
     <Compile Include="UI\AutoSplinePropertyManagerPage.cs" />
+    <Compile Include="UI\BomTaskPaneControl.Kadai.cs" />
+    <Compile Include="UI\KadaiForm.cs" />
+    <Compile Include="Commands\Kadai\KadaiPlanner.cs" />
+    <Compile Include="Commands\Kadai\KadaiCadContracts.cs" />
     <Compile Include="UI\MakeHolePageValues.cs" />
     <Compile Include="UI\MakeHolePropertyManagerPage.cs" />
     <Compile Include="UI\MakeHoleNativeWorkflow.cs">
