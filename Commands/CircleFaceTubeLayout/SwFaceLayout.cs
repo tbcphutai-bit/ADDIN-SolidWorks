@@ -53,11 +53,14 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 Rails.Small.Length / Mm, Rails.Large.Length / Mm, Rails.Small.PieceCount, Rails.Large.PieceCount));
         }
 
-        public TubeLayout Analyze(int? count, double diameter, double margin, bool flip)
+        public TubeLayout Analyze(int? count, double diameter, double margin, bool flip,
+            SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact)
         {
+            if (!count.HasValue && smallMode == SmallEndSpacingMode.EqualPitch)
+                throw new LayoutException("Equal-pitch small end requires Custom count.");
             double sign = faceSense * (flip ? -1 : 1);
-            log(F("SETTINGS flip={0} selected_normal_sign={1} large_edge_margin_mm={2:F6} count={3}",
-                flip, sign, margin / Mm, count?.ToString() ?? "auto"));
+            log(F("SETTINGS flip={0} selected_normal_sign={1} large_edge_margin_mm={2:F6} count={3} small_mode={4}",
+                flip, sign, margin / Mm, count?.ToString() ?? "auto", smallMode));
             RailStation Small(double s) => Station(Rails.Small.At(s), sign);
             RailStation Large(double s) => Station(Rails.Large.At(Rails.Large.Length - s), sign);
             var smallCache = CacheRail(Small, Rails.Small.Length, diameter, "small");
@@ -73,7 +76,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 if (count.HasValue)
                 {
                     layout = Solve(smallCache, Rails.Small.Length, largeCache, Rails.Large.Length,
-                        count.Value, diameter, margin, lift, log, verify: false);
+                        count.Value, diameter, margin, lift, log, verify: false, smallMode: smallMode);
                     VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
                 }
                 else
