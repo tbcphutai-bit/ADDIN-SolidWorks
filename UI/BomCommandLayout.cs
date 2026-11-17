@@ -384,12 +384,13 @@ namespace ADDIN
         private void EnsureModelMacroControls()
         {
             EnsureBendMinimumButton();
+            EnsureKadaiMacroButton();
             if (tabModelMacroPage == null || cardMacroCommands != null) return;
 
             cardMacroCommands = new ModernCard { Name = "cardMacroCommands", Text = "Lệnh macro" };
             tabModelMacroPage.Controls.Add(cardMacroCommands);
             foreach (Button tile in new Button[] { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
-                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum })
+                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum, btnKadai })
                 MoveControlToCard(tile, cardMacroCommands);
             btnToggleMacroCommands = new ModernButton
             {
@@ -485,7 +486,7 @@ namespace ADDIN
             bool vCutOpen = vCutBendAssignmentControl != null && vCutBendAssignmentControl.Visible;
 
             Button[] macroTiles = { btnCheckAssemblyHole, btnMirrorPart, btnEdgeToEqualSpline,
-                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum };
+                btnRepair3DSpline, btnVCutPropertySetup, btnCheckDxfMacro, btnCheckBendMinimum, btnKadai };
             foreach (Button tile in macroTiles)
                 if (tile != null) tile.Visible = !macroCommandsCollapsed;
 
