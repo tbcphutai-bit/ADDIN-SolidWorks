@@ -67,14 +67,15 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 if (modeler == null) throw new LayoutException("SolidWorks Modeler is unavailable.");
                 var geometry = new SwFaceLayout(FaceInPartCoordinates(), modeler, Log);
 
-                using (var dialog = new CircleFaceTubeLayoutForm(path, geometry.Rails, (count, diameter, margin, flip, smallMode) =>
+                using (var dialog = new CircleFaceTubeLayoutForm(path, geometry.Rails, (count, diameter, margin, flip, smallMode, allowOverhang, maxOverhang) =>
                 {
                     ClearPreview();
                     Log("PREVIEW_BEGIN");
                     try
                     {
                         EnsureModel();
-                        TubeLayout layout = geometry.Analyze(count, diameter, margin, flip, smallMode);
+                        TubeLayout layout = geometry.Analyze(count, diameter, margin, flip, smallMode,
+                            allowOverhang, maxOverhang);
                         ShowPreview(geometry.Rails, layout);
                         Log(F("PREVIEW_SUMMARY mode={0} count={1} small_pitch_mm={2:F6} large_pitch_mm={3:F6} small_left_mm={4:F6} small_right_mm={5:F6} large_left_mm={6:F6} large_right_mm={7:F6} small_gap_mm={8:F6}..{9:F6} min_full_mm={10:F6} min_full_pair={11}-{12} interfering_pairs={13} first_interfering_pair={14}-{15} sheet_min_mm={16:F6} sheet_clashes={17} sheet_inconclusive={18} lift_mm={19:F6}",
                             layout.SmallMode, layout.Axes.Length, layout.SmallPitch / Mm, layout.LargePitch / Mm,
@@ -85,6 +86,10 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                             layout.InterferingPairCount, layout.FirstInterferingPairA, layout.FirstInterferingPairB,
                             layout.MinimumSheetEstimate / Mm, layout.SheetClashCount, layout.SheetInconclusiveCount,
                             layout.Lift / Mm));
+                        Log(F("SMART_OVERHANG_SUMMARY enabled={0} cap_mm={1:F4} effective_margin_mm={2:F4} center_extrapolated={3} max_center_extension_mm={4:F4} search_attempts={5}",
+                            layout.SmartOverhangEnabled, layout.AppliedOverhang / Mm,
+                            layout.EffectiveCapMargin / Mm, layout.CenterExtrapolated,
+                            layout.MaximumCenterExtension / Mm, layout.OverhangSearchAttempts));
                         Log("PREVIEW_END result=" + (layout.Issue ?? "verified"));
                         return layout;
                     }
