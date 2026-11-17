@@ -25,6 +25,10 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         public int MinimumGapPairA, MinimumGapPairB, InterferingPairCount;
         public int FirstInterferingPairA, FirstInterferingPairB;
         public int SheetClashCount = 0, SheetInconclusiveCount = 0;
+        // Smart overhang only: negative projected end-cap margin means protrusion.
+        public bool SmartOverhangEnabled, CenterExtrapolated;
+        public double AppliedOverhang, MaximumCenterExtension, EffectiveCapMargin;
+        public int OverhangSearchAttempts;
         public TubeLayout(int count)
         {
             Axes = new TubeAxis[count];
@@ -75,9 +79,10 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         public static TubeLayout Solve(Func<double, RailStation> small, double smallLength,
             Func<double, RailStation> large, double largeLength, int count, double diameter,
             double margin, double lift, Action<string> log, bool verify = true,
-            SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact)
+            SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact,
+            bool allowOverhang = false)
         {
-            return SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, log, verify, smallMode)
+            return SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, log, verify, smallMode, allowOverhang)
                 ?? throw new LayoutException(smallMode == SmallEndSpacingMode.EqualPitch
                     ? "INFEASIBLE: equal-pitch Custom layout could not fit on the small end."
                     : "INFEASIBLE: no small-end contact sequence fits within the rail.");
@@ -85,15 +90,19 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
         private static TubeLayout SolveCore(Func<double, RailStation> small, double smallLength,
             Func<double, RailStation> large, double largeLength, int count, double diameter,
-            double margin, double lift, Action<string> log, bool verify, SmallEndSpacingMode smallMode)
+            double margin, double lift, Action<string> log, bool verify, SmallEndSpacingMode smallMode,
+            bool allowOverhang = false)
         {
             if (smallMode != SmallEndSpacingMode.TangentContact && smallMode != SmallEndSpacingMode.EqualPitch)
                 throw new LayoutException("Unsupported small-end spacing mode.");
             log(F("SPACING_MODE mode={0} count={1} small_length_mm={2:F6} large_length_mm={3:F6} diameter_mm={4:F3} margin_mm={5:F3}",
                 smallMode, count, smallLength / Mm, largeLength / Mm, diameter / Mm, margin / Mm));
             double radius = diameter / 2;
-            if (count < 2 || !(diameter > 0) || !(smallLength > 0) || !(margin >= 0) || !(lift >= 0))
-                throw new LayoutException("Invalid layout dimensions.");
+            if (count < 2 || count > MaximumCount || !(diameter > 0) || !(smallLength > 0) ||
+                !(lift >= 0) || (!allowOverhang && !(margin >= 0)) ||
+                (allowOverhang && (smallMode != SmallEndSpacingMode.EqualPitch ||
+                    margin > 0 || margin < -diameter)))
+                throw new LayoutException("Invalid dimensions or unsupported overhang.");
             double first = radius + margin, last = radius + margin;
             if (!(largeLength > first + last))
                 throw new LayoutException("INFEASIBLE: large end has insufficient length for the requested margins.");
@@ -108,7 +117,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             {
                 result = smallMode == SmallEndSpacingMode.EqualPitch
                     ? SolveEqualStations(small, smallLength, large, largeLength, count, diameter,
-                        margin, first, last, lift, log)
+                        margin, first, last, lift, log, allowOverhang)
                     : SolveStations(small, smallLength, large, largeLength, count, diameter, first, last, lift, log);
                 if (result == null) return null;
                 result.LargeLeftClearance = CapClearance(result.Axes[0], left, leftInward, radius);
@@ -121,8 +130,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     if (verify) VerifyTubes(result, diameter, small, log);
                     return result;
                 }
-                first = Math.Max(0, first + leftError);
-                last = Math.Max(0, last + rightError);
+                double minStation = allowOverhang ? -radius : 0;
+                first = Math.Max(minStation, first + leftError);
+                last = Math.Max(minStation, last + rightError);
             }
             AddIssue(result, "Large-end 3D cap margins could not be balanced.");
             if (verify) VerifyTubes(result, diameter, small, log);
@@ -179,7 +189,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
         private static TubeLayout SolveEqualStations(Func<double, RailStation> small, double smallLength,
             Func<double, RailStation> large, double largeLength, int count, double diameter,
-            double margin, double firstLarge, double lastLarge, double lift, Action<string> log)
+            double margin, double firstLarge, double lastLarge, double lift, Action<string> log,
+            bool allowOverhang)
         {
             double radius = diameter / 2;
             double largePitch = (largeLength - firstLarge - lastLarge) / (count - 1);
@@ -227,8 +238,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     result.SmallLeftClearance / Mm, result.SmallRightClearance / Mm));
                 if (Math.Abs(le) <= SymmetryTolerance && Math.Abs(re) <= SymmetryTolerance)
                     return result;
-                first = Math.Max(0, first + le);
-                last = Math.Max(0, last + re);
+                double minStation = allowOverhang ? -radius : 0;
+                first = Math.Max(minStation, first + le);
+                last = Math.Max(minStation, last + re);
             }
             AddIssue(result, "Could not balance small-end 3D cap margins in equal-pitch mode.");
             return result;
