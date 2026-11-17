@@ -54,15 +54,116 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         }
 
         public TubeLayout Analyze(int? count, double diameter, double margin, bool flip,
-            SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact)
+            SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact,
+            bool allowSymmetricOverhang = false, double maxOverhang = 0)
+        {
+            // V3 is strictly opt-in and applies only to Custom + EqualPitch.
+            if (!allowSymmetricOverhang)
+                return AnalyzeOne(count, diameter, margin, flip, smallMode, false);
+            if (!count.HasValue || smallMode != SmallEndSpacingMode.EqualPitch)
+                throw new LayoutException("Smart Overhang requires Custom count and EqualPitch.");
+            if (!(margin >= 0) || !(diameter > 0) || !(maxOverhang >= 0) ||
+                maxOverhang > diameter || double.IsNaN(maxOverhang) || double.IsInfinity(maxOverhang))
+                throw new LayoutException("Max cap overhang must be between 0 and tube diameter.");
+
+            log(F("SMART_OVERHANG enabled=True count={0} baseline_margin_mm={1:F3} max_cap_overhang_mm={2:F3}",
+                count.Value, margin / Mm, maxOverhang / Mm));
+            TubeLayout baseline = null, last = null;
+            string baselineFailure = null;
+            try
+            {
+                baseline = AnalyzeOne(count, diameter, margin, flip, smallMode, false);
+                baseline.SmartOverhangEnabled = true;
+                baseline.EffectiveCapMargin = margin;
+                if (baseline.Issue == null)
+                {
+                    log("SMART_OVERHANG kept_baseline=true overhang_mm=0");
+                    return baseline;
+                }
+                baselineFailure = baseline.Issue;
+                log("SMART_OVERHANG baseline_not_feasible reason=" + baselineFailure);
+            }
+            catch (LayoutException ex)
+            {
+                baselineFailure = ex.Message;
+                log("SMART_OVERHANG baseline_rejected reason=" + baselineFailure);
+            }
+
+            int attempts = 0;
+            // Evaluate increasing cap protrusion in 0.5 mm steps, retaining the
+            // first proven-clear candidate; never reduce count or disable collision checks.
+            const double step = 0.5 * Mm;
+            int steps = (int)Math.Ceiling(maxOverhang / step);
+            for (int i = 0; i <= steps; i++)
+            {
+                double h = Math.Min(maxOverhang, i * step);
+                if (i > 0 && h <= (i - 1) * step) continue;
+                attempts++;
+                log(F("SMART_OVERHANG_TRIAL index={0} target_cap_mm={1:F4}", attempts, -h / Mm));
+                try
+                {
+                    TubeLayout candidate = AnalyzeOne(count, diameter, -h, flip, smallMode, true);
+                    candidate.SmartOverhangEnabled = true;
+                    candidate.OverhangSearchAttempts = attempts;
+                    candidate.AppliedOverhang = h;
+                    candidate.EffectiveCapMargin = -h;
+                    double smallLast = candidate.SmallStations[count.Value - 1];
+                    double largeLast = candidate.FirstLargeStation + (count.Value - 1) * candidate.LargePitch;
+                    candidate.MaximumCenterExtension = Math.Max(0,
+                        Math.Max(Math.Max(-candidate.SmallStations[0], smallLast - Rails.Small.Length),
+                            Math.Max(-candidate.FirstLargeStation, largeLast - Rails.Large.Length)));
+                    candidate.CenterExtrapolated = candidate.MaximumCenterExtension > 1e-8;
+                    if (candidate.CenterExtrapolated)
+                        log(F("OVERHANG_EXTRAPOLATED center_ext_mm={0:F6}", candidate.MaximumCenterExtension / Mm));
+                    log(F("SMART_OVERHANG_RESULT index={0} cap_mm={1:F3} issue={2} min_gap_mm={3:F6} sheet_clashes={4} uncertain={5}",
+                        attempts, -h / Mm, candidate.Issue ?? "OK", candidate.MinimumGap / Mm,
+                        candidate.SheetClashCount, candidate.SheetInconclusiveCount));
+                    last = candidate;
+                    if (candidate.Issue == null)
+                    {
+                        log(F("SMART_OVERHANG_ACCEPT cap_overhang_mm={0:F3} trials={1}", h / Mm, attempts));
+                        return candidate;
+                    }
+                }
+                catch (LayoutException ex)
+                {
+                    log(F("SMART_OVERHANG_REJECT index={0} cap_mm={1:F3} reason={2}",
+                        attempts, -h / Mm, ex.Message));
+                }
+            }
+
+            if (last != null)
+            {
+                AddIssue(last, F("Smart Overhang found no verified layout up to {0:F2} mm (baseline: {1}).",
+                    maxOverhang / Mm, baselineFailure ?? "unavailable"));
+                return last;
+            }
+            if (baseline != null)
+            {
+                AddIssue(baseline, F("Smart Overhang found no verified layout up to {0:F2} mm.",
+                    maxOverhang / Mm));
+                return baseline;
+            }
+            throw new LayoutException(F("No verified Smart Overhang solution within {0:F2} mm. Baseline: {1}",
+                maxOverhang / Mm, baselineFailure ?? "unknown"));
+        }
+
+        private TubeLayout AnalyzeOne(int? count, double diameter, double margin, bool flip,
+            SmallEndSpacingMode smallMode, bool overhangCandidate)
         {
             if (!count.HasValue && smallMode == SmallEndSpacingMode.EqualPitch)
                 throw new LayoutException("Equal-pitch small end requires Custom count.");
             double sign = faceSense * (flip ? -1 : 1);
             log(F("SETTINGS flip={0} selected_normal_sign={1} large_edge_margin_mm={2:F6} count={3} small_mode={4}",
                 flip, sign, margin / Mm, count?.ToString() ?? "auto", smallMode));
-            RailStation Small(double s) => Station(Rails.Small.At(s), sign);
-            RailStation Large(double s) => Station(Rails.Large.At(Rails.Large.Length - s), sign);
+            RailStation SmallInside(double s) => Station(Rails.Small.At(s), sign);
+            RailStation LargeInside(double s) => Station(Rails.Large.At(Rails.Large.Length - s), sign);
+            Func<double, RailStation> Small = overhangCandidate
+                ? ExtendRail(SmallInside, Rails.Small.Length, diameter / 2, "SMALL")
+                : (Func<double, RailStation>)SmallInside;
+            Func<double, RailStation> Large = overhangCandidate
+                ? ExtendRail(LargeInside, Rails.Large.Length, diameter / 2, "LARGE")
+                : (Func<double, RailStation>)LargeInside;
             var smallCache = CacheRail(Small, Rails.Small.Length, diameter, "small");
             var largeCache = CacheRail(Large, Rails.Large.Length, diameter, "large");
 
@@ -78,7 +179,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 if (count.HasValue)
                 {
                     layout = Solve(smallCache, Rails.Small.Length, largeCache, Rails.Large.Length,
-                        count.Value, diameter, margin, lift, log, verify: false, smallMode: smallMode);
+                        count.Value, diameter, margin, lift, log, verify: false,
+                        smallMode: smallMode, allowOverhang: overhangCandidate);
                     VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
                 }
                 else
@@ -111,7 +213,10 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 layout.SheetInconclusiveCount = uncertain;
                 log(F("LIFT pass={0} offset_mm={1:F6} clashes={2} signed_sample_min_mm={3:F6} inconclusive={4}",
                     pass + 1, lift / Mm, clashes, layout.MinimumSheetEstimate / Mm, uncertain));
-                if (clashes == 0 && uncertain == 0 && layout.MinimumSheetEstimate >= -0.02 * Mm) return layout;
+                // B-rep is authoritative for extrapolated caps; sampled signed
+                // face-distance can be misleading beyond the face's trimmed edge.
+                bool sampledOk = overhangCandidate || layout.MinimumSheetEstimate >= -0.02 * Mm;
+                if (clashes == 0 && uncertain == 0 && sampledOk) return layout;
                 if (flip && ownerBody.GetType() == (int)swBodyType_e.swSolidBody && clashes > 0)
                 {
                     // On a solid, the opposite normal points into material. A
@@ -130,6 +235,27 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             return layout;
         }
 
+        private Func<double, RailStation> ExtendRail(Func<double, RailStation> interior,
+            double length, double maximumCenterExtension, string name)
+        {
+            double epsilon = Math.Min(0.01 * Mm, length / 100);
+            RailStation start = interior(0), end = interior(length);
+            Point3 startTangent = (interior(epsilon).Point - start.Point).Unit();
+            Point3 endTangent = (end.Point - interior(length - epsilon).Point).Unit();
+            return s =>
+            {
+                if (s >= 0 && s <= length) return interior(s);
+                if (s < -maximumCenterExtension - 1e-9 ||
+                    s > length + maximumCenterExtension + 1e-9)
+                    throw new LayoutException("Overhang station is outside the bounded rail extension.");
+                log(F("EXTRAPOLATE_RAIL end={0} station_mm={1:F6} extension_mm={2:F6}",
+                    name, s / Mm, (s < 0 ? -s : s - length) / Mm));
+                return s < 0
+                    ? new RailStation(start.Point + startTangent * s, start.Normal)
+                    : new RailStation(end.Point + endTangent * (s - length), end.Normal);
+            };
+        }
+
         private Func<double, RailStation> CacheRail(Func<double, RailStation> exact, double length, double diameter, string name)
         {
             // The solver runs entirely on managed data. Only the chosen
@@ -141,6 +267,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             log(F("RAIL_CACHE end={0} samples={1} step_mm={2:F6}", name, samples.Length, length / count / Mm));
             return station =>
             {
+                if (station < 0 || station > length)
+                    return exact(station); // Do not clamp a V3 extrapolated station.
                 double fraction = Math.Max(0, Math.Min(count, station / length * count));
                 int i = Math.Min(count - 1, (int)fraction);
                 double t = fraction - i;
