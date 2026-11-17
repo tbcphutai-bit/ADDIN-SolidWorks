@@ -67,14 +67,14 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 if (modeler == null) throw new LayoutException("SolidWorks Modeler is unavailable.");
                 var geometry = new SwFaceLayout(FaceInPartCoordinates(), modeler, Log);
 
-                using (var dialog = new CircleFaceTubeLayoutForm(path, geometry.Rails, (count, diameter, margin, flip) =>
+                using (var dialog = new CircleFaceTubeLayoutForm(path, geometry.Rails, (count, diameter, margin, flip, smallMode) =>
                 {
                     ClearPreview();
                     Log("PREVIEW_BEGIN");
                     try
                     {
                         EnsureModel();
-                        TubeLayout layout = geometry.Analyze(count, diameter, margin, flip);
+                        TubeLayout layout = geometry.Analyze(count, diameter, margin, flip, smallMode);
                         ShowPreview(geometry.Rails, layout);
                         Log("PREVIEW_END result=" + (layout.Issue ?? "verified"));
                         return layout;
