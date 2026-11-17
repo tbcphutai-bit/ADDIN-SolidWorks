@@ -91,6 +91,7 @@ namespace ADDIN
             Command(btnRepair3DSpline, TaiIcon.SplineSmooth, "Repair 3D", "Mịn spline 3D");
             Command(btnVCutPropertySetup, TaiIcon.VCut, "Set bend line", "Gán rãnh bào V-Cut");
             Command(btnCheckDxfMacro, TaiIcon.FileSearch, "Check DXF file", "Kiểm tra file DXF 2D");
+            Command(btnKadai, TaiIcon.Pattern, "Kadai", "Thanh ngang/dọc theo panel");
 
             // The few large buttons carry their icon above the name.
             foreach (Button stacked in new Button[] { btnGetWL, btnMakeHole, btnRepairHole, btnPaintHoleSummary })
