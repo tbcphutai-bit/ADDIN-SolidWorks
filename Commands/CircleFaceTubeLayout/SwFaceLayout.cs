@@ -182,6 +182,15 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         count.Value, diameter, margin, lift, log, verify: false,
                         smallMode: smallMode, allowOverhang: overhangCandidate);
                     VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
+                    // In V3, a geometry-invalid candidate can never be accepted.
+                    // Give the 3D axis layout a bounded chance to clear at a
+                    // different lift without running expensive SolidWorks BREP.
+                    if (overhangCandidate && layout.Issue != null)
+                    {
+                        log(F("OVERHANG_GEOMETRY_REJECT lift_mm={0:F6} reason={1}", lift / Mm, layout.Issue));
+                        lift += Math.Max(0.05 * Mm, lift * 0.5);
+                        continue;
+                    }
                 }
                 else
                 {
@@ -226,6 +235,8 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 }
                 lift += Math.Max(Math.Max(0.05 * Mm, lift * 0.5), -layout.MinimumSheetEstimate + 0.02 * Mm);
             }
+            if (overhangCandidate && layout != null && layout.Issue != null)
+                return layout; // Failed geometry proof: no BREP pass can authorize Create.
             string sheetIssue = uncertain > 0
                 ? "SolidWorks could not verify all tube-to-sheet checks within the allowed lift."
                 : flippedSolidClash
