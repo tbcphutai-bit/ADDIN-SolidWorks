@@ -100,7 +100,39 @@ internal static class GeometryTests
             -0.012, lift, Quiet, smallMode: SmallEndSpacingMode.TangentContact, allowOverhang: true),
             "overhang in touching mode must fail");
 
-        Console.WriteLine("PASS V3 opt-in negative cap margins, N30 baseline, N40/H2 and N41/H12 synthetic geometry");
+        // Curved + twisted (R3247 / R4323.16, twist 0.07 rad) with tangent rail extrapolation + VerifyExact + Flip.
+        Func<double, Point3> arcSmall = s => Arc(SmallRadius, SmallLength, s, 0);
+        Func<double, Point3> arcLarge = s => Arc(LargeRadius, LargeLength, s, 0.07);
+        RailStation CurvedStation(double s, bool outer, bool flip)
+        {
+            double len = outer ? LargeLength : SmallLength;
+            double clamped = Math.Max(0, Math.Min(len, s));
+            Point3 p = arcSmall((clamped / len) * SmallLength);
+            Point3 q = arcLarge((clamped / len) * LargeLength);
+            Func<double, Point3> ptFn = outer ? arcLarge : arcSmall;
+            Point3 tangent = (ptFn(Math.Min(len, clamped + 1e-7)) - ptFn(Math.Max(0, clamped - 1e-7))).Unit();
+            Point3 n = (q - p).Cross(tangent).Unit() * (flip ? -1 : 1);
+            Point3 basePt = outer ? q : p;
+            if (s < 0) basePt = basePt + (ptFn(1e-6) - ptFn(0)).Unit() * s;
+            else if (s > len) basePt = basePt + (ptFn(len) - ptFn(len - 1e-6)).Unit() * (s - len);
+            return new RailStation(basePt, n);
+        }
+        TubeLayout twisted41 = Solve(s => CurvedStation(s, false, false), SmallLength,
+            s => CurvedStation(s, true, false), LargeLength, 41, d, -0.012, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true);
+        VerifyExact(twisted41, s => CurvedStation(s, false, false), s => CurvedStation(s, true, false),
+            LargeLength, d, -0.012, Quiet);
+        Require(twisted41.Issue == null && twisted41.MinimumGap > TubeDistance.Resolution,
+            "curved twisted N=41 H=12mm must verify cleanly: " + twisted41.Issue);
+        TubeLayout twisted41Flip = Solve(s => CurvedStation(s, false, true), SmallLength,
+            s => CurvedStation(s, true, true), LargeLength, 41, d, -0.012, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true);
+        VerifyExact(twisted41Flip, s => CurvedStation(s, false, true), s => CurvedStation(s, true, true),
+            LargeLength, d, -0.012, Quiet);
+        Require(twisted41Flip.Issue == null && twisted41Flip.Axes[20].A.Z < twisted41.Axes[20].A.Z,
+            "curved twisted N=41 H=12mm flip must offset oppositely and verify: " + twisted41Flip.Issue);
+
+        Console.WriteLine("PASS V3 opt-in negative cap margins, N30 baseline, N40/H2 and N41/H12 synthetic + curved/twisted/flip geometry");
     }
 
     private static void TestEqualPitchCustom()

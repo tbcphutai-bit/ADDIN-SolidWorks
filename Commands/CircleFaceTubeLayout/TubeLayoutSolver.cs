@@ -26,9 +26,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         public int FirstInterferingPairA, FirstInterferingPairB;
         public int SheetClashCount = 0, SheetInconclusiveCount = 0;
         // Smart overhang only: negative projected end-cap margin means protrusion.
-        public bool SmartOverhangEnabled, CenterExtrapolated;
-        public double AppliedOverhang, MaximumCenterExtension, EffectiveCapMargin;
-        public int OverhangSearchAttempts;
+        public bool SmartOverhangEnabled = false, CenterExtrapolated = false;
+        public double AppliedOverhang = 0, MaximumCenterExtension = 0, EffectiveCapMargin = 0;
+        public int OverhangSearchAttempts = 0;
         public TubeLayout(int count)
         {
             Axes = new TubeAxis[count];

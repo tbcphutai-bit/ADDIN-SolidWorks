@@ -43,6 +43,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly BoundaryRails rails;
         private bool previewed;
         private bool previewInProgress;
+        private bool updatingControls;
         private int previewVersion;
         public TubeLayout Accepted { get; private set; }
         private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
@@ -182,26 +183,31 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
         private void InvalidatePreview()
         {
-            if (IsDisposed || Disposing) return;
-            previewVersion++;
-            Accepted = null;
-            create.Enabled = false;
-            if (previewed) clearPreview?.Invoke();
-            quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
-            allowOverhang.Enabled = !autoCount.Checked && SmallMode == SmallEndSpacingMode.EqualPitch;
-            maxOverhang.Enabled = OverhangActive;
-            if (maxOverhang.Maximum != diameter.Value)
-                maxOverhang.Maximum = diameter.Value; // Center extrapolation stays bounded.
+            if (IsDisposed || Disposing || updatingControls) return;
+            updatingControls = true;
+            try
+            {
+                previewVersion++;
+                Accepted = null;
+                create.Enabled = false;
+                if (previewed) clearPreview?.Invoke();
+                quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
+                allowOverhang.Enabled = !autoCount.Checked && SmallMode == SmallEndSpacingMode.EqualPitch;
+                maxOverhang.Enabled = OverhangActive;
+                if (maxOverhang.Maximum != diameter.Value)
+                    maxOverhang.Maximum = diameter.Value; // Center extrapolation stays bounded.
 
-            total.Text = Count.HasValue
-                ? F("Total axes: {0} ({1}{2}) · {3}", Count.Value, (int)quantity.Value,
-                    addOne.Checked ? "+1" : "", SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch")
-                : "Total axes: Auto (small end touching)";
-            report.Text = RailsText() + Environment.NewLine +
-                (previewed ? "Updating preview…" : "Choose Preview to verify the layout.");
-            if (!previewed) return;
-            refresh.Stop();
-            refresh.Start();
+                total.Text = Count.HasValue
+                    ? F("Total axes: {0} ({1}{2}) · {3}", Count.Value, (int)quantity.Value,
+                        addOne.Checked ? "+1" : "", SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch")
+                    : "Total axes: Auto (small end touching)";
+                report.Text = RailsText() + Environment.NewLine +
+                    (previewed ? "Updating preview…" : "Choose Preview to verify the layout.");
+                if (!previewed) return;
+                refresh.Stop();
+                refresh.Start();
+            }
+            finally { updatingControls = false; }
         }
 
         private string RailsText() => F("Small {0:F3} mm    Large {1:F3} mm", rails.Small.Length / Mm, rails.Large.Length / Mm);
@@ -243,16 +249,25 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     : "";
                 string gapsLine = F("Adj small 3D gaps: {0:F4}–{1:F4} mm · Min full 3D gap: {2:F4} mm{3}{4}",
                     result.MinimumContact / Mm, result.MaximumContact / Mm, result.MinimumGap / Mm, pairTag, interferenceTag);
-                string brepStatus = result.SheetClashCount == 0 && result.SheetInconclusiveCount == 0
-                    ? "Clear"
-                    : F("clashes={0}, inconclusive={1}", result.SheetClashCount, result.SheetInconclusiveCount);
-                string sheetLine = F("Sheet clearance: min {0:F3} mm · BREP: {1} · lift {2:F3} mm",
-                    result.MinimumSheetEstimate / Mm, brepStatus, result.Lift / Mm);
+                bool sheetChecked = !double.IsNaN(result.MinimumSheetEstimate);
+                string brepStatus = !sheetChecked
+                    ? "Skipped (geometry invalid)"
+                    : result.SheetClashCount == 0 && result.SheetInconclusiveCount == 0
+                        ? "Clear"
+                        : F("clashes={0}, inconclusive={1}", result.SheetClashCount, result.SheetInconclusiveCount);
+                string sheetLine = sheetChecked
+                    ? F("Sheet clearance: min {0:F3} mm · BREP: {1} · lift {2:F3} mm",
+                        result.MinimumSheetEstimate / Mm, brepStatus, result.Lift / Mm)
+                    : F("Sheet clearance: n/a (geometry invalid) · BREP: {0} · lift {1:F3} mm",
+                        brepStatus, result.Lift / Mm);
                 string overhangLine = activeOverhang
-                    ? F("Smart Overhang: cap protrusion {0:F3} mm each side; center extension max {1:F3} mm; attempts {2}; {3}",
-                        result.AppliedOverhang / Mm, result.MaximumCenterExtension / Mm,
-                        result.OverhangSearchAttempts,
-                        result.CenterExtrapolated ? "EXTRAPOLATED center outside selected face" : "centers on selected rails")
+                    ? (result.OverhangSearchAttempts == 0 && result.Issue == null
+                        ? F("Smart Overhang: baseline margin {0:F3} mm preserved (cap protrusion 0.000 mm; centers on selected rails)",
+                            result.EffectiveCapMargin / Mm)
+                        : F("Smart Overhang: cap protrusion {0:F3} mm each side; center extension max {1:F3} mm; attempts {2}; {3}",
+                            result.AppliedOverhang / Mm, result.MaximumCenterExtension / Mm,
+                            result.OverhangSearchAttempts,
+                            result.CenterExtrapolated ? "EXTRAPOLATED center outside selected face" : "centers on selected rails"))
                     : "Smart Overhang: OFF";
                 string statusLine = result.Issue == null
                     ? "OK: Verified 3D separation for every pair and the sheet."

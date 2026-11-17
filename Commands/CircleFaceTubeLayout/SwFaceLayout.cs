@@ -53,13 +53,37 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 Rails.Small.Length / Mm, Rails.Large.Length / Mm, Rails.Small.PieceCount, Rails.Large.PieceCount));
         }
 
+        private sealed class RailEvaluatorSet
+        {
+            public readonly Func<double, RailStation> SmallInside, LargeInside;
+            public readonly Func<double, RailStation> SmallExtended, LargeExtended;
+            public readonly Func<double, RailStation> SmallCacheInside, LargeCacheInside;
+            public readonly Func<double, RailStation> SmallCacheExtended, LargeCacheExtended;
+
+            public RailEvaluatorSet(SwFaceLayout owner, double diameter, double sign)
+            {
+                SmallInside = s => owner.Station(owner.Rails.Small.At(s), sign);
+                LargeInside = s => owner.Station(owner.Rails.Large.At(owner.Rails.Large.Length - s), sign);
+                SmallExtended = owner.ExtendRail(SmallInside, owner.Rails.Small.Length, diameter / 2, "SMALL");
+                LargeExtended = owner.ExtendRail(LargeInside, owner.Rails.Large.Length, diameter / 2, "LARGE");
+                SmallCacheInside = owner.CacheRail(SmallInside, owner.Rails.Small.Length, diameter, "small");
+                LargeCacheInside = owner.CacheRail(LargeInside, owner.Rails.Large.Length, diameter, "large");
+                SmallCacheExtended = s => (s < 0 || s > owner.Rails.Small.Length) ? SmallExtended(s) : SmallCacheInside(s);
+                LargeCacheExtended = s => (s < 0 || s > owner.Rails.Large.Length) ? LargeExtended(s) : LargeCacheInside(s);
+            }
+        }
+
         public TubeLayout Analyze(int? count, double diameter, double margin, bool flip,
             SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact,
             bool allowSymmetricOverhang = false, double maxOverhang = 0)
         {
+            double sign = faceSense * (flip ? -1 : 1);
             // V3 is strictly opt-in and applies only to Custom + EqualPitch.
             if (!allowSymmetricOverhang)
-                return AnalyzeOne(count, diameter, margin, flip, smallMode, false);
+            {
+                var rails = new RailEvaluatorSet(this, diameter, sign);
+                return AnalyzeOne(count, diameter, margin, flip, smallMode, false, sign, rails, skipSheetOnGeometryFail: false);
+            }
             if (!count.HasValue || smallMode != SmallEndSpacingMode.EqualPitch)
                 throw new LayoutException("Smart Overhang requires Custom count and EqualPitch.");
             if (!(margin >= 0) || !(diameter > 0) || !(maxOverhang >= 0) ||
@@ -68,11 +92,12 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
             log(F("SMART_OVERHANG enabled=True count={0} baseline_margin_mm={1:F3} max_cap_overhang_mm={2:F3}",
                 count.Value, margin / Mm, maxOverhang / Mm));
+            var evalSet = new RailEvaluatorSet(this, diameter, sign);
             TubeLayout baseline = null, last = null;
             string baselineFailure = null;
             try
             {
-                baseline = AnalyzeOne(count, diameter, margin, flip, smallMode, false);
+                baseline = AnalyzeOne(count, diameter, margin, flip, smallMode, false, sign, evalSet, skipSheetOnGeometryFail: true);
                 baseline.SmartOverhangEnabled = true;
                 baseline.EffectiveCapMargin = margin;
                 if (baseline.Issue == null)
@@ -82,6 +107,13 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 }
                 baselineFailure = baseline.Issue;
                 log("SMART_OVERHANG baseline_not_feasible reason=" + baselineFailure);
+                if (baseline.InterferingPairCount == 0 && flip &&
+                    ownerBody.GetType() == (int)swBodyType_e.swSolidBody &&
+                    baseline.SheetClashCount == count.Value)
+                {
+                    log("SMART_OVERHANG skip_search reason=flipped_solid_material_clash");
+                    return baseline;
+                }
             }
             catch (LayoutException ex)
             {
@@ -98,11 +130,12 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             {
                 double h = Math.Min(maxOverhang, i * step);
                 if (i > 0 && h <= (i - 1) * step) continue;
+                if (i == 0 && margin == 0 && baseline != null && baseline.InterferingPairCount > 0) continue;
                 attempts++;
                 log(F("SMART_OVERHANG_TRIAL index={0} target_cap_mm={1:F4}", attempts, -h / Mm));
                 try
                 {
-                    TubeLayout candidate = AnalyzeOne(count, diameter, -h, flip, smallMode, true);
+                    TubeLayout candidate = AnalyzeOne(count, diameter, -h, flip, smallMode, true, sign, evalSet, skipSheetOnGeometryFail: true);
                     candidate.SmartOverhangEnabled = true;
                     candidate.OverhangSearchAttempts = attempts;
                     candidate.AppliedOverhang = h;
@@ -123,6 +156,13 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     {
                         log(F("SMART_OVERHANG_ACCEPT cap_overhang_mm={0:F3} trials={1}", h / Mm, attempts));
                         return candidate;
+                    }
+                    if (candidate.InterferingPairCount == 0 && flip &&
+                        ownerBody.GetType() == (int)swBodyType_e.swSolidBody &&
+                        candidate.SheetClashCount == count.Value)
+                    {
+                        log("SMART_OVERHANG_STOP reason=flipped_solid_material_clash");
+                        break;
                     }
                 }
                 catch (LayoutException ex)
@@ -149,23 +189,17 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         }
 
         private TubeLayout AnalyzeOne(int? count, double diameter, double margin, bool flip,
-            SmallEndSpacingMode smallMode, bool overhangCandidate)
+            SmallEndSpacingMode smallMode, bool overhangCandidate, double sign, RailEvaluatorSet evalSet,
+            bool skipSheetOnGeometryFail)
         {
             if (!count.HasValue && smallMode == SmallEndSpacingMode.EqualPitch)
                 throw new LayoutException("Equal-pitch small end requires Custom count.");
-            double sign = faceSense * (flip ? -1 : 1);
             log(F("SETTINGS flip={0} selected_normal_sign={1} large_edge_margin_mm={2:F6} count={3} small_mode={4}",
                 flip, sign, margin / Mm, count?.ToString() ?? "auto", smallMode));
-            RailStation SmallInside(double s) => Station(Rails.Small.At(s), sign);
-            RailStation LargeInside(double s) => Station(Rails.Large.At(Rails.Large.Length - s), sign);
-            Func<double, RailStation> Small = overhangCandidate
-                ? ExtendRail(SmallInside, Rails.Small.Length, diameter / 2, "SMALL")
-                : (Func<double, RailStation>)SmallInside;
-            Func<double, RailStation> Large = overhangCandidate
-                ? ExtendRail(LargeInside, Rails.Large.Length, diameter / 2, "LARGE")
-                : (Func<double, RailStation>)LargeInside;
-            var smallCache = CacheRail(Small, Rails.Small.Length, diameter, "small");
-            var largeCache = CacheRail(Large, Rails.Large.Length, diameter, "large");
+            Func<double, RailStation> Small = overhangCandidate ? evalSet.SmallExtended : evalSet.SmallInside;
+            Func<double, RailStation> Large = overhangCandidate ? evalSet.LargeExtended : evalSet.LargeInside;
+            Func<double, RailStation> smallCache = overhangCandidate ? evalSet.SmallCacheExtended : evalSet.SmallCacheInside;
+            Func<double, RailStation> largeCache = overhangCandidate ? evalSet.LargeCacheExtended : evalSet.LargeCacheInside;
 
             // Shared outward lift keeps offsets coherent. Re-solve contact after each
             // lift. A bounded search deliberately rejects faces that require more.
@@ -182,14 +216,12 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         count.Value, diameter, margin, lift, log, verify: false,
                         smallMode: smallMode, allowOverhang: overhangCandidate);
                     VerifyExact(layout, Small, Large, Rails.Large.Length, diameter, margin, log);
-                    // In V3, a geometry-invalid candidate can never be accepted.
-                    // Give the 3D axis layout a bounded chance to clear at a
-                    // different lift without running expensive SolidWorks BREP.
-                    if (overhangCandidate && layout.Issue != null)
+                    if (skipSheetOnGeometryFail && layout.Issue != null)
                     {
+                        // Geometry already failed (e.g. 3D cylinder collision at this overhang step);
+                        // return immediately instead of burning 8 lift retries or BREP calls.
                         log(F("OVERHANG_GEOMETRY_REJECT lift_mm={0:F6} reason={1}", lift / Mm, layout.Issue));
-                        lift += Math.Max(0.05 * Mm, lift * 0.5);
-                        continue;
+                        return layout;
                     }
                 }
                 else
