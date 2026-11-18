@@ -24,11 +24,11 @@ namespace ADDIN.Commands.Kadai
         public double LongSlotExtraMm = 0.2; // TOTAL extra width in notch on long rib
         public double CrossSlotExtraMm = 0.2; // TOTAL extra width in notch on cross rib
         public double GapToPanelMm = 0;
-        // Explicit principal-axis datum for P2. No inferred assembly transforms.
         public int HeightAxis = 1; // 0=X, 1=Y, 2=Z; U/V are the other two axes
+        public int HeightSign = 1;
         public double OriginUmm = 0;
         public double OriginVmm = 0;
-        public double BottomMm = 0;
+        public double BottomMm = 0; // coordinate projected onto the signed height axis
         public double PreviewChordToleranceMm = 0.05;
         internal KadaiRequest Snapshot() { return (KadaiRequest)MemberwiseClone(); }
 
@@ -115,6 +115,8 @@ namespace ADDIN.Commands.Kadai
             Positive(settings.PreviewChordToleranceMm, "PreviewChordToleranceMm");
             if (settings.HeightAxis < 0 || settings.HeightAxis > 2)
                 throw new ArgumentOutOfRangeException("HeightAxis");
+            if (settings.HeightSign != 1 && settings.HeightSign != -1)
+                throw new ArgumentOutOfRangeException("HeightSign");
             foreach (double coordinate in new[] { settings.OriginUmm, settings.OriginVmm, settings.BottomMm })
                 if (double.IsNaN(coordinate) || double.IsInfinity(coordinate))
                     throw new ArgumentException("Datum coordinates must be finite.");

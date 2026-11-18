@@ -159,3 +159,19 @@ Trên SolidWorks 2024 SP5.0, truyền workbook Excel vào custom allowance khi t
 Bộ KDA1 7×4 đạt kiểm tra trên 11 Part Sheet Metal, 11 Drawing và 11 DXF. Validator đo đúng 56 rãnh, đơn vị mm và tỉ lệ 1:1. Assembly thử có 11 component và không có giao thể tích giữa các thanh. Build Debug/Release x64 đạt. SHA256 của bản sao mặt panel, thư viện vật liệu và workbook ST giữ nguyên. Log API và package ở `kadai-assembly-6866/st-native-04`.
 
 Thay đổi nằm trong `Commands/Kadai/KadaiNativePrototype.cs` và `tools/KadaiCadTests.cs`. **Apply vẫn khóa.** Các thanh của bộ thử là tấm phẳng. Phép thử lưu và mở lại bảng ST, Flat Pattern và DXF của các thanh này không đo độ bù cho một chi tiết thực sự có nếp uốn.
+
+## 9. Chọn mặt panel và mặt phẳng đế trong Assembly
+
+Kadai đưa **Chọn mặt panel** và **Chọn mặt đế** lên đầu cửa sổ. Người dùng có thể bấm nút rồi chọn một mặt trong vùng đồ họa, hoặc chọn mặt trước rồi bấm nút. Cửa sổ hiện tên component đã chọn. Khi chọn đủ hai mặt, Kadai quy điểm và pháp tuyến của mặt đế về hệ Part panel, suy ra trục cao, chiều từ đế về phía panel và cao độ đáy. Đổi bên đặt thanh bằng cách chọn mặt đế ở phía tương ứng. Các thông số tọa độ, lề và khe hở nằm trong mục **Thông số nâng cao**.
+
+Preview thử lề đang nhập trước. Với tùy chọn tự tìm lề, các lượt thử thu dần vùng bố trí và chỉ hiện lưới khi kiểm tra đủ rãnh. Báo cáo Preview hiện cặp lề thực dùng. Người dùng có thể bỏ tùy chọn để thử đúng lề nhập. Mặt đế cong, nghiêng so với cả ba trục của Part panel hoặc cắt qua panel bị từ chối. Hỗ trợ chọn component cấp trên cùng, một mặt panel liên tục và một mặt phẳng đế. [Cách đọc điểm và pháp tuyến từ mặt phẳng bằng API](https://help.solidworks.com/2023/English/api/sldworksapi/Get_Normal_of_Planar_Surface_Example_VB.htm)
+
+| Lượt thử bằng API trên SolidWorks 2024 SP5.0 | Kết quả |
+|---|---|
+| Bản sao 4315-KDA1, mặt panel 3d và mặt đế bs1 | Hướng +Y, cao độ 0 mm trong Part panel. 7×4 rồi 5×3, lần lượt 56 và 30 rãnh. |
+| Bản sao 6866, mặt panel côn và mặt đế bs-new | Hướng +Z, cao độ khoảng −306,269 mm trong Part panel. 7×4 rồi 5×3, lần lượt 56 và 30 rãnh. Component đế được resolve trong bộ nhớ của phiên thử đọc riêng. |
+| Đối chứng | UI từ chối mặt cong làm đế. Test số kiểm tra hướng cao âm và rãnh đối ứng. Save flag của Assembly giữ nguyên trong thao tác chọn mặt và Preview. |
+
+Build Debug/Release x64 trên nhánh và source TAI TOOL đạt. Đối chiếu 47.298 mục IL/metadata/tài nguyên ngoài Kadai cho 0 sai khác. Các file trên nhánh gồm `KadaiCadContracts.cs`, `KadaiPlanner.cs`, `KadaiJointGeometry.cs`, `KadaiPreviewBackend.cs`, `UI/KadaiForm.cs` và `tools/KadaiJointGeometryTests.cs`. Log kiểm thử nằm trong thư mục local `kadai-assembly-6866/face-pick-cad-02`. **Apply vẫn khóa.**
+
+TAI TOOL đã được cập nhật khi SolidWorks đóng. DLL cài có MVID `103a06d5-5a5a-4ca1-86b9-127315f818e1` và SHA256 `72677A85918D84100A2C6261F252C15FC3A74C1AA26E789C4C1D7828F339BFDF`, khớp bản ứng viên đã kiểm thử. Cùng đợt này bản cài nhận code writer thử ST từ mục 8. Đối chiếu 31 file nguồn 6866 cho 0 sai khác và t7 khớp bản sao tham chiếu.

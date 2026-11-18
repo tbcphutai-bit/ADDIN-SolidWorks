@@ -45,7 +45,7 @@ namespace ADDIN.Commands.Kadai
                 int u = h == 0 ? 1 : 0, v = h == 2 ? 1 : 2;
                 int across = isLong ? u : v;
                 double station = ((isLong ? settings.OriginUmm : settings.OriginVmm) + rib.CoordinateMm) * .001;
-                if (!IsUnit(profile.AlongDirection, isLong ? v : u) || !IsUnit(profile.HeightDirection, h)
+                if (!IsUnit(profile.AlongDirection, isLong ? v : u) || !IsUnit(profile.HeightDirection, h, settings.HeightSign)
                     || !IsUnit(profile.ExtrusionDirection, across)
                     || profile.PointsWorldMeters.Any(p => Math.Abs(p[across] - station) > GeometryTolerance))
                     throw new InvalidOperationException(rib.Id + ": contour lệch mặt phẳng định vị thanh.");
@@ -204,10 +204,10 @@ namespace ADDIN.Commands.Kadai
             return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
         }
 
-        private static bool IsUnit(double[] direction, int axis)
+        private static bool IsUnit(double[] direction, int axis, int sign = 1)
         {
             return direction != null && direction.Length == 3
-                && direction.Where((value, index) => value != (index == axis ? 1d : 0d)).Count() == 0;
+                && direction.Where((value, index) => value != (index == axis ? sign : 0d)).Count() == 0;
         }
 
         private static bool Finite(double value) { return !double.IsNaN(value) && !double.IsInfinity(value); }

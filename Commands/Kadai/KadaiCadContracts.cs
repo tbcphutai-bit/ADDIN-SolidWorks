@@ -19,6 +19,13 @@ namespace ADDIN.Commands.Kadai
         public int DocumentStamp, PanelStamp;
     }
 
+    internal sealed class KadaiBaseDatum
+    {
+        public KadaiPanelSource Source;
+        public int HeightAxis, HeightSign;
+        public double PlaneCoordinateMm;
+    }
+
     internal sealed class KadaiProfile3D
     {
         public string RibId;

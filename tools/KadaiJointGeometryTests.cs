@@ -47,6 +47,15 @@ internal static class KadaiJointGeometryTests
             Console.WriteLine("PASS joint layout and notched preview " + counts[0] + "x" + counts[1]);
         }
         var valid = KadaiPlanner.Build(request);
+        var reversedRequest = request.Snapshot();
+        reversedRequest.HeightSign = -1;
+        var reversed = KadaiPlanner.Build(reversedRequest);
+        var reversedProfiles = Profiles(reversed);
+        var reversedCuts = KadaiJointGeometry.Build(reversed, reversedProfiles, 100, .1);
+        Require(KadaiJointGeometry.NotchedProfiles(reversed, reversedProfiles, reversedCuts).All(rib =>
+            rib.HeightDirection[1] == -1 && rib.PointsWorldMeters.All(point => point[1] <= -reversedRequest.BottomMm * .001)),
+            "Wrong datum or height on negative axis.");
+        Console.WriteLine("PASS signed height axis and notch perimeter");
         Reject(() => KadaiJointGeometry.Build(valid, Profiles(valid), 100, 0), "zero depth clearance");
         Reject(() => KadaiJointGeometry.Build(valid, Profiles(valid), 159.5, .1), "insufficient top web");
         Reject(() => KadaiJointGeometry.Build(valid, Profiles(valid), 2, .3), "insufficient bottom web");
@@ -90,12 +99,12 @@ internal static class KadaiJointGeometryTests
             double end = along + (isLong ? settings.LengthZmm : settings.LengthXmm) * .001;
             var profile = new KadaiProfile3D { RibId = rib.Id, Direction = rib.Direction, Closed = true,
                 AlongDirection = isLong ? new[] { 0d, 0, 1 } : new[] { 1d, 0, 0 },
-                HeightDirection = new[] { 0d, 1, 0 }, ExtrusionDirection = isLong ? new[] { 1d, 0, 0 } : new[] { 0d, 0, 1 },
+                HeightDirection = new[] { 0d, settings.HeightSign, 0 }, ExtrusionDirection = isLong ? new[] { 1d, 0, 0 } : new[] { 0d, 0, 1 },
                 ThicknessMeters = (isLong ? settings.LongThicknessMm : settings.CrossThicknessMm) * .001 };
             foreach (var point in new[] { new[] { along, b + .19 }, new[] { (end + along) / 2, b + .16 },
                 new[] { end, b + .22 }, new[] { end, b }, new[] { along, b } })
-                profile.PointsWorldMeters.Add(isLong ? new[] { fixedCoordinate, point[1], point[0] }
-                    : new[] { point[0], point[1], fixedCoordinate });
+                profile.PointsWorldMeters.Add(isLong ? new[] { fixedCoordinate, settings.HeightSign * point[1], point[0] }
+                    : new[] { point[0], settings.HeightSign * point[1], fixedCoordinate });
             list.Add(profile);
         }
         return list;

@@ -11,6 +11,12 @@ namespace ADDIN.Commands.Kadai
     // Principal-axis sections in panel Part coordinates, displayed in the active model.
     internal sealed class KadaiPreviewBackend : IKadaiCadBackend, IDisposable
     {
+        internal sealed class SlottedLayout
+        {
+            public KadaiPlan Plan;
+            public List<KadaiProfile3D> Profiles;
+        }
+
         private readonly ISldWorks app;
         private readonly int threadId = Thread.CurrentThread.ManagedThreadId;
         private readonly List<Body2> visibleBodies = new List<Body2>();
@@ -25,13 +31,18 @@ namespace ADDIN.Commands.Kadai
         }
         public KadaiPanelSource CaptureSource(ISldWorks a, ModelDoc2 d)
         {
+            return CaptureSelectedFace(d, "panel");
+        }
+
+        private KadaiPanelSource CaptureSelectedFace(ModelDoc2 d, string role)
+        {
             CheckThread();
             var assembly = d as AssemblyDoc;
             if (d == null || (assembly == null && d.GetType() != (int)swDocumentTypes_e.swDocPART))
                 throw new InvalidOperationException("Mở Assembly chứa panel hoặc mở Part panel.");
             var sel = (SelectionMgr)d.SelectionManager;
             if (sel.GetSelectedObjectCount2(-1) != 1 || !(sel.GetSelectedObject6(1, -1) is Face2))
-                throw new InvalidOperationException("Chọn đúng một mặt panel (Face), rồi Capture face.");
+                throw new InvalidOperationException("Chọn đúng một mặt " + role + " trong vùng đồ họa.");
             var face = (Face2)sel.GetSelectedObject6(1, -1);
             ModelDoc2 part = d;
             Component2 component = null;
@@ -42,14 +53,14 @@ namespace ADDIN.Commands.Kadai
                     throw new InvalidOperationException("Thoát Edit Part/Edit Component rồi chọn lại mặt panel.");
                 component = sel.GetSelectedObjectsComponent3(1, -1) as Component2;
                 if (component == null || component.GetParent() != null)
-                    throw new InvalidOperationException("Chọn trực tiếp mặt của Part panel ở cấp hiện hành. Nếu panel nằm trong cụm con, mở cụm con để Preview.");
+                    throw new InvalidOperationException("Chọn mặt của Part ở cấp hiện hành. Nếu Part nằm trong cụm con, hãy mở cụm con.");
                 part = component.GetModelDoc2() as ModelDoc2;
                 if (part == null || part.GetType() != (int)swDocumentTypes_e.swDocPART
                     || part.ConfigurationManager.ActiveConfiguration.Name != component.ReferencedConfiguration)
-                    throw new InvalidOperationException("Resolve component panel và kiểm tra configuration đang dùng trong Assembly.");
+                    throw new InvalidOperationException("Resolve component được chọn và kiểm tra configuration đang dùng trong Assembly.");
                 face = part.Extension.GetCorrespondingEntity2(face) as Face2;
                 if (face == null)
-                    throw new InvalidOperationException("Mặt đã chọn không có mặt tương ứng trong Part panel.");
+                    throw new InvalidOperationException("Mặt đã chọn không có mặt tương ứng trong Part.");
                 placement = component.Transform2?.ArrayData as double[];
                 if (placement == null || placement.Length != 16 || placement.Any(value => double.IsNaN(value) || double.IsInfinity(value))
                     || Math.Abs(placement[12] - 1) > 1e-9)
@@ -64,6 +75,45 @@ namespace ADDIN.Commands.Kadai
                 PanelComponent = component, ComponentPlacement = placement,
                 DocumentStamp = d.GetUpdateStamp(), PanelStamp = part.GetUpdateStamp(),
                 PersistentReferenceEncoded = Convert.ToBase64String(id) };
+        }
+
+        internal KadaiBaseDatum CaptureBase(KadaiPanelSource panel)
+        {
+            var panelFace = Resolve(panel);
+            var selected = CaptureSelectedFace(panel.DocumentTransient, "đế");
+            var face = (Face2)selected.SelectedFaceTransient;
+            var surface = face.GetSurface() as Surface;
+            if (surface == null || !surface.IsPlane())
+                throw new InvalidOperationException("Mặt đế phải là mặt phẳng. Chọn lại mặt tỳ của các thanh.");
+            var plane = surface.PlaneParams as double[];
+            if (plane == null || plane.Length != 6)
+                throw new InvalidOperationException("Không đọc được mặt phẳng đế.");
+            var normal = IntoPanelFrame(plane.Take(3).ToArray(), selected.ComponentPlacement, panel.ComponentPlacement, false);
+            var point = IntoPanelFrame(plane.Skip(3).ToArray(), selected.ComponentPlacement, panel.ComponentPlacement, true);
+            int axis = Enumerable.Range(0, 3).OrderByDescending(i => Math.Abs(normal[i])).First();
+            if (Enumerable.Range(0, 3).Any(i => i != axis && Math.Abs(normal[i]) > 1e-6))
+                throw new InvalidOperationException("Mặt đế đang nghiêng so với các trục của Part panel. Chọn mặt tỳ vuông góc với một trục của panel.");
+            var bounds = MeasureBounds(panelFace);
+            double planeCoordinate = point[axis];
+            if (bounds[axis] < planeCoordinate - 1e-6 && bounds[axis + 3] > planeCoordinate + 1e-6)
+                throw new InvalidOperationException("Mặt đế cắt qua panel. Chọn mặt tỳ nằm về một phía của toàn bộ mặt panel.");
+            double mid = (bounds[axis] + bounds[axis + 3]) / 2;
+            if (Math.Abs(mid - planeCoordinate) <= 1e-6)
+                throw new InvalidOperationException("Mặt đế trùng mặt panel. Chọn mặt tỳ khác.");
+            return new KadaiBaseDatum { Source = selected, HeightAxis = axis,
+                HeightSign = mid > planeCoordinate ? 1 : -1, PlaneCoordinateMm = planeCoordinate * 1000 };
+        }
+
+        private static double[] IntoPanelFrame(double[] value, double[] from, double[] panel, bool point)
+        {
+            // SolidWorks stores three local basis vectors followed by translation.
+            // Transform2 has unit scale, so the inverse rotation is the transpose.
+            var assembly = from == null ? value : Enumerable.Range(0, 3).Select(i =>
+                value[0] * from[i] + value[1] * from[3 + i] + value[2] * from[6 + i]
+                + (point ? from[9 + i] : 0)).ToArray();
+            if (panel == null) return assembly;
+            return Enumerable.Range(0, 3).Select(i => Enumerable.Range(0, 3).Sum(j =>
+                (assembly[j] - (point ? panel[9 + j] : 0)) * panel[3 * i + j])).ToArray();
         }
 
         private static bool IsAssemblyEditingRoot(AssemblyDoc assembly)
@@ -137,7 +187,7 @@ namespace ADDIN.Commands.Kadai
             var surface = (Surface)face.GetSurface();
             var modeler = (Modeler)app.GetModeler();
             var settings = plan.Settings;
-            int h = settings.HeightAxis, u = UAxis(h), v = VAxis(h);
+            int h = settings.HeightAxis, sign = settings.HeightSign, u = UAxis(h), v = VAxis(h);
             double[] box = (double[])face.GetBox();
             var results = new List<KadaiProfile3D>();
             foreach (var rib in plan.LongRibs.Concat(plan.CrossRibs))
@@ -149,7 +199,7 @@ namespace ADDIN.Commands.Kadai
                 double fixedCoordinate = ((longitudinal ? settings.OriginUmm : settings.OriginVmm) + rib.CoordinateMm) * .001;
                 Func<double, double[]> intersect = coordinate => Intersect(face, surface, modeler,
                     h, along, across, coordinate, fixedCoordinate, box[h] - 1, box[h + 3] + 1,
-                    settings.GapToPanelMm * .001);
+                    sign * settings.GapToPanelMm * .001);
                 var samples = new List<double[]>();
                 int first = -1, last = -1;
                 // Discover one connected projected interval; never bridge a hole or
@@ -173,19 +223,47 @@ namespace ADDIN.Commands.Kadai
                         settings.PreviewChordToleranceMm * .001, 0);
                 }
                 double bottom = settings.BottomMm * .001;
-                if (samples.Any(p => p[h] <= bottom + .0001))
-                    throw new InvalidOperationException(rib.Id + ": datum đáy nằm trên/tiếp xúc panel.");
+                if (samples.Any(p => sign * p[h] <= bottom + .0001))
+                    throw new InvalidOperationException(rib.Id + ": mặt đế ở sai phía panel hoặc quá sát. Kiểm tra hướng cao và mặt đế.");
+                var heightDirection = Unit(h); heightDirection[h] = sign;
                 var profile = new KadaiProfile3D { RibId = rib.Id, Direction = rib.Direction,
                     ThicknessMeters = (longitudinal ? settings.LongThicknessMm : settings.CrossThicknessMm) * .001,
-                    ExtrusionDirection = Unit(across), AlongDirection = Unit(along), HeightDirection = Unit(h),
+                    ExtrusionDirection = Unit(across), AlongDirection = Unit(along), HeightDirection = heightDirection,
                     Closed = true, ValidationMessage = "Preview polyline; midpoint tolerance " + settings.PreviewChordToleranceMm + " mm. Manufacturing gate remains closed." };
                 profile.PointsWorldMeters.AddRange(samples);
-                var bottomEnd = (double[])samples.Last().Clone(); bottomEnd[h] = bottom;
-                var bottomStart = (double[])samples.First().Clone(); bottomStart[h] = bottom;
+                var bottomEnd = (double[])samples.Last().Clone(); bottomEnd[h] = sign * bottom;
+                var bottomStart = (double[])samples.First().Clone(); bottomStart[h] = sign * bottom;
                 profile.PointsWorldMeters.Add(bottomEnd); profile.PointsWorldMeters.Add(bottomStart);
                 results.Add(profile);
             }
             return results;
+        }
+
+        internal SlottedLayout BuildLayout(KadaiRequest settings, KadaiPanelSource panel,
+            double seamMm, double clearanceMm, bool autoMargins)
+        {
+            string rejection = null, suggestion = null;
+            var factors = autoMargins ? new[] { 0d, .12, .22, .30, .36, .42 } : new[] { 0d };
+            foreach (double factor in factors)
+            {
+                var adjusted = settings.Snapshot();
+                adjusted.LongEndMarginMm = Math.Max(settings.LongEndMarginMm, Math.Ceiling(settings.LengthXmm * factor * 10) / 10);
+                adjusted.CrossEndMarginMm = Math.Max(settings.CrossEndMarginMm, Math.Ceiling(settings.LengthZmm * factor * 10) / 10);
+                var plan = KadaiPlanner.Build(adjusted);
+                List<KadaiProfile3D> profiles = null;
+                try
+                {
+                    profiles = CalculateProfiles(plan, panel);
+                    var cuts = KadaiJointGeometry.Build(plan, profiles, seamMm, clearanceMm);
+                    return new SlottedLayout { Plan = plan, Profiles = KadaiJointGeometry.NotchedProfiles(plan, profiles, cuts) };
+                }
+                catch (InvalidOperationException ex)
+                {
+                    if (rejection == null) rejection = ex.Message;
+                    if (profiles != null) suggestion = KadaiJointGeometry.SuggestMargins(plan, profiles);
+                }
+            }
+            throw new InvalidOperationException(rejection + (string.IsNullOrEmpty(suggestion) ? "" : " " + suggestion));
         }
         private static double[] Boundary(Func<double, double[]> intersect, double outside, double[] inside, int along)
         {
