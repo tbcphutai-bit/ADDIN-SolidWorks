@@ -14,6 +14,12 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private readonly CheckBox autoCount = new CheckBox { Text = "Auto count", Checked = true, AutoSize = true };
         private readonly CheckBox addOne = new CheckBox { Text = "Add +1", Checked = true, AutoSize = true };
         private readonly CheckBox flip = new CheckBox { Text = "Flip Side", AutoSize = true };
+        private readonly CheckBox allowOverhang = new CheckBox
+        { Text = "Allow symmetric overhang (V3)", AutoSize = true, Checked = false };
+        private readonly NumericUpDown maxOverhang = Number(12, 0, 40, 2);
+        private readonly NumericUpDown minClearance = Number(0, 0, 50, 2);
+        private readonly CheckBox checkOtherBodies = new CheckBox
+        { Text = "Check other assembly/part bodies", AutoSize = true, Checked = false };
         private readonly ComboBox smallMode = new ComboBox { Width = 195, DropDownStyle = ComboBoxStyle.DropDownList };
         private SmallEndSpacingMode SmallMode => smallMode.SelectedIndex == 1
             ? SmallEndSpacingMode.EqualPitch : SmallEndSpacingMode.TangentContact;
@@ -32,37 +38,45 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         };
         private readonly Button create = new Button { Text = "Create 3D Sketch", AutoSize = true, Enabled = false };
         private readonly Timer refresh = new Timer { Interval = 350 };
-        private readonly Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze;
+        private readonly Func<int?, double, double, bool, SmallEndSpacingMode, bool, double, double, bool, TubeLayout> analyze;
+        private bool OverhangActive => !autoCount.Checked &&
+            SmallMode == SmallEndSpacingMode.EqualPitch && allowOverhang.Checked;
+        private readonly int contextBodyCount;
+        private readonly int unreadableContextCount;
         private readonly Action clearPreview;
         private readonly Action<string> logLine;
         private readonly BoundaryRails rails;
         private bool previewed;
         private bool previewInProgress;
+        private bool updatingControls;
         private int previewVersion;
         public TubeLayout Accepted { get; private set; }
         private int? Count => autoCount.Checked ? (int?)null : (int)quantity.Value + (addOne.Checked ? 1 : 0);
 
         public CircleFaceTubeLayoutForm(string logPath, BoundaryRails rails,
-            Func<int?, double, double, bool, SmallEndSpacingMode, TubeLayout> analyze,
+            int contextBodyCount, int unreadableContextCount,
+            Func<int?, double, double, bool, SmallEndSpacingMode, bool, double, double, bool, TubeLayout> analyze,
             Action clearPreview = null, Action<string> logLine = null)
         {
             this.rails = rails;
+            this.contextBodyCount = contextBodyCount;
+            this.unreadableContextCount = unreadableContextCount;
             this.analyze = analyze;
             this.clearPreview = clearPreview;
             this.logLine = logLine;
-            Text = "Circle Along Face";
+            Text = "Circle Along Face V3 - Smart Overhang";
             Font = SystemFonts.MessageBoxFont;
-            ClientSize = new Size(540, 425);
+            ClientSize = new Size(580, 545);
             AutoScaleMode = AutoScaleMode.Font;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.Manual;
             ShowInTaskbar = false;
             MaximizeBox = MinimizeBox = false;
 
-            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 9 };
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 54));
-            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 46));
-            for (int i = 0; i < 7; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var grid = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 2, RowCount = 13 };
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
+            grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
+            for (int i = 0; i < 11; i++) grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             Controls.Add(grid);
@@ -78,13 +92,25 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             grid.Controls.Add(total, 1, 4);
 
             Row(grid, 5, "Small-end mode (Custom)", smallMode);
+            Row(grid, 6, "Min pair gap in EqualPitch (mm)", minClearance);
+            grid.Controls.Add(allowOverhang, 0, 7);
+            Row(grid, 8, "Max cap overhang (mm)", maxOverhang);
+            bool hasContext = contextBodyCount > 0 || unreadableContextCount > 0;
+            checkOtherBodies.Enabled = hasContext;
+            checkOtherBodies.Checked = hasContext;
+            checkOtherBodies.Text = hasContext
+                ? F("Check other assembly/part bodies ({0} found)", contextBodyCount + unreadableContextCount)
+                : "Check other assembly/part bodies (none in Part)";
+            grid.Controls.Add(checkOtherBodies, 0, 9);
+            grid.SetColumnSpan(checkOtherBodies, 2);
+
             var legend = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
             legend.Controls.Add(new Label { Text = "● Small end", ForeColor = Color.DeepSkyBlue, AutoSize = true });
             legend.Controls.Add(new Label { Text = "● Large end", ForeColor = Color.DarkGoldenrod, AutoSize = true });
             legend.Controls.Add(new Label { Text = "● Verified axes", ForeColor = Color.ForestGreen, AutoSize = true });
-            grid.Controls.Add(legend, 0, 6);
+            grid.Controls.Add(legend, 0, 10);
             grid.SetColumnSpan(legend, 2);
-            grid.Controls.Add(report, 0, 7);
+            grid.Controls.Add(report, 0, 11);
             grid.SetColumnSpan(report, 2);
 
             var buttons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
@@ -92,7 +118,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             var debug = new Button { Text = "Open Debug Log", AutoSize = true };
             var cancel = new Button { Text = "Cancel", AutoSize = true, DialogResult = DialogResult.Cancel };
             buttons.Controls.AddRange(new Control[] { preview, create, debug, cancel });
-            grid.Controls.Add(buttons, 0, 8);
+            grid.Controls.Add(buttons, 0, 12);
             grid.SetColumnSpan(buttons, 2);
             CancelButton = cancel;
             AcceptButton = preview;
@@ -108,12 +134,12 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, Text); }
             };
             refresh.Tick += (sender, args) => Preview();
-            foreach (NumericUpDown control in new[] { diameter, quantity, margin })
+            foreach (NumericUpDown control in new[] { diameter, quantity, margin, maxOverhang, minClearance })
             {
                 control.ValueChanged += (sender, args) => InvalidatePreview();
                 control.TextChanged += (sender, args) => InvalidatePendingText();
             }
-            foreach (CheckBox control in new[] { autoCount, addOne, flip })
+            foreach (CheckBox control in new[] { autoCount, addOne, flip, allowOverhang, checkOtherBodies })
                 control.CheckedChanged += (sender, args) => InvalidatePreview();
             smallMode.SelectedIndexChanged += (sender, args) => InvalidatePreview();
             FormClosed += (sender, args) => refresh.Stop();
@@ -124,7 +150,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         {
             using (var done = new Form
             {
-                Text = "Circle Along Face",
+                Text = "Circle Along Face V3 - Smart Overhang",
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 AutoSize = true,
@@ -175,21 +201,32 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
 
         private void InvalidatePreview()
         {
-            if (IsDisposed || Disposing) return;
-            previewVersion++;
-            Accepted = null;
-            create.Enabled = false;
-            if (previewed) clearPreview?.Invoke();
-            quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
-            total.Text = Count.HasValue
-                ? F("Total axes: {0} ({1}{2}) · {3}", Count.Value, (int)quantity.Value,
-                    addOne.Checked ? "+1" : "", SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch")
-                : "Total axes: Auto (small end touching)";
-            report.Text = RailsText() + Environment.NewLine +
-                (previewed ? "Updating preview…" : "Choose Preview to verify the layout.");
-            if (!previewed) return;
-            refresh.Stop();
-            refresh.Start();
+            if (IsDisposed || Disposing || updatingControls) return;
+            updatingControls = true;
+            try
+            {
+                previewVersion++;
+                Accepted = null;
+                create.Enabled = false;
+                if (previewed) clearPreview?.Invoke();
+                quantity.Enabled = addOne.Enabled = smallMode.Enabled = !autoCount.Checked;
+                minClearance.Enabled = !autoCount.Checked && SmallMode == SmallEndSpacingMode.EqualPitch;
+                allowOverhang.Enabled = !autoCount.Checked && SmallMode == SmallEndSpacingMode.EqualPitch;
+                maxOverhang.Enabled = OverhangActive;
+                if (maxOverhang.Maximum != diameter.Value)
+                    maxOverhang.Maximum = diameter.Value; // Center extrapolation stays bounded.
+
+                total.Text = Count.HasValue
+                    ? F("Total axes: {0} ({1}{2}) · {3}", Count.Value, (int)quantity.Value,
+                        addOne.Checked ? "+1" : "", SmallMode == SmallEndSpacingMode.EqualPitch ? "EqualPitch" : "Touch")
+                    : "Total axes: Auto (small end touching)";
+                report.Text = RailsText() + Environment.NewLine +
+                    (previewed ? "Updating preview…" : "Choose Preview to verify the layout.");
+                if (!previewed) return;
+                refresh.Stop();
+                refresh.Start();
+            }
+            finally { updatingControls = false; }
         }
 
         private string RailsText() => F("Small {0:F3} mm    Large {1:F3} mm", rails.Small.Length / Mm, rails.Large.Length / Mm);
@@ -209,10 +246,16 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             try
             {
                 var mode = autoCount.Checked ? SmallEndSpacingMode.TangentContact : SmallMode;
-                logLine?.Invoke(F("UI_INPUT auto={0} base_count={1} add_one={2} effective_count={3} selected_mode={4} effective_mode={5} diameter_mm={6:F3} margin_mm={7:F3} flip={8}",
+                bool activeOverhang = OverhangActive;
+                double activeMinClearance = mode == SmallEndSpacingMode.EqualPitch ? (double)minClearance.Value * Mm : 0;
+                bool checkContextNow = (contextBodyCount > 0 || unreadableContextCount > 0) && checkOtherBodies.Checked;
+                logLine?.Invoke(F("UI_INPUT auto={0} base_count={1} add_one={2} effective_count={3} selected_mode={4} effective_mode={5} diameter_mm={6:F3} margin_mm={7:F3} flip={8} allow_overhang={9} max_cap_overhang_mm={10:F3} min_pair_gap_mm={11:F3} check_context={12}",
                     autoCount.Checked, (int)quantity.Value, addOne.Checked, Count?.ToString() ?? "auto",
-                    SmallMode, mode, (double)diameter.Value, (double)margin.Value, flip.Checked));
-                var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm, flip.Checked, mode);
+                    SmallMode, mode, (double)diameter.Value, (double)margin.Value, flip.Checked,
+                    activeOverhang, (double)maxOverhang.Value, activeMinClearance / Mm, checkContextNow));
+                var result = analyze(Count, (double)diameter.Value * Mm, (double)margin.Value * Mm,
+                    flip.Checked, mode, activeOverhang, (double)maxOverhang.Value * Mm,
+                    activeMinClearance, checkContextNow);
                 if (IsDisposed || Disposing || version != previewVersion) return;
                 string smallLine = result.SmallMode == SmallEndSpacingMode.EqualPitch
                     ? F("Small end: EqualPitch · pitch {0:F3} mm · cap margins L={1:F3} / R={2:F3} mm",
@@ -224,21 +267,58 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                     ? F(" (pair {0}-{1})", result.MinimumGapPairA, result.MinimumGapPairB)
                     : "";
                 string interferenceTag = result.InterferingPairCount > 0
-                    ? F(" · interfering={0} (first {1}-{2})", result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB)
+                    ? F(" · below target={0} (first {1}-{2})", result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB)
                     : "";
-                string gapsLine = F("Adj small 3D gaps: {0:F4}–{1:F4} mm · Min full 3D gap: {2:F4} mm{3}{4}",
-                    result.MinimumContact / Mm, result.MaximumContact / Mm, result.MinimumGap / Mm, pairTag, interferenceTag);
-                string brepStatus = result.SheetClashCount == 0 && result.SheetInconclusiveCount == 0
-                    ? "Clear"
-                    : F("clashes={0}, inconclusive={1}", result.SheetClashCount, result.SheetInconclusiveCount);
-                string sheetLine = F("Sheet clearance: min {0:F3} mm · BREP: {1} · lift {2:F3} mm",
-                    result.MinimumSheetEstimate / Mm, brepStatus, result.Lift / Mm);
+                string reqTag = result.SmallMode == SmallEndSpacingMode.EqualPitch && result.MinimumPairClearance > 0
+                    ? F(" [req >= {0:F2} mm]", result.MinimumPairClearance / Mm)
+                    : "";
+                string tightWarning = result.Issue == null && result.SmallMode == SmallEndSpacingMode.EqualPitch &&
+                    result.MinimumGap < 0.10 * Mm
+                    ? " [Tight geometric gap < 0.10 mm: verify fabrication tolerance]"
+                    : "";
+                string gapsLine = F("Adj small 3D gaps: {0:F4}–{1:F4} mm · Min full 3D gap: {2:F4} mm{3}{4}{5}{6}",
+                    result.MinimumContact / Mm, result.MaximumContact / Mm, result.MinimumGap / Mm, pairTag, reqTag, interferenceTag, tightWarning);
+                bool sheetChecked = !double.IsNaN(result.MinimumSheetEstimate);
+                string brepStatus = !sheetChecked
+                    ? "Skipped (geometry invalid)"
+                    : result.SheetClashCount == 0 && result.SheetInconclusiveCount == 0
+                        ? "Clear"
+                        : F("clashes={0}, inconclusive={1}", result.SheetClashCount, result.SheetInconclusiveCount);
+                string sheetLine = sheetChecked
+                    ? F("Sheet clearance: min {0:F3} mm · BREP: {1} · lift {2:F3} mm",
+                        result.MinimumSheetEstimate / Mm, brepStatus, result.Lift / Mm)
+                    : F("Sheet clearance: n/a (geometry invalid) · BREP: {0} · lift {1:F3} mm",
+                        brepStatus, result.Lift / Mm);
+                string overhangLine = activeOverhang
+                    ? (result.OverhangSearchAttempts == 0 && result.Issue == null
+                        ? F("Smart Overhang: baseline margin {0:F3} mm preserved (cap protrusion 0.000 mm; centers on selected rails)",
+                            result.EffectiveCapMargin / Mm)
+                        : F("Smart Overhang: cap protrusion {0:F3} mm each side (0.5 mm scan + 0.05 mm local refinement); center ext max {1:F3} mm; attempts {2}; {3}",
+                            result.AppliedOverhang / Mm, result.MaximumCenterExtension / Mm,
+                            result.OverhangSearchAttempts,
+                            result.CenterExtrapolated ? "EXTRAPOLATED center outside selected face" : "centers on selected rails"))
+                    : "Smart Overhang: OFF";
+                int totalOther = Math.Max(result.ContextBodyCount + result.ContextInconclusiveCount, contextBodyCount + unreadableContextCount);
+                string scopeLine;
+                if (totalOther == 0)
+                    scopeLine = "Scope: Single-body part verified (owner body + pairs; straight axes use offset end normals, not continuous surface tangency).";
+                else if (!result.ContextCheckPerformed)
+                    scopeLine = F("Scope: LIMITED — {0} other body/component(s) NOT checked (assembly interference unverified).", totalOther);
+                else if (result.ContextClashCount > 0 || result.ContextInconclusiveCount > 0)
+                    scopeLine = F("Scope: Context B-rep checked ({0} other body/component(s)) · COLLISION: colliding_axes={1}, inconclusive={2} ({3}).",
+                        result.ContextBodyCount, result.ContextClashCount, result.ContextInconclusiveCount, result.ContextClashSummary ?? "see log");
+                else
+                    scopeLine = F("Scope: Full context verified Clear ({0} other visible body/component(s) + owner body + pairs; offset end normals, not continuous surface tangency).",
+                        result.ContextBodyCount);
+
                 string statusLine = result.Issue == null
-                    ? "OK: Verified 3D separation for every pair and the sheet."
+                    ? (totalOther > 0 && !result.ContextCheckPerformed
+                        ? "OK (LIMITED SCOPE — other bodies UNVERIFIED): Verified tube pairs and owner body only."
+                        : "OK: Verified 3D tube separation and B-rep checks (offset end normals).")
                     : "INFEASIBLE: " + result.Issue;
 
                 report.Text = string.Join(Environment.NewLine,
-                    RailsText(), smallLine, largeLine, gapsLine, sheetLine, statusLine);
+                    RailsText(), smallLine, largeLine, overhangLine, gapsLine, sheetLine, scopeLine, statusLine);
                 total.Text = autoCount.Checked
                     ? F("Total axes: {0} (Auto{1})", result.Axes.Length, result.Axes.Length == MaximumCount ? ", limit" : "")
                     : F("Total axes: {0} ({1}{2}) · {3}", result.Axes.Length, (int)quantity.Value,

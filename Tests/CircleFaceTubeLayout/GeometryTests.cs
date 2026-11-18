@@ -17,6 +17,7 @@ internal static class GeometryTests
             TestCylinders();
             TestRails();
             TestEqualPitchCustom();
+            TestV3OverhangGeometry();
             var flat = Layout(41, 0, false, Console.WriteLine);
             AssertLayout(flat, 41);
             Require(Math.Abs(flat.LargePitch / Mm - 34.79925) < 0.01, "reference large-end pitch");
@@ -49,6 +50,110 @@ internal static class GeometryTests
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static void TestV3OverhangGeometry()
+    {
+        // Pure geometry: no SolidWorks COM, therefore these tests verify
+        // station extension, cap projection and 3D tube separation only.
+        // Real solid/surface B-rep checks belong to the integration suite.
+        const double shortLength = 0.81135, longLength = 1.42197;
+        const double d = 0.020, requestedMargin = 0.005, lift = 0.00001;
+        var normal = new Point3(0, 0, 1);
+        RailStation Small(double s) => new RailStation(
+            new Point3(s - shortLength / 2, 0, 0), normal);
+        RailStation Large(double s) => new RailStation(
+            new Point3(s - longLength / 2, 3, 0), normal);
+
+        TubeLayout thirty = Solve(Small, shortLength, Large, longLength, 30, d,
+            requestedMargin, lift, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(thirty.Issue == null && thirty.SmallStations[0] > 0,
+            "N=30 baseline fits without overhang");
+
+        TubeLayout fortyBaseline = Solve(Small, shortLength, Large, longLength, 40, d,
+            requestedMargin, lift, Quiet, smallMode: SmallEndSpacingMode.EqualPitch);
+        Require(fortyBaseline.Issue != null && fortyBaseline.InterferingPairCount > 0,
+            "N=40 with margins is blocked for sloped straight fixture");
+
+        TubeLayout forty = Solve(Small, shortLength, Large, longLength, 40, d,
+            -0.002, lift, Quiet, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true);
+        Require(forty.Issue == null && forty.MinimumGap > TubeDistance.Resolution,
+            "N=40 H=2mm must clear in synthetic tapered fixture");
+        AssertEqualPitchLayout(forty, 40, -0.002);
+
+        TubeLayout fortyOne = Solve(Small, shortLength, Large, longLength, 41, d,
+            -0.012, lift, Quiet, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true);
+        Require(fortyOne.Issue == null && fortyOne.MinimumGap > TubeDistance.Resolution,
+            "N=41 H=12mm must clear in synthetic fixture");
+        AssertEqualPitchLayout(fortyOne, 41, -0.012);
+        Require(fortyOne.SmallStations[0] < 0 &&
+            fortyOne.SmallStations[40] > shortLength,
+            "N=41 center stations extend beyond both small-rail ends");
+
+        ExpectFailure(() => Solve(Small, shortLength, Large, longLength, 41, d,
+            -0.012, lift, Quiet, smallMode: SmallEndSpacingMode.EqualPitch),
+            "negative margin without opt-in must fail");
+        ExpectFailure(() => Solve(Small, shortLength, Large, longLength, 41, d,
+            -0.021, lift, Quiet, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true),
+            "overhang > diameter must fail");
+        ExpectFailure(() => Solve(Small, shortLength, Large, longLength, 41, d,
+            -0.012, lift, Quiet, smallMode: SmallEndSpacingMode.TangentContact, allowOverhang: true),
+            "overhang in touching mode must fail");
+
+        // Curved + twisted (R3247 / R4323.16, twist 0.07 rad) with tangent rail extrapolation + VerifyExact + Flip.
+        Func<double, Point3> arcSmall = s => Arc(SmallRadius, SmallLength, s, 0);
+        Func<double, Point3> arcLarge = s => Arc(LargeRadius, LargeLength, s, 0.07);
+        RailStation CurvedStation(double s, bool outer, bool flip)
+        {
+            double len = outer ? LargeLength : SmallLength;
+            double clamped = Math.Max(0, Math.Min(len, s));
+            Point3 p = arcSmall((clamped / len) * SmallLength);
+            Point3 q = arcLarge((clamped / len) * LargeLength);
+            Func<double, Point3> ptFn = outer ? arcLarge : arcSmall;
+            Point3 tangent = (ptFn(Math.Min(len, clamped + 1e-7)) - ptFn(Math.Max(0, clamped - 1e-7))).Unit();
+            Point3 n = (q - p).Cross(tangent).Unit() * (flip ? -1 : 1);
+            Point3 basePt = outer ? q : p;
+            if (s < 0) basePt = basePt + (ptFn(1e-6) - ptFn(0)).Unit() * s;
+            else if (s > len) basePt = basePt + (ptFn(len) - ptFn(len - 1e-6)).Unit() * (s - len);
+            return new RailStation(basePt, n);
+        }
+        TubeLayout twisted41 = Solve(s => CurvedStation(s, false, false), SmallLength,
+            s => CurvedStation(s, true, false), LargeLength, 41, d, -0.012, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true);
+        VerifyExact(twisted41, s => CurvedStation(s, false, false), s => CurvedStation(s, true, false),
+            LargeLength, d, -0.012, Quiet);
+        Require(twisted41.Issue == null && twisted41.MinimumGap > TubeDistance.Resolution,
+            "curved twisted N=41 H=12mm must verify cleanly: " + twisted41.Issue);
+        TubeLayout twisted41Flip = Solve(s => CurvedStation(s, false, true), SmallLength,
+            s => CurvedStation(s, true, true), LargeLength, 41, d, -0.012, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true);
+        VerifyExact(twisted41Flip, s => CurvedStation(s, false, true), s => CurvedStation(s, true, true),
+            LargeLength, d, -0.012, Quiet);
+        Require(twisted41Flip.Issue == null && twisted41Flip.Axes[20].A.Z < twisted41.Axes[20].A.Z,
+            "curved twisted N=41 H=12mm flip must offset oppositely and verify: " + twisted41Flip.Issue);
+
+        // Configurable manufacturing minimum pair clearance (0.20 mm) in EqualPitch vs TangentContact.
+        TubeLayout tightRejected = Solve(s => CurvedStation(s, false, false), SmallLength,
+            s => CurvedStation(s, true, false), LargeLength, 41, d, -0.012, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true, minimumClearance: 0.0002);
+        VerifyExact(tightRejected, s => CurvedStation(s, false, false), s => CurvedStation(s, true, false),
+            LargeLength, d, -0.012, Quiet);
+        Require(tightRejected.Issue != null && tightRejected.Issue.Contains("below required 0.20 mm"),
+            "N=41 H=12mm with minGap=0.20mm must fail fabrication threshold");
+
+        TubeLayout clearAt16 = Solve(s => CurvedStation(s, false, false), SmallLength,
+            s => CurvedStation(s, true, false), LargeLength, 41, d, -0.016, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true, minimumClearance: 0.0002);
+        VerifyExact(clearAt16, s => CurvedStation(s, false, false), s => CurvedStation(s, true, false),
+            LargeLength, d, -0.016, Quiet);
+        Require(clearAt16.Issue == null && clearAt16.MinimumGap >= 0.0002,
+            "N=41 H=16mm must clear minGap=0.20mm: " + clearAt16.Issue);
+
+        ExpectFailure(() => Solve(Small, shortLength, Large, longLength, 41, d,
+            0.005, lift, Quiet, smallMode: SmallEndSpacingMode.TangentContact, minimumClearance: 0.0002),
+            "minimumClearance in TangentContact mode must fail");
+
+        Console.WriteLine("PASS V3 opt-in negative cap margins, N30 baseline, N40/H2, N41/H12 + curved/twisted/flip + minGap=0.20mm geometry");
     }
 
     private static void TestEqualPitchCustom()
