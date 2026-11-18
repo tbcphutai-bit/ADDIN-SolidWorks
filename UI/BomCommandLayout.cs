@@ -381,26 +381,6 @@ namespace ADDIN
             LayoutModelMacroCommands();
         }
 
-        private ModernButton btnCircleAlongFace;
-
-        private void EnsureCircleAlongFaceButton()
-        {
-            if (btnCircleAlongFace != null || tabModelMacroPage == null) return;
-            btnCircleAlongFace = new ModernButton
-            {
-                Name = "btnCircleAlongFace",
-                Text = "Circle Along Face",
-                Subtitle = "Part / Assembly · 3D Sketch",
-                Kind = ModernButtonKind.Tile,
-                Tone = ModernButtonTone.Accent,
-                TabIndex = 33
-            };
-            btnCircleAlongFace.Click += (sender, args) =>
-                new ADDIN.Commands.CircleFaceTubeLayout.CircleFaceTubeLayoutCommand(swApp).Run(this);
-            tabModelMacroPage.Controls.Add(btnCircleAlongFace);
-            SetBomCommandToolTip(btnCircleAlongFace, "Chọn một mặt tấm, xem trước và tạo 3D Sketch đường tâm ống.");
-        }
-
         private void EnsureModelMacroControls()
         {
             EnsureBendMinimumButton();

@@ -110,10 +110,18 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         }
                     }, ClearPreview, Log))
                     {
-                        if (dialog.ShowDialog(owner) != DialogResult.OK)
+                        CircleFaceTubeLayoutCommandEntry.AttachDialog(dialog);
+                        try
                         {
-                            Log("CANCEL");
-                            return;
+                            if (dialog.ShowDialog(owner) != DialogResult.OK)
+                            {
+                                Log("CANCEL");
+                                return;
+                            }
+                        }
+                        finally
+                        {
+                            CircleFaceTubeLayoutCommandEntry.DetachDialog(dialog);
                         }
                         ClearPreview();
                         EnsureModel();
