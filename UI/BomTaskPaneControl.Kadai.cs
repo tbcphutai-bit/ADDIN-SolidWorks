@@ -14,7 +14,7 @@ namespace ADDIN
         {
             if (tabModelMacroPage == null || btnKadai != null) return;
             btnKadai = new ModernButton { Name = "btnKadai", Text = "Kadai", TabStop = true,
-                Subtitle = "Part · Preview 3D", Kind = ModernButtonKind.Tile, Icon = TaiIcon.Curve,
+                Subtitle = "Assembly · Preview 3D", Kind = ModernButtonKind.Tile, Icon = TaiIcon.Curve,
                 Tone = ModernButtonTone.Accent, AutoSize = false, Visible = true };
             btnKadai.Click += btnKadai_Click;
             tabModelMacroPage.Controls.Add(btnKadai);

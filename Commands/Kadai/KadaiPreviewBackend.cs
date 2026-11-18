@@ -8,14 +8,14 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands.Kadai
 {
-    // P2: principal-axis sections of one trimmed face in a Part. The polyline is
-    // a measured preview approximation, never a certified manufacturing contour.
+    // Principal-axis sections in panel Part coordinates, displayed in the active model.
     internal sealed class KadaiPreviewBackend : IKadaiCadBackend, IDisposable
     {
         private readonly ISldWorks app;
         private readonly int threadId = Thread.CurrentThread.ManagedThreadId;
         private readonly List<Body2> visibleBodies = new List<Body2>();
         private ModelDoc2 previewDocument;
+        private object previewContext;
         internal int VisibleBodyCount { get { return visibleBodies.Count; } }
         internal KadaiPreviewBackend(ISldWorks app) { this.app = app; }
         private void CheckThread()
@@ -26,29 +26,79 @@ namespace ADDIN.Commands.Kadai
         public KadaiPanelSource CaptureSource(ISldWorks a, ModelDoc2 d)
         {
             CheckThread();
-            if (d == null || d.GetType() != (int)swDocumentTypes_e.swDocPART)
-                throw new InvalidOperationException("P2: mở Part chứa panel; chọn đúng một Face. Assembly transforms chưa được kiểm chứng.");
+            var assembly = d as AssemblyDoc;
+            if (d == null || (assembly == null && d.GetType() != (int)swDocumentTypes_e.swDocPART))
+                throw new InvalidOperationException("Mở Assembly chứa panel hoặc mở Part panel.");
             var sel = (SelectionMgr)d.SelectionManager;
             if (sel.GetSelectedObjectCount2(-1) != 1 || !(sel.GetSelectedObject6(1, -1) is Face2))
                 throw new InvalidOperationException("Chọn đúng một mặt panel (Face), rồi Capture face.");
             var face = (Face2)sel.GetSelectedObject6(1, -1);
-            byte[] id = d.Extension.GetPersistReference3(face) as byte[];
+            ModelDoc2 part = d;
+            Component2 component = null;
+            double[] placement = null;
+            if (assembly != null)
+            {
+                if (!IsAssemblyEditingRoot(assembly))
+                    throw new InvalidOperationException("Thoát Edit Part/Edit Component rồi chọn lại mặt panel.");
+                component = sel.GetSelectedObjectsComponent3(1, -1) as Component2;
+                if (component == null || component.GetParent() != null)
+                    throw new InvalidOperationException("Chọn trực tiếp mặt của Part panel ở cấp hiện hành. Nếu panel nằm trong cụm con, mở cụm con để Preview.");
+                part = component.GetModelDoc2() as ModelDoc2;
+                if (part == null || part.GetType() != (int)swDocumentTypes_e.swDocPART
+                    || part.ConfigurationManager.ActiveConfiguration.Name != component.ReferencedConfiguration)
+                    throw new InvalidOperationException("Resolve component panel và kiểm tra configuration đang dùng trong Assembly.");
+                face = part.Extension.GetCorrespondingEntity2(face) as Face2;
+                if (face == null)
+                    throw new InvalidOperationException("Mặt đã chọn không có mặt tương ứng trong Part panel.");
+                placement = component.Transform2?.ArrayData as double[];
+                if (placement == null || placement.Length != 16 || placement.Any(value => double.IsNaN(value) || double.IsInfinity(value))
+                    || Math.Abs(placement[12] - 1) > 1e-9)
+                    throw new InvalidOperationException("Không đọc được phép đặt component panel.");
+            }
+            byte[] id = part.Extension.GetPersistReference3(face) as byte[];
             if (id == null || id.Length == 0) throw new InvalidOperationException("Face không có persistent reference.");
             return new KadaiPanelSource { DocumentPath = d.GetPathName(),
                 Configuration = d.ConfigurationManager.ActiveConfiguration.Name,
-                DocumentTransient = d, SelectedFaceTransient = face,
+                DocumentTransient = d, SelectedFaceTransient = face, PanelPart = part,
+                PanelConfiguration = part.ConfigurationManager.ActiveConfiguration.Name,
+                PanelComponent = component, ComponentPlacement = placement,
+                DocumentStamp = d.GetUpdateStamp(), PanelStamp = part.GetUpdateStamp(),
                 PersistentReferenceEncoded = Convert.ToBase64String(id) };
         }
-        private Face2 Resolve(KadaiPanelSource panel)
+
+        private static bool IsAssemblyEditingRoot(AssemblyDoc assembly)
+        {
+            var editComponent = assembly.GetEditTargetComponent();
+            return editComponent == null || editComponent.IsRoot();
+        }
+
+        internal bool IsSourceCurrent(KadaiPanelSource panel)
         {
             CheckThread();
-            if (panel == null || panel.DocumentTransient == null || app.ActiveDoc == null
-                || !SameDocument(panel.DocumentTransient, (ModelDoc2)app.ActiveDoc))
-                throw new InvalidOperationException("Panel document đã đổi hoặc đã đóng; Capture lại mặt.");
-            if (panel.DocumentTransient.ConfigurationManager.ActiveConfiguration.Name != panel.Configuration)
-                throw new InvalidOperationException("Configuration đã đổi; Capture lại mặt.");
+            var active = app.ActiveDoc as ModelDoc2;
+            if (panel == null || active == null || !SameDocument(panel.DocumentTransient, active)
+                || active.ConfigurationManager.ActiveConfiguration.Name != panel.Configuration
+                || active.GetUpdateStamp() != panel.DocumentStamp
+                || panel.PanelPart.ConfigurationManager.ActiveConfiguration.Name != panel.PanelConfiguration
+                || panel.PanelPart.GetUpdateStamp() != panel.PanelStamp) return false;
+            var component = panel.PanelComponent;
+            if (component == null) return true;
+            if (!IsAssemblyEditingRoot((AssemblyDoc)active) || component.IsSuppressed()
+                || component.ReferencedConfiguration != panel.PanelConfiguration) return false;
+            var part = component.GetModelDoc2() as ModelDoc2;
+            var placement = component.Transform2?.ArrayData as double[];
+            return part != null && SameDocument(part, panel.PanelPart) && placement != null
+                && placement.Length == panel.ComponentPlacement.Length
+                && placement.Zip(panel.ComponentPlacement, (current, captured) => Math.Abs(current - captured))
+                    .All(delta => delta <= 1e-9);
+        }
+
+        private Face2 Resolve(KadaiPanelSource panel)
+        {
+            if (!IsSourceCurrent(panel))
+                throw new InvalidOperationException("Assembly, Part panel, configuration hoặc vị trí đã đổi; Capture lại mặt.");
             int error;
-            var face = panel.DocumentTransient.Extension.GetObjectByPersistReference3(
+            var face = panel.PanelPart.Extension.GetObjectByPersistReference3(
                 Convert.FromBase64String(panel.PersistentReferenceEncoded), out error) as Face2;
             if (face == null || error != 0) throw new InvalidOperationException("Panel reference mất; Capture lại mặt.");
             return face;
@@ -219,16 +269,33 @@ namespace ADDIN.Commands.Kadai
         }
         public void ShowTemporaryPreview(ModelDoc2 document, KadaiPlan plan, List<KadaiProfile3D> ribs)
         {
+            if (document?.GetType() != (int)swDocumentTypes_e.swDocPART)
+                throw new InvalidOperationException("Preview trong Assembly cần mặt của component đã Capture.");
+            ShowTemporaryPreview(document, ribs, null);
+        }
+
+        internal void ShowTemporaryPreview(KadaiPanelSource source, List<KadaiProfile3D> ribs)
+        {
+            if (!IsSourceCurrent(source))
+                throw new InvalidOperationException("Nguồn panel đã đổi; Capture lại mặt.");
+            ShowTemporaryPreview(source.DocumentTransient, ribs, source.PanelComponent);
+        }
+
+        private void ShowTemporaryPreview(ModelDoc2 document, List<KadaiProfile3D> ribs, Component2 component)
+        {
             CheckThread(); ClearTemporaryPreview(null);
-            if (document == null || document.GetType() != 1 || !SameDocument(document, (ModelDoc2)app.ActiveDoc))
-                throw new InvalidOperationException("Preview requires its active Part document.");
+            var active = app.ActiveDoc as ModelDoc2;
+            if (document == null || active == null || !SameDocument(document, active))
+                throw new InvalidOperationException("Kích hoạt lại Assembly hoặc Part chứa panel.");
             bool dirty = document.GetSaveFlag();
             previewDocument = document;
+            previewContext = (object)component ?? document;
             try {
                 foreach (var rib in ribs) {
                     var body = CreatePreviewBody(rib); visibleBodies.Add(body);
+                    // Display3 with a Component2 applies its placement to Part-local geometry.
                     // swTempBodySelectOptionNone = 0. Bodies cannot steal source face selection.
-                    int result = body.Display3(document, rib.Direction == KadaiRibDirection.Longitudinal ? 0x70C040 : 0x4090F0, 0);
+                    int result = body.Display3(previewContext, rib.Direction == KadaiRibDirection.Longitudinal ? 0x70C040 : 0x4090F0, 0);
                     if (result != 0) throw new InvalidOperationException("Display3 failed: " + result);
                 }
                 document.GraphicsRedraw2();
@@ -239,12 +306,13 @@ namespace ADDIN.Commands.Kadai
         {
             CheckThread();
             foreach (var body in visibleBodies) {
-                try { if (previewDocument != null) body.Hide(previewDocument); } catch (COMException) { }
+                try { if (previewContext != null) body.Hide(previewContext); } catch (COMException) { }
                 finally { ReleaseOwned(body); }
             }
             visibleBodies.Clear();
             try { if (previewDocument != null) previewDocument.GraphicsRedraw2(); } catch (COMException) { }
             previewDocument = null;
+            previewContext = null;
         }
         private static void ReleaseOwned(object value)
         {

@@ -108,6 +108,59 @@ namespace ADDIN.Commands.Kadai
                 Dot(p, profile.AlongDirection) - origin, Dot(p, profile.HeightDirection) - bottomMm * .001 }).ToArray();
         }
 
+        internal static List<KadaiProfile3D> NotchedProfiles(KadaiPlan plan, IList<KadaiProfile3D> blanks,
+            Dictionary<string, List<KadaiJointCut>> joints)
+        {
+            double bottom = plan.Settings.BottomMm;
+            var result = new List<KadaiProfile3D>(blanks.Count);
+            foreach (var blank in blanks)
+            {
+                var points = LocalPoints(blank, bottom);
+                int contourCount = points.Length - 2;
+                var perimeter = new List<double[]>();
+                if (blank.Direction == KadaiRibDirection.Longitudinal)
+                {
+                    perimeter.AddRange(points.Take(contourCount + 1));
+                    foreach (var cut in joints[blank.RibId].AsEnumerable().Reverse())
+                    {
+                        perimeter.Add(new[] { cut.Right, 0d });
+                        perimeter.Add(new[] { cut.Right, cut.Top });
+                        perimeter.Add(new[] { cut.Left, cut.Top });
+                        perimeter.Add(new[] { cut.Left, 0d });
+                    }
+                    perimeter.Add(points[contourCount + 1]);
+                }
+                else
+                {
+                    int next = 0;
+                    foreach (var cut in joints[blank.RibId])
+                    {
+                        // Ignore a sample coincident with a shoulder to avoid short kernel edges.
+                        while (next < contourCount && points[next][0] < cut.Left - GeometryTolerance)
+                            perimeter.Add(points[next++]);
+                        perimeter.Add(new[] { cut.Left, HeightAt(points, contourCount, cut.Left) });
+                        perimeter.Add(new[] { cut.Left, cut.Bottom });
+                        perimeter.Add(new[] { cut.Right, cut.Bottom });
+                        perimeter.Add(new[] { cut.Right, HeightAt(points, contourCount, cut.Right) });
+                        while (next < contourCount && points[next][0] <= cut.Right + GeometryTolerance)
+                            next++;
+                    }
+                    perimeter.AddRange(points.Skip(next));
+                }
+
+                var notched = new KadaiProfile3D { RibId = blank.RibId, Direction = blank.Direction,
+                    Closed = true, ThicknessMeters = blank.ThicknessMeters, AlongDirection = blank.AlongDirection,
+                    HeightDirection = blank.HeightDirection, ExtrusionDirection = blank.ExtrusionDirection,
+                    ValidationMessage = blank.ValidationMessage };
+                var origin = blank.PointsWorldMeters[blank.PointsWorldMeters.Count - 1];
+                foreach (var point in perimeter)
+                    notched.PointsWorldMeters.Add(Enumerable.Range(0, 3).Select(axis => origin[axis]
+                        + point[0] * blank.AlongDirection[axis] + point[1] * blank.HeightDirection[axis]).ToArray());
+                result.Add(notched);
+            }
+            return result;
+        }
+
         internal static string SuggestMargins(KadaiPlan plan, IList<KadaiProfile3D> profiles)
         {
             var settings = plan.Settings;

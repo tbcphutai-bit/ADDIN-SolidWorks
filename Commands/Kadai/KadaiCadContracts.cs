@@ -10,14 +10,20 @@ namespace ADDIN.Commands.Kadai
         public string DocumentPath;
         public string Configuration;
         public object SelectedFaceTransient; // do not persist COM RCW across sessions
-        public string PersistentReferenceEncoded; // must be implemented by Codex
+        public string PersistentReferenceEncoded;
         public ModelDoc2 DocumentTransient;
+        public ModelDoc2 PanelPart;
+        public string PanelConfiguration;
+        public Component2 PanelComponent;
+        public double[] ComponentPlacement;
+        public int DocumentStamp, PanelStamp;
     }
 
     internal sealed class KadaiProfile3D
     {
         public string RibId;
         public KadaiRibDirection Direction;
+        // Model coordinates of the source Part. Assembly placement is applied by the renderer.
         public readonly List<double[]> PointsWorldMeters = new List<double[]>();
         public bool Closed;
         public string ValidationMessage;

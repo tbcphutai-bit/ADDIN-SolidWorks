@@ -1,6 +1,8 @@
 // Kadai layout and measured temporary-body preview. Production Apply stays gated.
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using ADDIN.Commands.Kadai;
 using SolidWorks.Interop.sldworks;
@@ -32,7 +34,6 @@ namespace ADDIN.UI
         private readonly KadaiPreviewBackend backend;
         private readonly Timer lifecycle = new Timer { Interval = 300 };
         private KadaiPanelSource source;
-        private int sourceStamp;
         private readonly TextBox report = new TextBox();
         private readonly Panel map = new Panel();
         private KadaiPlan plan;
@@ -67,7 +68,7 @@ namespace ADDIN.UI
             Add(top, "Gap theo trục cao (mm)", gap);
             heightAxis.Items.AddRange(new object[] { "X (U=Y, V=Z)", "Y (U=X, V=Z)", "Z (U=X, V=Y)" });
             heightAxis.SelectedIndex = 1;
-            Add(top, "Trục cao / datum", heightAxis);
+            Add(top, "Trục cao trong Part panel", heightAxis);
             Add(top, "Gốc footprint U (mm)", originU);
             Add(top, "Gốc footprint V (mm)", originV);
             Add(top, "Cao độ đáy (mm)", bottom);
@@ -119,42 +120,48 @@ namespace ADDIN.UI
                 // Face.GetBox is deliberately approximate for spline surfaces.
                 // Use true geometric extrema for the initial footprint instead.
                 var box = backend.MeasureBounds((Face2)captured.SelectedFaceTransient);
-                int u = KadaiPreviewBackend.UAxis(heightAxis.SelectedIndex);
-                int v = KadaiPreviewBackend.VAxis(heightAxis.SelectedIndex);
+                int h = heightAxis.SelectedIndex;
+                int u = KadaiPreviewBackend.UAxis(h);
+                int v = KadaiPreviewBackend.VAxis(h);
                 loading = true;
                 try {
-                    originU.Value = (decimal)(box[u] * 1000); originV.Value = (decimal)(box[v] * 1000);
-                    extentX.Value = (decimal)((box[u + 3] - box[u]) * 1000);
-                    extentZ.Value = (decimal)((box[v + 3] - box[v]) * 1000);
+                    originU.Value = (decimal)Math.Floor(box[u] * 100000) / 100;
+                    originV.Value = (decimal)Math.Floor(box[v] * 100000) / 100;
+                    extentX.Value = (decimal)Math.Ceiling((box[u + 3] * 1000 - (double)originU.Value) * 10) / 10;
+                    extentZ.Value = (decimal)Math.Ceiling((box[v + 3] * 1000 - (double)originV.Value) * 10) / 10;
+                    decimal minimumHeight = (decimal)(box[h] * 1000) - gap.Value;
+                    if (minimumHeight <= bottom.Value + seam.Value)
+                        bottom.Value = Math.Floor((minimumHeight - seam.Value - 20) * 100) / 100;
                 } finally { loading = false; }
                 source = captured;
-                sourceStamp = source.DocumentTransient.GetUpdateStamp();
                 RefreshPlan();
-                report.AppendText(System.Environment.NewLine + "Captured: " + source.DocumentPath
-                    + " / " + source.Configuration + ". Kiểm tra footprint, datum đáy và lề trước Preview.");
+                report.AppendText(System.Environment.NewLine + "Đã chọn panel "
+                    + (source.PanelComponent?.Name2 ?? source.PanelPart.GetTitle())
+                    + " / " + source.PanelConfiguration
+                    + ". Kiểm tra lề và đặt cao độ đáy theo mặt đế trong hệ tọa độ Part panel.");
             } catch (Exception ex) { source = null; report.Text = "CAPTURE: " + ex.Message; }
         }
         private void Preview3D()
         {
             try {
                 backend.ClearTemporaryPreview(null);
-                if (source == null) throw new InvalidOperationException("Chọn mặt panel trong Part và Capture face trước.");
+                if (source == null) throw new InvalidOperationException("Chọn mặt panel và bấm Capture face trước.");
                 plan = KadaiPlanner.Build(ReadSettings());
                 var profiles = backend.CalculateProfiles(plan, source);
-                backend.ShowTemporaryPreview(source.DocumentTransient, plan, profiles);
-                sourceStamp = source.DocumentTransient.GetUpdateStamp();
-                report.Text = "3D temporary bodies: " + backend.VisibleBodyCount
-                    + System.Environment.NewLine + "Polyline theo mặt thật, midpoint tolerance 0.05 mm.";
+                Dictionary<string, List<KadaiJointCut>> joints;
                 try {
-                    var joints = KadaiJointGeometry.Build(plan, profiles, (double)seam.Value, (double)depthClearance.Value);
-                    report.AppendText(System.Environment.NewLine + "Đã kiểm tra " + plan.CrossingCount
-                        + " giao, " + System.Linq.Enumerable.Sum(joints.Values, cuts => cuts.Count) + " rãnh dự kiến.");
+                    joints = KadaiJointGeometry.Build(plan, profiles, (double)seam.Value, (double)depthClearance.Value);
                 } catch (InvalidOperationException ex) {
-                    report.AppendText(System.Environment.NewLine + "Kiểm tra rãnh: " + ex.Message);
+                    report.Text = "Kiểm tra rãnh: " + ex.Message;
                     string suggestion = KadaiJointGeometry.SuggestMargins(plan, profiles);
                     if (suggestion.Length > 0) report.AppendText(System.Environment.NewLine + suggestion);
+                    return;
                 }
-                report.AppendText(System.Environment.NewLine + "Preview chỉ hiển thị phôi thanh. Apply khóa trong bản thử.");
+                backend.ShowTemporaryPreview(source, KadaiJointGeometry.NotchedProfiles(plan, profiles, joints));
+                report.Text = "Preview 3D: " + backend.VisibleBodyCount + " thanh đã xẻ rãnh, "
+                    + plan.CrossingCount + " điểm giao, " + joints.Values.Sum(cuts => cuts.Count) + " rãnh."
+                    + System.Environment.NewLine + "Dọc màu xanh lá: rãnh mở từ đáy. Ngang màu cam: rãnh mở từ phía panel."
+                    + System.Environment.NewLine + "Apply đang khóa.";
                 if (lastPreviewPlan != null)
                     report.AppendText(System.Environment.NewLine + KadaiPlanner.DescribeStationChanges(lastPreviewPlan, plan));
                 lastPreviewPlan = plan;
@@ -164,10 +171,7 @@ namespace ADDIN.UI
         {
             if (source == null) return;
             try {
-                var active = app.ActiveDoc as ModelDoc2;
-                if (active != null && app.IsSame(active, source.DocumentTransient) == (int)swObjectEquality.swObjectSame
-                    && source.Configuration == active.ConfigurationManager.ActiveConfiguration.Name
-                    && sourceStamp == active.GetUpdateStamp()) return;
+                if (backend.IsSourceCurrent(source)) return;
             } catch (System.Runtime.InteropServices.COMException) { }
             backend.ClearTemporaryPreview(null); source = null; lastPreviewPlan = null;
             report.Text = "Panel document/configuration/rebuild đã đổi. Preview đã xóa; Capture lại mặt.";
@@ -239,7 +243,7 @@ namespace ADDIN.UI
                 plan = KadaiPlanner.Build(ReadSettings());
                 report.Text = "Document: " + doc.GetTitle() + System.Environment.NewLine
                     + plan.ToReport() + System.Environment.NewLine
-                    + "3D: Capture một face trong Part. Datum theo trục đã chọn. Apply chưa nghiệm thu.";
+                    + "3D: Chọn mặt của Part panel trong Assembly rồi bấm Capture face. Datum theo trục của Part panel.";
                 map.Invalidate();
             }
             catch (Exception ex)
