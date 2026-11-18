@@ -29,6 +29,11 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         public bool SmartOverhangEnabled = false, CenterExtrapolated = false;
         public double AppliedOverhang = 0, MaximumCenterExtension = 0, EffectiveCapMargin = 0;
         public int OverhangSearchAttempts = 0;
+        public double MinimumPairClearance = 0;
+        // Assembly / multi-body external collision scope metadata.
+        public bool ContextCheckPerformed = false;
+        public int ContextBodyCount = 0, ContextClashCount = 0, ContextInconclusiveCount = 0;
+        public string ContextClashSummary = null;
         public TubeLayout(int count)
         {
             Axes = new TubeAxis[count];
@@ -80,9 +85,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             Func<double, RailStation> large, double largeLength, int count, double diameter,
             double margin, double lift, Action<string> log, bool verify = true,
             SmallEndSpacingMode smallMode = SmallEndSpacingMode.TangentContact,
-            bool allowOverhang = false)
+            bool allowOverhang = false, double minimumClearance = 0)
         {
-            return SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, log, verify, smallMode, allowOverhang)
+            return SolveCore(small, smallLength, large, largeLength, count, diameter, margin, lift, log, verify, smallMode, allowOverhang, minimumClearance)
                 ?? throw new LayoutException(smallMode == SmallEndSpacingMode.EqualPitch
                     ? "INFEASIBLE: equal-pitch Custom layout could not fit on the small end."
                     : "INFEASIBLE: no small-end contact sequence fits within the rail.");
@@ -91,12 +96,16 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         private static TubeLayout SolveCore(Func<double, RailStation> small, double smallLength,
             Func<double, RailStation> large, double largeLength, int count, double diameter,
             double margin, double lift, Action<string> log, bool verify, SmallEndSpacingMode smallMode,
-            bool allowOverhang = false)
+            bool allowOverhang = false, double minimumClearance = 0)
         {
             if (smallMode != SmallEndSpacingMode.TangentContact && smallMode != SmallEndSpacingMode.EqualPitch)
                 throw new LayoutException("Unsupported small-end spacing mode.");
-            log(F("SPACING_MODE mode={0} count={1} small_length_mm={2:F6} large_length_mm={3:F6} diameter_mm={4:F3} margin_mm={5:F3}",
-                smallMode, count, smallLength / Mm, largeLength / Mm, diameter / Mm, margin / Mm));
+            if (!(minimumClearance >= 0) || double.IsNaN(minimumClearance) || double.IsInfinity(minimumClearance))
+                throw new LayoutException("Minimum pair clearance must be non-negative.");
+            if (minimumClearance > 0 && smallMode != SmallEndSpacingMode.EqualPitch)
+                throw new LayoutException("Custom minimum pair clearance is only supported in EqualPitch mode.");
+            log(F("SPACING_MODE mode={0} count={1} small_length_mm={2:F6} large_length_mm={3:F6} diameter_mm={4:F3} margin_mm={5:F3} min_pair_gap_mm={6:F3}",
+                smallMode, count, smallLength / Mm, largeLength / Mm, diameter / Mm, margin / Mm, minimumClearance / Mm));
             double radius = diameter / 2;
             if (count < 2 || count > MaximumCount || !(diameter > 0) || !(smallLength > 0) ||
                 !(lift >= 0) || (!allowOverhang && !(margin >= 0)) ||
@@ -120,6 +129,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         margin, first, last, lift, log, allowOverhang)
                     : SolveStations(small, smallLength, large, largeLength, count, diameter, first, last, lift, log);
                 if (result == null) return null;
+                result.MinimumPairClearance = minimumClearance;
                 result.LargeLeftClearance = CapClearance(result.Axes[0], left, leftInward, radius);
                 result.LargeRightClearance = CapClearance(result.Axes[count - 1], right, rightInward, radius);
                 double leftError = margin - result.LargeLeftClearance, rightError = margin - result.LargeRightClearance;
@@ -352,6 +362,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             result.MinimumGapPairA = result.MinimumGapPairB = 0;
             result.InterferingPairCount = 0;
             result.FirstInterferingPairA = result.FirstInterferingPairB = 0;
+            int overlapCount = 0;
             for (int i = 0; i < result.Axes.Length; i++)
             {
                 TubeAxis a = result.Axes[i];
@@ -370,16 +381,21 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                         result.MinimumGapPairB = j + 1;
                     }
                     log(F("PAIR a={0} b={1} lower_mm={2:F6} upper_mm={3:F6}", i + 1, j + 1, full.Lower / Mm, full.Upper / Mm));
-                    if (full.Lower <= TubeDistance.Resolution)
+                    bool hardOverlap = full.Lower <= TubeDistance.Resolution;
+                    bool belowCustomClearance = result.SmallMode == SmallEndSpacingMode.EqualPitch &&
+                        result.MinimumPairClearance > 0 && full.Lower < result.MinimumPairClearance;
+                    if (hardOverlap || belowCustomClearance)
                     {
                         result.InterferingPairCount++;
+                        if (hardOverlap) overlapCount++;
                         if (result.FirstInterferingPairA == 0)
                         {
                             result.FirstInterferingPairA = i + 1;
                             result.FirstInterferingPairB = j + 1;
                         }
-                        log(F("INTERFERING_PAIR a={0} b={1} lower_mm={2:F6} upper_mm={3:F6}",
-                            i + 1, j + 1, full.Lower / Mm, full.Upper / Mm));
+                        log(F("INTERFERING_PAIR a={0} b={1} lower_mm={2:F6} upper_mm={3:F6} required_mm={4:F6}",
+                            i + 1, j + 1, full.Lower / Mm, full.Upper / Mm,
+                            Math.Max(TubeDistance.Resolution, result.MinimumPairClearance) / Mm));
                     }
                     if (j != i + 1) continue;
 
@@ -396,8 +412,11 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             if (result.InterferingPairCount > 0)
             {
                 string message = result.SmallMode == SmallEndSpacingMode.EqualPitch
-                    ? F("Equal-pitch placement causes 3D tube interference ({0} pair(s), first {1}-{2}, min full gap {3:F4} mm); reduce Custom count, diameter or margin.",
-                        result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB, result.MinimumGap / Mm)
+                    ? (overlapCount > 0
+                        ? F("Equal-pitch placement causes 3D tube interference ({0} pair(s), first {1}-{2}, min full gap {3:F4} mm); reduce Custom count, diameter or margin.",
+                            result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB, result.MinimumGap / Mm)
+                        : F("Equal-pitch min 3D tube gap {0:F4} mm is below required {1:F2} mm ({2} pair(s), first {3}-{4}); reduce clearance target or count, or increase overhang.",
+                            result.MinimumGap / Mm, result.MinimumPairClearance / Mm, result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB))
                     : F("Full-length tube separation could not be proven ({0} pair(s), first {1}-{2}, min full gap {3:F4} mm).",
                         result.InterferingPairCount, result.FirstInterferingPairA, result.FirstInterferingPairB, result.MinimumGap / Mm);
                 AddIssue(result, message);

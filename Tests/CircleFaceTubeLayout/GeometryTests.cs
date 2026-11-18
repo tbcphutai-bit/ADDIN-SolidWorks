@@ -132,7 +132,28 @@ internal static class GeometryTests
         Require(twisted41Flip.Issue == null && twisted41Flip.Axes[20].A.Z < twisted41.Axes[20].A.Z,
             "curved twisted N=41 H=12mm flip must offset oppositely and verify: " + twisted41Flip.Issue);
 
-        Console.WriteLine("PASS V3 opt-in negative cap margins, N30 baseline, N40/H2 and N41/H12 synthetic + curved/twisted/flip geometry");
+        // Configurable manufacturing minimum pair clearance (0.20 mm) in EqualPitch vs TangentContact.
+        TubeLayout tightRejected = Solve(s => CurvedStation(s, false, false), SmallLength,
+            s => CurvedStation(s, true, false), LargeLength, 41, d, -0.012, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true, minimumClearance: 0.0002);
+        VerifyExact(tightRejected, s => CurvedStation(s, false, false), s => CurvedStation(s, true, false),
+            LargeLength, d, -0.012, Quiet);
+        Require(tightRejected.Issue != null && tightRejected.Issue.Contains("below required 0.20 mm"),
+            "N=41 H=12mm with minGap=0.20mm must fail fabrication threshold");
+
+        TubeLayout clearAt16 = Solve(s => CurvedStation(s, false, false), SmallLength,
+            s => CurvedStation(s, true, false), LargeLength, 41, d, -0.016, lift, Quiet,
+            verify: false, smallMode: SmallEndSpacingMode.EqualPitch, allowOverhang: true, minimumClearance: 0.0002);
+        VerifyExact(clearAt16, s => CurvedStation(s, false, false), s => CurvedStation(s, true, false),
+            LargeLength, d, -0.016, Quiet);
+        Require(clearAt16.Issue == null && clearAt16.MinimumGap >= 0.0002,
+            "N=41 H=16mm must clear minGap=0.20mm: " + clearAt16.Issue);
+
+        ExpectFailure(() => Solve(Small, shortLength, Large, longLength, 41, d,
+            0.005, lift, Quiet, smallMode: SmallEndSpacingMode.TangentContact, minimumClearance: 0.0002),
+            "minimumClearance in TangentContact mode must fail");
+
+        Console.WriteLine("PASS V3 opt-in negative cap margins, N30 baseline, N40/H2, N41/H12 + curved/twisted/flip + minGap=0.20mm geometry");
     }
 
     private static void TestEqualPitchCustom()
