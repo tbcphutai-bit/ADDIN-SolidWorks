@@ -27,6 +27,8 @@ namespace ADDIN.UI
         private readonly NumericUpDown originU = Number(-99999, 99999, 0, 2);
         private readonly NumericUpDown originV = Number(-99999, 99999, 0, 2);
         private readonly NumericUpDown bottom = Number(-99999, 99999, 0, 2);
+        private readonly NumericUpDown seam = Number(.1m, 99999, 100, 1);
+        private readonly NumericUpDown depthClearance = Number(.01m, 20, .1m, 2);
         private readonly KadaiPreviewBackend backend;
         private readonly Timer lifecycle = new Timer { Interval = 300 };
         private KadaiPanelSource source;
@@ -34,6 +36,7 @@ namespace ADDIN.UI
         private readonly TextBox report = new TextBox();
         private readonly Panel map = new Panel();
         private KadaiPlan plan;
+        private KadaiPlan lastPreviewPlan;
         private bool loading;
 
         internal KadaiForm(ISldWorks app)
@@ -68,6 +71,8 @@ namespace ADDIN.UI
             Add(top, "Gốc footprint U (mm)", originU);
             Add(top, "Gốc footprint V (mm)", originV);
             Add(top, "Cao độ đáy (mm)", bottom);
+            Add(top, "Mặt ghép tính từ đáy (mm)", seam);
+            Add(top, "Độ hở theo chiều cao (mm)", depthClearance);
 
             map.Dock = DockStyle.Top; map.Height = 110; map.BackColor = Color.White;
             map.Paint += DrawLayout;
@@ -97,9 +102,9 @@ namespace ADDIN.UI
             preset.SelectedIndex = 0;
             LoadPreset("KDA1");
             foreach (var input in new[] { countL, countC, extentX, extentZ, marginL, marginC,
-                thickL, thickC, clearanceL, clearanceC, gap, originU, originV, bottom })
+                thickL, thickC, clearanceL, clearanceC, gap, originU, originV, bottom, seam, depthClearance })
                 input.ValueChanged += (s, e) => { if (!loading) { backend.ClearTemporaryPreview(null); RefreshPlan(); } };
-            heightAxis.SelectedIndexChanged += (s, e) => { if (!loading) { backend.ClearTemporaryPreview(null); source = null; RefreshPlan(); } };
+            heightAxis.SelectedIndexChanged += (s, e) => { if (!loading) { backend.ClearTemporaryPreview(null); source = null; lastPreviewPlan = null; RefreshPlan(); } };
             lifecycle.Tick += (s, e) => CheckSourceLifecycle();
             lifecycle.Start();
         }
@@ -109,6 +114,7 @@ namespace ADDIN.UI
             try {
                 backend.ClearTemporaryPreview(null);
                 source = null;
+                lastPreviewPlan = null;
                 var captured = backend.CaptureSource(app, app.ActiveDoc as ModelDoc2);
                 // Face.GetBox is deliberately approximate for spline surfaces.
                 // Use true geometric extrema for the initial footprint instead.
@@ -138,8 +144,20 @@ namespace ADDIN.UI
                 backend.ShowTemporaryPreview(source.DocumentTransient, plan, profiles);
                 sourceStamp = source.DocumentTransient.GetUpdateStamp();
                 report.Text = "3D temporary bodies: " + backend.VisibleBodyCount
-                    + System.Environment.NewLine + "Polyline theo mặt thật, midpoint tolerance 0.05 mm; chưa chứng nhận gia công."
-                    + System.Environment.NewLine + "Preview chưa tạo rãnh. Apply khóa: contour chính xác, lắp ghép và cập nhật chưa nghiệm thu.";
+                    + System.Environment.NewLine + "Polyline theo mặt thật, midpoint tolerance 0.05 mm.";
+                try {
+                    var joints = KadaiJointGeometry.Build(plan, profiles, (double)seam.Value, (double)depthClearance.Value);
+                    report.AppendText(System.Environment.NewLine + "Đã kiểm tra " + plan.CrossingCount
+                        + " giao, " + System.Linq.Enumerable.Sum(joints.Values, cuts => cuts.Count) + " rãnh dự kiến.");
+                } catch (InvalidOperationException ex) {
+                    report.AppendText(System.Environment.NewLine + "Kiểm tra rãnh: " + ex.Message);
+                    string suggestion = KadaiJointGeometry.SuggestMargins(plan, profiles);
+                    if (suggestion.Length > 0) report.AppendText(System.Environment.NewLine + suggestion);
+                }
+                report.AppendText(System.Environment.NewLine + "Preview chỉ hiển thị phôi thanh. Apply khóa trong bản thử.");
+                if (lastPreviewPlan != null)
+                    report.AppendText(System.Environment.NewLine + KadaiPlanner.DescribeStationChanges(lastPreviewPlan, plan));
+                lastPreviewPlan = plan;
             } catch (Exception ex) { backend.ClearTemporaryPreview(null); report.Text = "3D PREVIEW STOP: " + ex.Message; }
         }
         private void CheckSourceLifecycle()
@@ -151,7 +169,7 @@ namespace ADDIN.UI
                     && source.Configuration == active.ConfigurationManager.ActiveConfiguration.Name
                     && sourceStamp == active.GetUpdateStamp()) return;
             } catch (System.Runtime.InteropServices.COMException) { }
-            backend.ClearTemporaryPreview(null); source = null;
+            backend.ClearTemporaryPreview(null); source = null; lastPreviewPlan = null;
             report.Text = "Panel document/configuration/rebuild đã đổi. Preview đã xóa; Capture lại mặt.";
         }
         protected override void Dispose(bool disposing)
@@ -189,6 +207,7 @@ namespace ADDIN.UI
                 clearanceL.Value = (decimal)p.LongSlotExtraMm;
                 clearanceC.Value = (decimal)p.CrossSlotExtraMm;
                 gap.Value = (decimal)p.GapToPanelMm;
+                seam.Value = p.Preset == "KF3" ? 50 : 100;
             }
             finally { loading = false; }
             RefreshPlan();

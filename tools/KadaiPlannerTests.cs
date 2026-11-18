@@ -23,6 +23,10 @@ public static class KadaiPlannerTests
         Check(kf.Warnings.Any(x => x.Contains("zero nominal")), "Zero clearance warning");
         var mutable = new KadaiRequest(); var snapshot = KadaiPlanner.Build(mutable); mutable.LongRibCount = 99;
         Check(snapshot.Settings.LongRibCount == 7, "Plan keeps its request snapshot");
+        var increased = KadaiPlanner.Build(new KadaiRequest { LongRibCount = 10, CrossRibCount = 6 });
+        Check(snapshot.LongRibs.Last().Id != increased.LongRibs.Last().Id &&
+            snapshot.LongRibs.Last().StationKey == increased.LongRibs.Last().StationKey, "Fixed end plane keeps station key");
+        Check(KadaiPlanner.DescribeStationChanges(snapshot, increased).Contains("giữ 6 mặt phẳng thanh, thêm 10, bỏ 5"), "Station diff");
         Reject(() => KadaiPlanner.Build(new KadaiRequest { LongRibCount = 0 }), "zero count");
         Reject(() => KadaiPlanner.Build(new KadaiRequest { LongRibCount = 100, CrossRibCount = 100 }), "budget");
         Reject(() => KadaiPlanner.Build(new KadaiRequest { LengthXmm = double.NaN }), "NaN span");

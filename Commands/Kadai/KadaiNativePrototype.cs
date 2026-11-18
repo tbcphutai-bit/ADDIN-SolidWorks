@@ -23,25 +23,16 @@ namespace ADDIN.Commands.Kadai
                 if (f.GetTypeName2() == "ProfileFeature" && app.IsSame(f.GetSpecificFeature2(), sketch) == 1) return f;
             throw new InvalidOperationException("Cannot resolve the new sketch by COM identity.");
         }
-        internal ModelDoc2 WritePart(KadaiProfile3D profile, KadaiPlan plan, string path,
-            double jointHeightMm, double jointDepthClearanceMm)
+        private ModelDoc2 WritePart(KadaiProfile3D profile, double bottomMm, string path, List<KadaiJointCut> cuts)
         {
             Require(!File.Exists(path), "Refusing to overwrite " + path);
-            Require(profile.Closed && profile.PointsWorldMeters.Count >= 4, "Profile is not closed.");
-            Require(jointHeightMm > 0 && jointDepthClearanceMm >= 0, "Invalid joint datum.");
+            var local = KadaiJointGeometry.LocalPoints(profile, bottomMm);
             string template = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
             Require(File.Exists(template), "Missing native Part template: " + template);
             var doc = app.NewDocument(template, 0, 0, 0) as ModelDoc2;
             Require(doc != null, "Cannot create native Part.");
             try {
             doc.SetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swUnitsLinear, (int)swLengthUnit_e.swMM);
-            var points = profile.PointsWorldMeters;
-            double origin = Dot(points[0], profile.AlongDirection);
-            double bottom = plan.Settings.BottomMm * .001;
-            var local = points.Select(p => new[] { Dot(p, profile.AlongDirection) - origin,
-                Dot(p, profile.HeightDirection) - bottom }).ToList();
-            double seam = jointHeightMm * .001;
-            Require(local.Take(local.Count - 2).All(p => p[1] > seam + .0001), "Joint datum must be below the complete panel contour.");
             Feature plane = null;
             for (Feature f = doc.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature)
                 if (f.GetTypeName2() == "RefPlane") { plane = f; break; }
@@ -51,8 +42,8 @@ namespace ADDIN.Commands.Kadai
             var profileSketchObject = sketch.ActiveSketch;
             try {
                 sketch.AddToDB = true;
-                for (int i = 0; i < local.Count; i++) {
-                    var a = local[i]; var b = local[(i + 1) % local.Count];
+                for (int i = 0; i < local.Length; i++) {
+                    var a = local[i]; var b = local[(i + 1) % local.Length];
                     Require(sketch.CreateLine(a[0], a[1], 0, b[0], b[1], 0) != null, "Profile edge failed.");
                 }
             } finally { sketch.AddToDB = false; sketch.InsertSketch(true); }
@@ -64,21 +55,14 @@ namespace ADDIN.Commands.Kadai
                 .0001, 0, 0, false, 0, 0, 0, allowance, true, 0, 0, 0, .5, true, false, true, true);
             Require(flange != null, "Native Sheet Metal Base Flange failed.");
             flange.Name = "Kadai_BaseFlange_" + profile.RibId;
-            bool longitudinal = profile.Direction == KadaiRibDirection.Longitudinal;
-            var slots = plan.CandidateSlots.Where(s => s.OwnerRibId == profile.RibId).ToList();
             doc.ClearSelection2(true); Require(plane.Select2(false, 0), "Cannot select slot plane.");
             sketch.InsertSketch(true);
             var slotSketchObject = sketch.ActiveSketch;
             try {
                 sketch.AddToDB = true;
-                foreach (var slot in slots) {
-                    double center = ((longitudinal ? plan.Settings.OriginVmm : plan.Settings.OriginUmm) + slot.CenterAlongRibMm) * .001 - origin;
-                    double halfWidth = slot.WidthMm * .0005;
-                    Require(center - halfWidth > local.First()[0] && center + halfWidth < local[local.Count - 3][0], "Slot lies outside its rib.");
-                    double y0 = longitudinal ? -.001 : seam - jointDepthClearanceMm * .001;
-                    double y1 = longitudinal ? seam : local.Max(p => p[1]) + .001;
-                    var corners = new[] { new[] { center - halfWidth, y0 }, new[] { center + halfWidth, y0 },
-                        new[] { center + halfWidth, y1 }, new[] { center - halfWidth, y1 } };
+                foreach (var slot in cuts) {
+                    var corners = new[] { new[] { slot.Left, slot.Bottom }, new[] { slot.Right, slot.Bottom },
+                        new[] { slot.Right, slot.Top }, new[] { slot.Left, slot.Top } };
                     for (int i = 0; i < 4; i++) {
                         var a = corners[i]; var b = corners[(i + 1) % 4];
                         Require(sketch.CreateLine(a[0], a[1], 0, b[0], b[1], 0) != null, "Slot sketch edge failed.");
@@ -114,6 +98,43 @@ namespace ADDIN.Commands.Kadai
             return doc;
             } catch { try { app.CloseDoc(doc.GetTitle()); } catch { } throw; }
         }
+
+        internal void WriteNewPackage(KadaiPlan plan, List<KadaiProfile3D> profiles, string directory,
+            double jointHeightMm, double jointDepthClearanceMm, bool export, string assemblyTemplate, Action<string> progress)
+        {
+            // Validate the entire grid before opening or writing any output document.
+            var cuts = KadaiJointGeometry.Build(plan, profiles, jointHeightMm, jointDepthClearanceMm);
+            directory = Path.GetFullPath(directory);
+            Require(!Directory.Exists(directory) && !File.Exists(directory), "A new output folder is required.");
+            Directory.CreateDirectory(directory);
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            var rows = new List<string> { "SlotId,RibId,MatingRibId,LeftMm,RightMm,BottomMm,TopMm" };
+            foreach (var profile in profiles)
+                foreach (var cut in cuts[profile.RibId])
+                    rows.Add(string.Join(",", cut.SlotId, profile.RibId, cut.MatingRibId,
+                        (cut.Left * 1000).ToString("R", culture), (cut.Right * 1000).ToString("R", culture),
+                        (cut.Bottom * 1000).ToString("R", culture), (cut.Top * 1000).ToString("R", culture)));
+            File.WriteAllLines(Path.Combine(directory, "JointPlan.csv"), rows);
+            File.WriteAllLines(Path.Combine(directory, "Stations.csv"),
+                new[] { "RibId,StationKey" }.Concat(plan.LongRibs.Concat(plan.CrossRibs)
+                    .Select(rib => rib.Id + "," + rib.StationKey)));
+            foreach (var profile in profiles) {
+                string partPath = Path.Combine(directory, profile.RibId + ".SLDPRT");
+                progress?.Invoke("START " + profile.RibId);
+                var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId]);
+                try {
+                    if (export) {
+                        ExportFlatDxf(part, Path.Combine(directory, profile.RibId + ".dxf"));
+                        string drawingPath = Path.Combine(directory, profile.RibId + ".SLDDRW");
+                        CreateFlatDrawing(part, drawingPath);
+                        app.CloseDoc(drawingPath);
+                    }
+                    progress?.Invoke("PASS " + profile.RibId + " native SheetMetal/Cut/Flat" + (export ? "/Drawing/DXF" : ""));
+                } finally { app.CloseDoc(partPath); }
+            }
+            CreateAssembly(profiles, directory, plan.Settings.BottomMm, assemblyTemplate);
+            File.WriteAllText(Path.Combine(directory, "PASS.txt"), "Native prototype only; production gate closed.");
+        }
         internal void ExportFlatDxf(ModelDoc2 doc, string path)
         {
             Require(!File.Exists(path), "Refusing to overwrite DXF.");
@@ -130,15 +151,19 @@ namespace ADDIN.Commands.Kadai
             Require(File.Exists(template), "Missing Assembly template.");
             var doc = app.NewDocument(template, 0, 0, 0) as ModelDoc2;
             Require(doc != null, "Cannot create Assembly.");
+            var openedParts = new List<string>();
+            try {
             var assembly = (AssemblyDoc)doc;
             var bom = new List<string> { "RibId,Part,Quantity,Status" };
             foreach (var profile in profiles) {
                 string partPath = Path.Combine(directory, profile.RibId + ".SLDPRT");
                 int error = 0, warning = 0;
                 var part = app.GetOpenDocumentByName(partPath) as ModelDoc2;
-                if (part == null) part = app.OpenDoc6(partPath, 1, 3, "", ref error, ref warning) as ModelDoc2;
+                bool openedHere = part == null;
+                if (openedHere) part = app.OpenDoc6(partPath, 1, 3, "", ref error, ref warning) as ModelDoc2;
                 Require(part != null, "Cannot load prototype Part for Assembly: " + partPath + " error/warning=" + error + "/" + warning);
                 Require(string.Equals(part.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase), "Part filename conflict with another open document.");
+                if (openedHere) openedParts.Add(partPath);
                 var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
                 var box = (double[])body.GetBodyBox();
                 double[] a = profile.AlongDirection, h = profile.HeightDirection;
@@ -158,9 +183,26 @@ namespace ADDIN.Commands.Kadai
                 bom.Add(profile.RibId + "," + Path.GetFileName(partPath) + ",1,PROTOTYPE");
             }
             doc.EditRebuild3(); doc.ShowNamedView2("*Isometric", 7); doc.ViewZoomtofit2();
+            Require(Items(assembly.GetComponents(false)).Length == profiles.Count, "Unexpected Assembly component count.");
+            Require(doc.Extension.NeedsRebuild2 == 0, "Assembly requires a rebuild.");
+            var interference = assembly.InterferenceDetectionManager;
+            Require(interference != null, "Cannot check native interference.");
+            try {
+                interference.TreatCoincidenceAsInterference = false;
+                interference.IncludeMultibodyPartInterferences = false;
+                var collisions = interference.GetInterferences();
+                Require(collisions == null || (collisions is Array && ((Array)collisions).Length == 0),
+                    "Native Assembly has overlapping rib volumes.");
+            } finally { interference.Done(); }
             int saveError = 0, saveWarning = 0;
-            Require(doc.Extension.SaveAs(path, 0, 1, null, ref saveError, ref saveWarning) && saveError == 0, "Assembly save failed.");
+            Require(doc.Extension.SaveAs(path, 0, 1, null, ref saveError, ref saveWarning) && saveError == 0 && saveWarning == 0,
+                "Assembly save failed: " + saveError + "/" + saveWarning);
             File.WriteAllLines(Path.Combine(directory, "BOM.csv"), bom);
+            } finally {
+                string savedPath = doc.GetPathName();
+                app.CloseDoc(string.IsNullOrEmpty(savedPath) ? doc.GetTitle() : savedPath);
+                foreach (string partPath in openedParts) app.CloseDoc(partPath);
+            }
         }
         internal ModelDoc2 CreateFlatDrawing(ModelDoc2 part, string path)
         {
@@ -169,6 +211,7 @@ namespace ADDIN.Commands.Kadai
             Require(File.Exists(template), "Missing Drawing template: " + template);
             var drawing = app.NewDocument(template, 0, 0, 0) as ModelDoc2;
             Require(drawing != null, "Drawing creation failed.");
+            try {
             drawing.SetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swUnitsLinear, (int)swLengthUnit_e.swMM);
             var view = ((DrawingDoc)drawing).CreateFlatPatternViewFromModelView3(part.GetPathName(), "", .15, .15, 0, false, false);
             Require(view != null, "Flat drawing view failed.");
@@ -193,9 +236,14 @@ namespace ADDIN.Commands.Kadai
             if (note != null) ((Annotation)note.GetAnnotation()).SetPosition2(.05, .02, 0);
             drawing.ClearSelection2(true); drawing.ViewZoomtofit2();
             int error = 0, warning = 0;
-            Require(drawing.Extension.SaveAs(path, 0, 1, null, ref error, ref warning) && error == 0,
-                "Drawing save failed: " + error);
+            Require(drawing.Extension.SaveAs(path, 0, 1, null, ref error, ref warning) && error == 0 && warning == 0,
+                "Drawing save failed: " + error + "/" + warning);
             return drawing;
+            } catch {
+                string savedPath = drawing.GetPathName();
+                app.CloseDoc(string.IsNullOrEmpty(savedPath) ? drawing.GetTitle() : savedPath);
+                throw;
+            }
         }
     }
 }

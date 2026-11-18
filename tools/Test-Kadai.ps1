@@ -13,6 +13,16 @@ $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if ($LASTEXITCODE -ne 0) { throw 'C# planner test compilation failed.' }
 & (Join-Path $output 'KadaiPlannerTests.exe') | Tee-Object -FilePath (Join-Path $output 'numeric.txt')
 if ($LASTEXITCODE -ne 0) { throw 'C# planner tests failed.' }
+$jointTest = Join-Path $output 'KadaiJointGeometryTests.exe'
+$interop = Join-Path $InteropDirectory 'SolidWorks.Interop.sldworks.dll'
+$jointSources = @('tools\KadaiJointGeometryTests.cs', 'Commands\Kadai\KadaiPlanner.cs',
+    'Commands\Kadai\KadaiCadContracts.cs', 'Commands\Kadai\KadaiJointGeometry.cs') |
+    ForEach-Object { Join-Path $repo $_ }
+Copy-Item -LiteralPath $interop -Destination $output
+& $compiler /nologo /target:exe ('/out:' + $jointTest) ('/r:' + $interop) @jointSources
+if ($LASTEXITCODE -ne 0) { throw 'C# joint preflight test compilation failed.' }
+& $jointTest | Tee-Object -FilePath (Join-Path $output 'joints.txt')
+if ($LASTEXITCODE -ne 0) { throw 'C# joint preflight tests failed.' }
 foreach ($configuration in @('Debug','Release')) {
     # Suppress the repository's production-copy post-build event. Do not kill SW,
     # register COM, or deploy binaries as a side effect of a Kadai verification build.
@@ -20,4 +30,4 @@ foreach ($configuration in @('Debug','Release')) {
     & $MSBuild (Join-Path $repo 'ADDIN.csproj') /t:Build ('/p:Configuration=' + $configuration) /p:Platform=x64 ('/p:OutputPath=' + $target) ('/p:ReferencePath=' + $InteropDirectory) /p:RegisterForComInterop=false /p:PostBuildEvent= /m:1 /nr:false /nologo /v:quiet /fl ('/flp:logfile=' + (Join-Path $output ($configuration + '.log')) + ';verbosity=normal')
     if ($LASTEXITCODE -ne 0) { throw ($configuration + ' x64 build failed.') }
 }
-'PASS: actual C# planner and Debug/Release x64 builds. SolidWorks CAD tests are separate.'
+'PASS: C# planner, joint preflight and Debug/Release x64 builds. SolidWorks CAD tests are separate.'

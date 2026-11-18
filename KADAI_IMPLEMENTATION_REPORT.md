@@ -102,4 +102,25 @@ Người dùng có thể review code, build cô lập, dùng layout và thử pr
 
 Điều tra bổ sung và công cụ API được commit ở `ce3aea441e1240f105fcd91e16c50b0b6dc25756`: `tools/KadaiNativeAudit.cs`, `tools/KadaiSwControl.cs`, `tools/KadaiMarkIsolationHost.cs`, `docs/kadai/KADAI_CRASH_ROOT_CAUSE_20261118.md`. Công cụ kiểm tra đúng PID, từ chối exit khi có document và cho phép đối chứng MARK trong process test; không nằm trong production add-in. Compile tools, 30 numeric checks, Debug/Release x64 đều PASS. Sau thử nghiệm đã hoàn nguyên đúng 3 startup values/kiểu DWORD, gỡ CLSID test, phục hồi/hash 13/13 AutoRecover và kiểm tra lại 110 CAD gốc: 0 thay đổi. Các thử nghiệm sau yêu cầu chuyển sang API đều thực hiện bằng COM/debugger, không dùng Computer Use.
 
+## 6. Tiếp tục triển khai trên TAI TOOL có CircleFace V3
+
+Kadai bổ sung kiểm tra hình học rãnh cho toàn lưới trước khi ghi bất kỳ Part nào. Bộ kiểm tra đo vị trí theo khung của mỗi thanh, kiểm tra đủ đối ứng, khoảng cách tới biên và rãnh bên cạnh, độ hở ngang, vật liệu còn lại và độ chồng hai chiều sâu tại cùng cao độ ghép. Form báo rãnh lỗi và gợi ý lề từ các contour hiện tại để người dùng nhập lại và Preview. Form cũng báo số mặt phẳng thanh giữ nguyên, thêm và bỏ khi đổi lưới trên cùng mặt đã Capture. Khóa vị trí 0,001 mm giúp so sánh qua các lượt preview; file native đã lưu vẫn mang ID thứ tự.
+
+Writer thí nghiệm tạo package vào thư mục mới và ghi `JointPlan.csv`, `Stations.csv`, Assembly/BOM cùng các Part. Sau khi dựng Assembly, kiểm tra số component, rebuild và giao thể tích bằng [SOLIDWORKS Interference Detection API](https://help.solidworks.com/2024/English/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IAssemblyDoc~InterferenceDetectionManager.html). DXF validator kiểm tra kích thước và đơn vị 1:1, cạnh đáy rãnh và cạnh bên tại đúng vị trí theo joint plan. Log và CAD ở thư mục local ngoài Git.
+
+| Lượt thử tại SW 2024 SP5.0 trên copy mặt KDA1 | Kết quả |
+|---|---|
+| Preview 3+1, 7×4 → 10×6 → 7×4, 5×2 | PASS số temporary bodies, Cancel và trạng thái Part nguồn |
+| Native 3+1 | 4 Part Sheet Metal/Normal Cut/Flat Pattern, 4 Drawing, 4 DXF; 6 rãnh đạt checker; Assembly 4 component, không giao thể tích |
+| Native 7×4 với lề 50/150,9 mm | Chặn trước khi tạo package vì một rãnh vượt đầu contour đã trim |
+| Native 7×4 với lề thử 70/630 mm trên cùng mặt | 11 Part Sheet Metal/Normal Cut/Flat Pattern, 11 Drawing, 11 DXF; 56 rãnh đạt checker; Assembly 11 component, không giao thể tích |
+| Native 10×6 với lề thử 70/630 mm | 16 Part Sheet Metal/Normal Cut/Flat Pattern; Assembly 16 component, không giao thể tích |
+| Quay về 7×4 với cùng tham số thử | 11 Part và Assembly mới trong thư mục riêng; contour, station và joint plan khớp hash của lượt 7×4 trước |
+| Offline | 32 kiểm tra planner, test mức rãnh cho 3+1/7×4/10×6/5×2 và các trường hợp từ chối; Debug/Release x64 đạt trên nhánh Kadai và source tích hợp |
+| Bảo toàn dữ liệu | Đối chiếu 110 CAD gốc, 0 thay đổi; bản sao mặt dùng thử cũng giữ nguyên hash |
+
+Tích hợp local được xây từ snapshot của source TAI TOOL đang dùng, đối chiếu với DLL trước tích hợp cho 47.249 mục IL/metadata/tài nguyên khớp. Ngoài các kiểu mới của Kadai, bản tích hợp chỉ khác ở 11 mục dùng để đăng ký, bố trí, bật nút hoặc đóng form Kadai trong Task Pane. IL của Make Hole, Fix Tỉ lệ, DIM Kegaki và CircleFace V3 khớp baseline. Điểm ghép local gồm `ADDIN.csproj`, `BomTaskPaneControl.cs` và `UI/BomCommandLayout.cs`. Các tài liệu đang mở của người dùng được tách khỏi phiên test bằng PID.
+
+Các giá trị 70/630 mm là tham số đối chứng trên mặt được chọn, không phải preset sản xuất. Chưa xác nhận lắp đặt với panel/vật cản trong hành trình lắp, vật liệu và dung sai công ty, contour chính xác ở toàn bộ bề dày, native KF3, hoặc cập nhật Feature/Drawing tại chỗ. **Apply/Export giao diện vẫn khóa.**
+
 Đối chiếu API: [Sheet Metal 2013+ data access](https://help.solidworks.com/2024/english/api/sldworksapi/Get_Template_Sheet_Metal_Feature_Data_Example_VBNET.htm), [native Base Flange example](https://help.solidworks.com/2024/english/api/sldworksapi/insert_sheet_metal_base_flange_example_vbnet.htm), [FeatureCut4](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ifeaturemanager~featurecut4.html). Kết quả CAD trong báo cáo dựa trên chạy local, không dựa vào ví dụ tài liệu.

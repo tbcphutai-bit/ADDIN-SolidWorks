@@ -14,14 +14,16 @@ namespace ADDIN
         {
             if (tabModelMacroPage == null || btnKadai != null) return;
             btnKadai = new ModernButton { Name = "btnKadai", Text = "Kadai", TabStop = true,
-                AutoSize = false, Visible = true };
+                Subtitle = "Part · Preview 3D", Kind = ModernButtonKind.Tile, Icon = TaiIcon.Curve,
+                Tone = ModernButtonTone.Accent, AutoSize = false, Visible = true };
             btnKadai.Click += btnKadai_Click;
             tabModelMacroPage.Controls.Add(btnKadai);
+            SetBomCommandToolTip(btnKadai, "Kadai: bố trí thanh và Preview 3D theo mặt panel. Apply chưa nghiệm thu.");
         }
 
         private void btnKadai_Click(object sender, EventArgs e)
         {
-            if (!CanRunModelMacro(btnKadai)) return;
+            if (solidWorksClosing || IsDisposed || Disposing || !CanRunModelMacro(btnKadai)) return;
             if (kadaiForm != null && !kadaiForm.IsDisposed)
             {
                 if (kadaiForm.WindowState == FormWindowState.Minimized) kadaiForm.WindowState = FormWindowState.Normal;

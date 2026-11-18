@@ -51,6 +51,7 @@ namespace ADDIN.Commands.Kadai
     internal sealed class KadaiRibPosition
     {
         public string Id;
+        public string StationKey;
         public KadaiRibDirection Direction;
         public double CoordinateMm;
         public double NormalizedPosition;
@@ -133,6 +134,7 @@ namespace ADDIN.Commands.Kadai
                 plan.LongRibs.Add(new KadaiRibPosition
                 {
                     Id = "L-" + (i + 1).ToString("D3", CultureInfo.InvariantCulture),
+                    StationKey = StationKey("L", settings.HeightAxis, settings.OriginUmm + xs[i]),
                     Direction = KadaiRibDirection.Longitudinal, CoordinateMm = xs[i],
                     NormalizedPosition = xs[i] / settings.LengthXmm
                 });
@@ -140,6 +142,7 @@ namespace ADDIN.Commands.Kadai
                 plan.CrossRibs.Add(new KadaiRibPosition
                 {
                     Id = "C-" + (i + 1).ToString("D3", CultureInfo.InvariantCulture),
+                    StationKey = StationKey("C", settings.HeightAxis, settings.OriginVmm + zs[i]),
                     Direction = KadaiRibDirection.Transverse, CoordinateMm = zs[i],
                     NormalizedPosition = zs[i] / settings.LengthZmm
                 });
@@ -190,6 +193,24 @@ namespace ADDIN.Commands.Kadai
             double span = extent - 2 * margin;
             for (int i = 0; i < count; i++) result.Add(margin + span * i / (count - 1));
             return result;
+        }
+        private static string StationKey(string direction, int heightAxis, double worldCoordinateMm)
+        {
+            return direction + heightAxis.ToString(CultureInfo.InvariantCulture) + "@" +
+                Math.Round(worldCoordinateMm * 1000, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture);
+        }
+
+        // Compare center planes on the same captured face. Ordinal file labels
+        // may change; this diff alone does not authorize updating saved Parts.
+        internal static string DescribeStationChanges(KadaiPlan before, KadaiPlan after)
+        {
+            var oldKeys = before.LongRibs.Concat(before.CrossRibs).Select(rib => rib.StationKey).ToList();
+            var newKeys = after.LongRibs.Concat(after.CrossRibs).Select(rib => rib.StationKey).ToList();
+            if (oldKeys.Distinct().Count() != oldKeys.Count || newKeys.Distinct().Count() != newKeys.Count)
+                return "Không thể đối chiếu vị trí: hai thanh cùng khóa tọa độ 0.001 mm.";
+            return "So với Preview trước: giữ " + oldKeys.Intersect(newKeys).Count()
+                + " mặt phẳng thanh, thêm " + newKeys.Except(oldKeys).Count()
+                + ", bỏ " + oldKeys.Except(newKeys).Count() + ". Part đã lưu chưa được cập nhật.";
         }
         private static void Positive(double x, string label)
         {

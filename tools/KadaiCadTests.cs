@@ -17,42 +17,57 @@ public static class KadaiCadTests
             if (args.Length < 2 || (Directory.Exists(args[1]) && !args.Contains("--assemble-only"))) throw new ArgumentException("Provide copied panel Part and a NEW output directory.");
             Directory.CreateDirectory(args[1]);
             var sw = (ISldWorks)Marshal.GetActiveObject("SldWorks.Application");
+            return RunOnApplication(sw, args);
+        } catch (Exception e) { Console.Error.WriteLine(e); return 1; }
+    }
+
+    public static int RunOnApplication(ISldWorks sw, string[] args)
+    {
+        try {
+            string output = Path.GetFullPath(args[1]);
+            int templateIndex = Array.IndexOf(args, "--assembly-template");
+            string template = templateIndex >= 0 ? args[templateIndex + 1] : null;
+            int countIndex = Array.IndexOf(args, "--counts");
+            int marginIndex = Array.IndexOf(args, "--margins");
+            var request = new KadaiRequest { LongRibCount = countIndex >= 0 ? int.Parse(args[countIndex + 1]) : 3,
+                CrossRibCount = countIndex >= 0 ? int.Parse(args[countIndex + 2]) : 1,
+                OriginUmm = 0, OriginVmm = -1430, LengthXmm = 2250, LengthZmm = 1450,
+                LongEndMarginMm = 50, CrossEndMarginMm = 150.9 };
+            if (marginIndex >= 0) {
+                var invariant = System.Globalization.CultureInfo.InvariantCulture;
+                request.LongEndMarginMm = double.Parse(args[marginIndex + 1], invariant);
+                request.CrossEndMarginMm = double.Parse(args[marginIndex + 2], invariant);
+            }
+            if (!args.Contains("--assemble-only") && File.Exists(Path.Combine(output, "PASS.txt")))
+                throw new InvalidOperationException("Choose a fresh run directory.");
+            Directory.CreateDirectory(output);
             if (args[0].EndsWith(".json", StringComparison.OrdinalIgnoreCase)) {
                 var cached = new JavaScriptSerializer().Deserialize<List<KadaiProfile3D>>(File.ReadAllText(args[0]));
-                var settings = new KadaiRequest { LongRibCount = 3, CrossRibCount = 1, OriginVmm = -1430 };
-                var cachedPlan = KadaiPlanner.Build(settings);
                 var cachedWriter = new KadaiNativePrototype(sw);
-                foreach (var profile in args.Contains("--assemble-only") ? new List<KadaiProfile3D>() : cached) {
-                    var part = cachedWriter.WritePart(profile, cachedPlan, Path.Combine(args[1], profile.RibId + ".SLDPRT"), 100, .1);
-                    Console.WriteLine("PASS native SheetMetal/Cut/Flat " + profile.RibId);
-                    if (args.Contains("--export")) {
-                        cachedWriter.ExportFlatDxf(part, Path.Combine(args[1], profile.RibId + ".dxf"));
-                        Console.WriteLine("PASS DXF " + profile.RibId);
-                        var drawing = cachedWriter.CreateFlatDrawing(part, Path.Combine(args[1], profile.RibId + ".SLDDRW"));
-                        Console.WriteLine("PASS drawing " + profile.RibId); sw.CloseDoc(drawing.GetPathName());
-                    }
-                    sw.CloseDoc(part.GetPathName());
-                }
-                int templateIndex = Array.IndexOf(args, "--assembly-template");
-                cachedWriter.CreateAssembly(cached, args[1], cachedPlan.Settings.BottomMm,
-                    templateIndex >= 0 ? args[templateIndex + 1] : null);
+                if (args.Contains("--assemble-only"))
+                    cachedWriter.CreateAssembly(cached, output, request.BottomMm, template);
+                else
+                    cachedWriter.WriteNewPackage(KadaiPlanner.Build(request), cached, Path.Combine(output, "package"),
+                        100, .1, args.Contains("--export"), template, Console.WriteLine);
                 Console.WriteLine("PASS prototype assembly and BOM");
-                File.WriteAllText(Path.Combine(args[1], "PASS.txt"), "Native prototype only; production gate closed.");
+                File.WriteAllText(Path.Combine(output, "PASS.txt"), "Native prototype only; production gate closed.");
                 return 0;
             }
+            string input = Path.GetFullPath(args[0]);
+            if (!Path.GetFileName(input).StartsWith("KADAI_TEST__", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Use a copied CAD fixture with the KADAI_TEST__ prefix.");
             int e = 0, w = 0;
-            var doc = sw.GetOpenDocumentByName(args[0]) as ModelDoc2;
-            if (doc == null) doc = sw.OpenDoc6(args[0], 1, 3, "", ref e, ref w) as ModelDoc2;
-            if (doc == null || !string.Equals(doc.GetPathName(), args[0], StringComparison.OrdinalIgnoreCase)) throw new Exception("Wrong panel Part.");
+            var doc = sw.GetOpenDocumentByName(input) as ModelDoc2;
+            bool openedHere = doc == null;
+            if (openedHere) doc = sw.OpenDoc6(input, 1, 3, "", ref e, ref w) as ModelDoc2;
+            if (doc == null || !string.Equals(doc.GetPathName(), input, StringComparison.OrdinalIgnoreCase)) throw new Exception("Wrong panel Part.");
+            try {
             sw.ActivateDoc3(doc.GetTitle(), false, 0, ref e);
             // Test fixture selection: largest single face of the lowest surface body.
             var panel = Items(((PartDoc)doc).GetBodies2(1, false)).OfType<Body2>()
                 .OrderBy(b => ((double[])b.GetBodyBox())[1]).First();
             var face = Items(panel.GetFaces()).OfType<Face2>().OrderByDescending(f => f.GetArea()).First();
             doc.ClearSelection2(true); ((Entity)face).Select4(false, null);
-            var request = new KadaiRequest { LongRibCount = 3, CrossRibCount = 1,
-                OriginUmm = 0, OriginVmm = -1430, LengthXmm = 2250, LengthZmm = 1450,
-                LongEndMarginMm = 50, CrossEndMarginMm = 150.9 };
             bool dirty = doc.GetSaveFlag(); int stamp = doc.GetUpdateStamp(), features = doc.GetFeatureCount();
             using (var backend = new KadaiPreviewBackend(sw)) {
                 var source = backend.CaptureSource(sw, doc);
@@ -68,8 +83,9 @@ public static class KadaiCadTests
                     throw new Exception("Preview changed source state.");
                 Console.WriteLine("PASS preview/cancel source dirty/stamp/features unchanged");
                 if (args.Contains("--matrix")) foreach (var counts in new[] { new[] { 7, 4 }, new[] { 10, 6 }, new[] { 7, 4 }, new[] { 5, 2 } }) {
-                    request.LongRibCount = counts[0]; request.CrossRibCount = counts[1];
-                    var nextPlan = KadaiPlanner.Build(request);
+                    var nextRequest = request.Snapshot();
+                    nextRequest.LongRibCount = counts[0]; nextRequest.CrossRibCount = counts[1];
+                    var nextPlan = KadaiPlanner.Build(nextRequest);
                     var nextProfiles = backend.CalculateProfiles(nextPlan, source);
                     backend.ShowTemporaryPreview(doc, nextPlan, nextProfiles);
                     if (backend.VisibleBodyCount != counts[0] + counts[1]) throw new Exception("Wrong temporary body count.");
@@ -79,21 +95,16 @@ public static class KadaiCadTests
                 }
                 if (args.Contains("--parts")) {
                     var writer = new KadaiNativePrototype(sw);
-                    foreach (var profile in profiles) {
-                        var part = writer.WritePart(profile, plan, Path.Combine(args[1], profile.RibId + ".SLDPRT"), 100, .1);
-                        Console.WriteLine("PASS native SheetMetal/Cut/Flat " + profile.RibId);
-                        if (args.Contains("--export")) {
-                            writer.ExportFlatDxf(part, Path.Combine(args[1], profile.RibId + ".dxf"));
-                            Console.WriteLine("PASS DXF " + profile.RibId);
-                            var drawing = writer.CreateFlatDrawing(part, Path.Combine(args[1], profile.RibId + ".SLDDRW"));
-                            Console.WriteLine("PASS drawing " + profile.RibId); sw.CloseDoc(drawing.GetPathName());
-                        }
-                        sw.CloseDoc(part.GetPathName());
-                    }
+                    writer.WriteNewPackage(plan, profiles, Path.Combine(output, "package"), 100, .1,
+                        args.Contains("--export"), template, Console.WriteLine);
+                    if (dirty != doc.GetSaveFlag() || stamp != doc.GetUpdateStamp() || features != doc.GetFeatureCount())
+                        throw new Exception("Prototype package changed the source.");
+                    Console.WriteLine("PASS native assembly component count and final interference check");
                 }
             }
             File.WriteAllText(Path.Combine(args[1], "PASS.txt"), "SW " + sw.RevisionNumber() + "\r\nPreview/cancel verified; prototype only.\r\n");
             return 0;
+            } finally { if (openedHere) sw.CloseDoc(input); }
         } catch (Exception e) { Console.Error.WriteLine(e);
             if (args.Length > 1 && Directory.Exists(args[1])) File.WriteAllText(Path.Combine(args[1], "FAIL.txt"), e.ToString());
             return 1; }
