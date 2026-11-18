@@ -94,6 +94,12 @@ public static class KadaiNativeAudit
     {
         try {
             var sw = (ISldWorks)Marshal.GetActiveObject("SldWorks.Application");
+            string expected = System.Environment.GetEnvironmentVariable("KADAI_EXPECTED_SW_PID");
+            int expectedPid;
+            int actualPid = sw.GetProcessID();
+            if (!string.IsNullOrEmpty(expected) && (!int.TryParse(expected, out expectedPid) || actualPid != expectedPid))
+                throw new InvalidOperationException("Audit refused: SolidWorks PID differs from KADAI_EXPECTED_SW_PID.");
+            Console.WriteLine("SW_PID=" + actualPid + "; UserControl=" + sw.UserControl);
             var initialPaths = new HashSet<string>(Items(sw.GetDocuments()).OfType<ModelDoc2>()
                 .Select(d => d.GetPathName()), StringComparer.OrdinalIgnoreCase);
             var all = new Dictionary<string, object>(); all["revision"] = sw.RevisionNumber();
@@ -103,6 +109,7 @@ public static class KadaiNativeAudit
             if (args.Length < 2) return 0;
             var docs = new List<object>();
             foreach (string path in args.Skip(1)) {
+                Console.WriteLine("OPEN " + Path.GetFileName(path));
                 int err = 0, warn = 0;
                 var d = sw.GetOpenDocumentByName(Path.GetFullPath(path)) as ModelDoc2;
                 if (d == null) d = sw.OpenDoc6(Path.GetFullPath(path), path.EndsWith("SLDASM", StringComparison.OrdinalIgnoreCase) ? 2 : 1, 3, "", ref err, ref warn) as ModelDoc2;

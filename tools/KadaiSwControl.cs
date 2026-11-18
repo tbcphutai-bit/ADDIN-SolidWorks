@@ -10,6 +10,18 @@ public static class KadaiSwControl
     {
         try {
             var sw = (ISldWorks)Marshal.GetActiveObject("SldWorks.Application");
+            if (args[0] == "identity" || args[0] == "exit-isolated") {
+                int expectedPid;
+                if (args.Length != 2 || !int.TryParse(args[1], out expectedPid) || sw.GetProcessID() != expectedPid)
+                    throw new InvalidOperationException("SolidWorks PID does not match the explicitly designated session.");
+                var documents = sw.GetDocuments() as object[] ?? new object[0];
+                Console.WriteLine("PID=" + sw.GetProcessID() + "; UserControl=" + sw.UserControl + "; Documents=" + documents.Length);
+                if (args[0] == "exit-isolated") {
+                    if (documents.Length != 0) throw new InvalidOperationException("Refusing to exit a session with open documents.");
+                    sw.ExitApp();
+                }
+                return 0;
+            }
             if (args[0] == "load") { Console.WriteLine("LoadAddIn=" + sw.LoadAddIn(args[1])); return 0; }
             if (args[0] == "unload") { Console.WriteLine("UnloadAddIn=" + sw.UnloadAddIn(args[1])); return 0; }
             if (args[0] == "state") {
