@@ -149,3 +149,13 @@ Commit code và test chạy trên nhánh Kadai là `54db3935a98a4c4c99bf6d55d957
 Đã cài DLL/PDB sau khi SolidWorks đóng và kiểm lại SHA256, IL và MVID của DLL cài. DLL mới có SHA256 `2BB8254C6415D733519D94A1D2F55AB7DB92F1EEC32D97BFAED7D333F9FE02C9` và MVID `34acaf37-a974-4e5e-8af9-4eb5e6ed2247`. Bản sao dự phòng và danh sách sáu file nguồn tích hợp nằm trong `kadai-assembly-6866/integration`. Tệp `CheckAssemblyHole.cs` được chỉnh đồng thời trên máy có SHA256 giữ nguyên trước và sau triển khai. Đối chiếu 13/13 AutoRecover sau khi đóng phiên thử đạt.
 
 Trong một phiên SolidWorks thử nghiệm riêng, host nạp trực tiếp DLL đã cài, xác nhận cùng MVID, khởi tạo Task Pane control với bản sao Assembly 6866 đang active và gọi nút qua WinForms. Model → Macro hiển thị nút Kadai, nút đã bật, form mở được và Apply vẫn khóa. Log launcher ở thư mục local.
+
+## 8. Vật liệu custom và bảng uốn ST
+
+Mẫu native t7 và d1 dùng `StSA-` trong `kiku_板材_材料 2019.sldmat`. Thư viện cũ cũng có tên vật liệu này. Writer thử nhận đường dẫn thư viện cụ thể, tên vật liệu và đường dẫn bảng uốn từ các tùy chọn `--material-db`, `--material` và `--bend-table`. Bộ thử dùng bảng `BD_Kiku_ST_2020.xlsx` đã được chấp thuận. Workbook có dữ liệu bend deduction theo mm và mục chiều dày 1,6 mm.
+
+Trên SolidWorks 2024 SP5.0, truyền workbook Excel vào custom allowance khi tạo Base Flange làm mất đường dẫn. API nhập workbook trực tiếp cũng trả lỗi. Ghi mode Bend Table và đường dẫn trực tiếp lên feature Sheet Metal của body, sau đó gọi `ModifyDefinition`, cho phép đọc lại đúng bằng `GetCustomBendAllowance`. Writer kiểm tra chiều dày, mode, đường dẫn bảng và vật liệu của configuration trước khi lưu Part. Nó kiểm lại các giá trị này khi mở Part đã lưu để dựng Assembly thử. [API đọc vật liệu theo configuration](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ipartdoc~getmaterialpropertyname2.html) · [API Sheet Metal](https://help.solidworks.com/2024/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISheetMetalFeatureData_members.html)
+
+Bộ KDA1 7×4 đạt kiểm tra trên 11 Part Sheet Metal, 11 Drawing và 11 DXF. Validator đo đúng 56 rãnh, đơn vị mm và tỉ lệ 1:1. Assembly thử có 11 component và không có giao thể tích giữa các thanh. Build Debug/Release x64 đạt. SHA256 của bản sao mặt panel, thư viện vật liệu và workbook ST giữ nguyên. Log API và package ở `kadai-assembly-6866/st-native-04`.
+
+Thay đổi nằm trong `Commands/Kadai/KadaiNativePrototype.cs` và `tools/KadaiCadTests.cs`. **Apply vẫn khóa.** Các thanh của bộ thử là tấm phẳng. Phép thử lưu và mở lại bảng ST, Flat Pattern và DXF của các thanh này không đo độ bù cho một chi tiết thực sự có nếp uốn.

@@ -11,6 +11,14 @@ using ADDIN.Commands.Kadai;
 public static class KadaiCadTests
 {
     static object[] Items(object value) { return value as object[] ?? new object[0]; }
+    static string Option(string[] args, string name)
+    {
+        int index = Array.IndexOf(args, name);
+        if (index < 0) return null;
+        if (index + 1 == args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+            throw new ArgumentException("Missing value for " + name);
+        return args[index + 1];
+    }
     [STAThread] public static int Main(string[] args)
     {
         try {
@@ -27,6 +35,9 @@ public static class KadaiCadTests
             string output = Path.GetFullPath(args[1]);
             int templateIndex = Array.IndexOf(args, "--assembly-template");
             string template = templateIndex >= 0 ? args[templateIndex + 1] : null;
+            string materialDatabase = Option(args, "--material-db");
+            string material = Option(args, "--material");
+            string bendTable = Option(args, "--bend-table");
             int countIndex = Array.IndexOf(args, "--counts");
             int marginIndex = Array.IndexOf(args, "--margins");
             var request = new KadaiRequest { LongRibCount = countIndex >= 0 ? int.Parse(args[countIndex + 1]) : 3,
@@ -43,7 +54,7 @@ public static class KadaiCadTests
             Directory.CreateDirectory(output);
             if (args[0].EndsWith(".json", StringComparison.OrdinalIgnoreCase)) {
                 var cached = new JavaScriptSerializer().Deserialize<List<KadaiProfile3D>>(File.ReadAllText(args[0]));
-                var cachedWriter = new KadaiNativePrototype(sw);
+                var cachedWriter = new KadaiNativePrototype(sw, materialDatabase, material, bendTable);
                 if (args.Contains("--assemble-only"))
                     cachedWriter.CreateAssembly(cached, output, request.BottomMm, template);
                 else
@@ -94,7 +105,7 @@ public static class KadaiCadTests
                     Console.WriteLine("PASS real panel preview " + counts[0] + "x" + counts[1] + " / cancel unchanged");
                 }
                 if (args.Contains("--parts")) {
-                    var writer = new KadaiNativePrototype(sw);
+                    var writer = new KadaiNativePrototype(sw, materialDatabase, material, bendTable);
                     writer.WriteNewPackage(plan, profiles, Path.Combine(output, "package"), 100, .1,
                         args.Contains("--export"), template, Console.WriteLine);
                     if (dirty != doc.GetSaveFlag() || stamp != doc.GetUpdateStamp() || features != doc.GetFeatureCount())

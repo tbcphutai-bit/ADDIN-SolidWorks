@@ -13,7 +13,23 @@ namespace ADDIN.Commands.Kadai
     internal sealed class KadaiNativePrototype
     {
         readonly ISldWorks app;
-        internal KadaiNativePrototype(ISldWorks app) { this.app = app; }
+        private readonly string materialDatabasePath;
+        private readonly string materialName;
+        private readonly string bendTablePath;
+
+        internal KadaiNativePrototype(ISldWorks app, string materialDatabasePath = null,
+            string materialName = null, string bendTablePath = null)
+        {
+            this.app = app;
+            if (materialDatabasePath == null && materialName == null && bendTablePath == null) return;
+            Require(!string.IsNullOrWhiteSpace(materialName), "Specify the native material name.");
+            Require(File.Exists(materialDatabasePath) && string.Equals(Path.GetExtension(materialDatabasePath),
+                ".sldmat", StringComparison.OrdinalIgnoreCase), "Select an existing SolidWorks material database (.sldmat).");
+            Require(File.Exists(bendTablePath), "Select an existing Sheet Metal bend table.");
+            this.materialDatabasePath = Path.GetFullPath(materialDatabasePath);
+            this.materialName = materialName;
+            this.bendTablePath = Path.GetFullPath(bendTablePath);
+        }
         static object[] Items(object value) { return value as object[] ?? new object[0]; }
         static double Dot(double[] a, double[] b) { return a.Zip(b, (x, y) => x * y).Sum(); }
         static void Require(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
@@ -50,11 +66,19 @@ namespace ADDIN.Commands.Kadai
             var baseSketch = SketchFeature(doc, profileSketchObject);
             Require(baseSketch != null && baseSketch.Select2(false, 0), "Profile sketch missing.");
             baseSketch.Name = "Kadai_Profile_" + profile.RibId;
-            var allowance = doc.FeatureManager.CreateCustomBendAllowance(); allowance.Type = 2; allowance.KFactor = .5;
+            var allowance = doc.FeatureManager.CreateCustomBendAllowance();
+            allowance.Type = (int)swBendAllowanceTypes_e.swBendAllowanceKFactor;
+            allowance.KFactor = .5;
             var flange = doc.FeatureManager.InsertSheetMetalBaseFlange2(profile.ThicknessMeters, false,
                 .0001, 0, 0, false, 0, 0, 0, allowance, true, 0, 0, 0, .5, true, false, true, true);
             Require(flange != null, "Native Sheet Metal Base Flange failed.");
             flange.Name = "Kadai_BaseFlange_" + profile.RibId;
+            if (materialDatabasePath != null) {
+                doc.ClearSelection2(true);
+                SetBodyBendTable(doc);
+                ((PartDoc)doc).SetMaterialPropertyName2(doc.ConfigurationManager.ActiveConfiguration.Name,
+                    materialDatabasePath, materialName);
+            }
             doc.ClearSelection2(true); Require(plane.Select2(false, 0), "Cannot select slot plane.");
             sketch.InsertSketch(true);
             var slotSketchObject = sketch.ActiveSketch;
@@ -89,6 +113,7 @@ namespace ADDIN.Commands.Kadai
             Require(flat.SetSuppression2(1, 1, null), "Cannot unsuppress Flat Pattern."); doc.EditRebuild3();
             Require(flat.GetErrorCode2(out warning) == 0 && !warning, "Flat Pattern failed.");
             Require(flat.SetSuppression2(0, 1, null), "Cannot restore folded Part."); doc.EditRebuild3();
+            VerifyManufacturingSettings(doc, profile.ThicknessMeters);
             doc.Extension.CustomPropertyManager[""].Add3("Kadai_RibId", 30, profile.RibId, 2);
             doc.Extension.CustomPropertyManager[""].Add3("Kadai_Status", 30, "PROTOTYPE - NOT FOR MANUFACTURE", 2);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -97,6 +122,54 @@ namespace ADDIN.Commands.Kadai
                 "Saving prototype failed: " + error + "/" + saveWarning);
             return doc;
             } catch { try { app.CloseDoc(doc.GetTitle()); } catch { } throw; }
+        }
+
+        private static Feature FindSheetMetalFeature(ModelDoc2 doc)
+        {
+            for (Feature feature = doc.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
+                if (feature.GetTypeName2() == "SheetMetal") return feature;
+            throw new InvalidOperationException("Native Sheet Metal feature missing.");
+        }
+
+        private void SetBodyBendTable(ModelDoc2 doc)
+        {
+            var feature = FindSheetMetalFeature(doc);
+            var settings = feature.GetDefinition() as SheetMetalFeatureData;
+            Require(settings != null && settings.AccessSelections(doc, null), "Cannot edit native Sheet Metal settings.");
+            bool committed = false;
+            try
+            {
+                int status = settings.SetOverrideDefaultParameter2(
+                    (int)swSheetMetalOverrideDefaultParameters_e.swSheetMetalOverrideDefaultParameters_BendAllowance, true);
+                Require(status == 0, "Cannot override native body bend allowance: " + status);
+                // SW 2024 SP5 accepts the company .xlsx through the body feature's direct
+                // properties. Passing ICustomBendAllowance into Base Flange drops the file.
+                settings.BendAllowanceType = (int)swBendAllowanceTypes_e.swBendAllowanceBendTable;
+                settings.BendTableFile = bendTablePath;
+                committed = feature.ModifyDefinition(settings, doc, null);
+                Require(committed, "SolidWorks rejected the selected Sheet Metal bend table.");
+            }
+            finally { if (!committed) settings.ReleaseSelectionAccess(); }
+        }
+
+        private void VerifyManufacturingSettings(ModelDoc2 doc, double expectedThickness)
+        {
+            if (materialDatabasePath == null) return;
+            string configuration = doc.ConfigurationManager.ActiveConfiguration.Name;
+            string database;
+            string material = ((PartDoc)doc).GetMaterialPropertyName2(configuration, out database);
+            Require(string.Equals(materialName, material, StringComparison.Ordinal)
+                && string.Equals(Path.GetFileNameWithoutExtension(materialDatabasePath),
+                    Path.GetFileNameWithoutExtension(database), StringComparison.OrdinalIgnoreCase),
+                "SolidWorks did not retain the selected custom material. Read " + database + " / " + material);
+
+            var settings = FindSheetMetalFeature(doc).GetDefinition() as SheetMetalFeatureData;
+            Require(settings != null && Math.Abs(settings.Thickness - expectedThickness) <= 1e-8,
+                "SolidWorks did not retain the specified Sheet Metal thickness.");
+            var allowance = settings.GetCustomBendAllowance();
+            Require(allowance != null && allowance.Type == (int)swBendAllowanceTypes_e.swBendAllowanceBendTable
+                && string.Equals(allowance.BendTableFile, bendTablePath, StringComparison.OrdinalIgnoreCase),
+                "SolidWorks did not retain the selected bend table. Read " + allowance?.Type + " / " + allowance?.BendTableFile);
         }
 
         internal void WriteNewPackage(KadaiPlan plan, List<KadaiProfile3D> profiles, string directory,
@@ -164,6 +237,7 @@ namespace ADDIN.Commands.Kadai
                 Require(part != null, "Cannot load prototype Part for Assembly: " + partPath + " error/warning=" + error + "/" + warning);
                 Require(string.Equals(part.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase), "Part filename conflict with another open document.");
                 if (openedHere) openedParts.Add(partPath);
+                VerifyManufacturingSettings(part, profile.ThicknessMeters);
                 var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
                 var box = (double[])body.GetBodyBox();
                 double[] a = profile.AlongDirection, h = profile.HeightDirection;
