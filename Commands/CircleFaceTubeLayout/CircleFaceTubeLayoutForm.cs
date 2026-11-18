@@ -64,7 +64,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
             this.analyze = analyze;
             this.clearPreview = clearPreview;
             this.logLine = logLine;
-            Text = "Circle Along Face";
+            Text = "Circle Along Face V3 - Smart Overhang";
             Font = SystemFonts.MessageBoxFont;
             ClientSize = new Size(580, 545);
             AutoScaleMode = AutoScaleMode.Font;
@@ -150,7 +150,7 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
         {
             using (var done = new Form
             {
-                Text = "Circle Along Face",
+                Text = "Circle Along Face V3 - Smart Overhang",
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 AutoSize = true,
