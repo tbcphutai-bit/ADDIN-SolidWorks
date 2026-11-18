@@ -1,0 +1,205 @@
+// PR #62 / CHECK DRAWING ONLY
+// SOURCE TEMPLATE for Anti to integrate inside Commands/CheckDrawingBom.cs or as a
+// separate compiled file added explicitly to ADDIN.csproj (old-style .csproj).
+// Base: cfdfa94be9b1d76ac92714016b9e8e9677f9532a
+// This file in docs/ is NOT compiled automatically and changes NO runtime behavior.
+// No SOLIDWORKS COM here: deterministic, pure decision logic, easy to test.
+// Result polarity: true = pink toward viewer = ウラ; false = colored side = 表.
+
+using System;
+
+namespace ADDIN.Commands
+{
+    internal enum CdFlatSideChoice
+    {
+        UseWorkingCopy,
+        UseDirectRead,
+        Unknown
+    }
+
+    internal sealed class CdFlatSideProof
+    {
+        // These flags must be established independently from exact Drawing/View
+        // source + referenced Part/config/Display State, NOT copied from direct.Message.
+        public bool DrawingPathVerified { get; set; }
+        public bool ReferencedPartPathVerified { get; set; }
+        public bool ConfigurationVerified { get; set; }
+        public bool DisplayStateVerified { get; set; }
+        public bool FlatPatternBodyVerified { get; set; }
+        public bool FaceColorCompleteAndUnambiguous { get; set; }
+        public bool SourceFreshnessVerified { get; set; }
+
+        // A file timestamp, stable disk hash, or !GetSaveFlag() alone does NOT
+        // prove that a hidden Drawing View's cached geometry matches in-memory
+        // in-context edits. Anti must implement independent positive evidence.
+        public bool IsComplete
+        {
+            get
+            {
+                return DrawingPathVerified &&
+                       ReferencedPartPathVerified &&
+                       ConfigurationVerified &&
+                       DisplayStateVerified &&
+                       FlatPatternBodyVerified &&
+                       FaceColorCompleteAndUnambiguous &&
+                       SourceFreshnessVerified;
+            }
+        }
+    }
+
+    internal sealed class CdFlatSidePolicyInput
+    {
+        // OFF by default. Never infer true from the fact that the direct probe ran.
+        public bool PilotEnabled { get; set; }
+
+        public bool? DirectPinkFacingViewer { get; set; }
+        public bool? WorkingCopyPinkFacingViewer { get; set; }
+        public double WorkingCopyFrontPinkMm2 { get; set; }
+        public double WorkingCopyBackPinkMm2 { get; set; }
+
+        // Must be based on typed/structured failure reason, not arbitrary
+        // substring of a localized Warning message, when integrated for production.
+        public bool WorkingCopyBlockedSpecificallyByDirtyAssembly { get; set; }
+        public CdFlatSideProof DirectProof { get; set; }
+    }
+
+    internal sealed class CdFlatSidePolicyDecision
+    {
+        public CdFlatSideChoice Choice { get; private set; }
+        public bool? PinkFacingViewer { get; private set; }
+        public string Code { get; private set; }
+        public string Explanation { get; private set; }
+
+        public static CdFlatSidePolicyDecision Of(
+            CdFlatSideChoice choice, bool? pink, string code, string explanation)
+        {
+            return new CdFlatSidePolicyDecision
+            {
+                Choice = choice,
+                PinkFacingViewer = pink,
+                Code = code,
+                Explanation = explanation
+            };
+        }
+    }
+
+    internal static class CdFlatSidePilotPolicy
+    {
+        private const double AreaEpsilonMm2 = 0.000001;
+
+        public static CdFlatSidePolicyDecision Evaluate(CdFlatSidePolicyInput input)
+        {
+            if (input == null)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.Unknown, null,
+                    "INPUT_MISSING", "Cannot evaluate missing inputs.");
+
+            bool? direct = input.DirectPinkFacingViewer;
+            bool? legacy = input.WorkingCopyPinkFacingViewer;
+
+            // SHADOW contract: do not modify current CHECK DRAWING statuses.
+            if (!input.PilotEnabled)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.UseWorkingCopy,
+                    legacy, "SHADOW_LEGACY", "Pilot is OFF; retain Working Copy result.");
+
+            // Standalone Working Copy's ClassifyFlatPinkSide returns true when
+            // BOTH front and back are pink (because it returns 'front').
+            // That is ambiguous, not an independent proof of ウラ.
+            bool bothPink = input.WorkingCopyFrontPinkMm2 > AreaEpsilonMm2 &&
+                            input.WorkingCopyBackPinkMm2 > AreaEpsilonMm2;
+            if (bothPink)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.Unknown, null,
+                    "WC_BOTH_SIDES_PINK_AMBIGUOUS",
+                    "Working Copy painted both sides; cannot certify polarity.");
+
+            // Both readers can decide and disagree -> never arbitrarily choose.
+            if (direct.HasValue && legacy.HasValue && direct.Value != legacy.Value)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.Unknown, null,
+                    "DIRECT_WORKCOPY_DISAGREE",
+                    "Direct Read disagrees with a determinate Working Copy.");
+
+            // The proven legacy checker remains authoritative when determinate
+            // and unambiguous. This also covers agreement with Direct Read.
+            if (legacy.HasValue)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.UseWorkingCopy,
+                    legacy, "LEGACY_CONFIRMED",
+                    "Working Copy verified the view side.");
+
+            // The only proposed Direct promotion: a tightly-scoped PILOT in which
+            // legacy cannot run SPECIFICALLY because the reference Assembly is dirty.
+            // IMPORTANT: SourceFreshnessVerified requires real independent proof;
+            // do not automatically set it true for merely in-memory face readings.
+            if (direct.HasValue &&
+                input.WorkingCopyBlockedSpecificallyByDirtyAssembly &&
+                input.DirectProof != null &&
+                input.DirectProof.IsComplete)
+                return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.UseDirectRead,
+                    direct, "PILOT_DIRTY_ASSEMBLY_DIRECT_VERIFIED",
+                    "Dirty Assembly blocked Working Copy; independently verified Direct View.");
+
+            // Any other missing/ambiguous path retains the real legacy result
+            // (usually Warning), without pretending that a cached view is fresh.
+            return CdFlatSidePolicyDecision.Of(CdFlatSideChoice.UseWorkingCopy,
+                legacy, "DIRECT_PROMOTION_BLOCKED",
+                "Insufficient independent evidence to use Direct Read.");
+        }
+
+        // Synthetic tests for the policy ONLY. They are NOT a substitute for
+        // SOLIDWORKS 2024 SP5 live COM/view/face tests.
+        public static int RunSelfTests()
+        {
+            int count = 0;
+            CdFlatSideProof verified = new CdFlatSideProof {
+                DrawingPathVerified = true,
+                ReferencedPartPathVerified = true,
+                ConfigurationVerified = true,
+                DisplayStateVerified = true,
+                FlatPatternBodyVerified = true,
+                FaceColorCompleteAndUnambiguous = true,
+                SourceFreshnessVerified = true
+            };
+            CdFlatSideProof stale = new CdFlatSideProof {
+                DrawingPathVerified = true,
+                ReferencedPartPathVerified = true,
+                ConfigurationVerified = true,
+                DisplayStateVerified = true,
+                FlatPatternBodyVerified = true,
+                FaceColorCompleteAndUnambiguous = true,
+                SourceFreshnessVerified = false
+            };
+            Action<bool, string> require = (condition, name) =>
+            {
+                if (!condition) throw new InvalidOperationException("PR62 test failed: " + name);
+                count++;
+            };
+
+            CdFlatSidePolicyInput p = new CdFlatSidePolicyInput {
+                PilotEnabled = false, DirectPinkFacingViewer = false,
+                WorkingCopyPinkFacingViewer = null,
+                WorkingCopyBlockedSpecificallyByDirtyAssembly = true,
+                DirectProof = verified
+            };
+            require(Evaluate(p).Choice == CdFlatSideChoice.UseWorkingCopy, "shadow never promotes");
+            p.PilotEnabled = true;
+            require(Evaluate(p).Choice == CdFlatSideChoice.UseDirectRead, "controlled dirty-asm pilot");
+            p.DirectProof = stale;
+            require(Evaluate(p).Choice == CdFlatSideChoice.UseWorkingCopy, "stale source blocks");
+            p.DirectProof = verified;
+            p.WorkingCopyBlockedSpecificallyByDirtyAssembly = false;
+            require(Evaluate(p).Choice == CdFlatSideChoice.UseWorkingCopy, "non-dirty failure blocks");
+            p.WorkingCopyPinkFacingViewer = false;
+            require(Evaluate(p).Choice == CdFlatSideChoice.UseWorkingCopy, "agreement legacy");
+            p.WorkingCopyPinkFacingViewer = true;
+            require(Evaluate(p).Choice == CdFlatSideChoice.Unknown, "conflicting polarities fail closed");
+            p.WorkingCopyFrontPinkMm2 = 42109.7;
+            p.WorkingCopyBackPinkMm2 = 42239.0;
+            require(Evaluate(p).Code == "WC_BOTH_SIDES_PINK_AMBIGUOUS", "both sides pink");
+            p.WorkingCopyFrontPinkMm2 = 0;
+            p.WorkingCopyBackPinkMm2 = 0;
+            p.WorkingCopyPinkFacingViewer = null;
+            p.DirectPinkFacingViewer = null;
+            require(Evaluate(p).Choice == CdFlatSideChoice.UseWorkingCopy &&
+                    !Evaluate(p).PinkFacingViewer.HasValue, "two unknown readers remain unknown");
+            return count;
+        }
+    }
+}

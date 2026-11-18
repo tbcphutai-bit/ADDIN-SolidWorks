@@ -34,6 +34,77 @@ namespace ADDIN.Commands
             ExportReport(result, null, false);
         }
 
+        public static string ResolveDefaultReportPath(DrawingBatchCheckResult result)
+        {
+            if (result != null && !string.IsNullOrWhiteSpace(result.ReportPath))
+                return Path.GetFullPath(result.ReportPath);
+
+            string root = (result != null && !string.IsNullOrWhiteSpace(result.ReportDirectory))
+                ? result.ReportDirectory
+                : Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "TAI_TOOL",
+                    "CHECK_DRAWING");
+
+            string output = Path.Combine(
+                root,
+                DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + "_" + Guid.NewGuid().ToString("N").Substring(0, 6));
+
+            return Path.Combine(output, "CHECK_DRAWING.xlsx");
+        }
+
+        public static string FormatReadableSource(string source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+                return "Chưa xác định";
+
+            string key = source.Trim();
+            switch (key.ToUpperInvariant())
+            {
+                case "PROPERTY_RESOLVED_REFERENCE_ONLY":
+                    return "Property của Part tham chiếu (chưa xác minh chữ hiển thị)";
+                case "DRAWING_DISPLAY_VERIFIED":
+                    return "Chữ hiển thị trực tiếp trên Drawing";
+                case "DRAWING_RAW_LINK":
+                case "DRAWING_GOBAN_LINK_INVALID":
+                    return "Ô bảng trên Drawing (mất liên kết Property)";
+                case "DRAWING_DISPLAY_UNAVAILABLE":
+                case "DISPLAY_UNAVAILABLE":
+                case "DRAWING_TABLE_DISPLAY_UNAVAILABLE":
+                    return "Chưa đọc được chữ hiển thị (chế độ Silent)";
+                case "DRAWING_GOBAN_LINK_UNVERIFIED":
+                    return "Chưa xác minh được liên kết trên Drawing";
+                case "PROPERTY_BOM_MISMATCH":
+                    return "Đối chiếu Property của Part và BOM";
+                case "MODEL_PROPERTY_MANUAL":
+                    return "Custom Property của Part (nhập tay)";
+                case "MODEL_PROPERTY_LINK_REQUIRED":
+                    return "Custom Property của Part (mất liên kết bắt buộc)";
+                case "DRAWING_FLAT_SIDE":
+                case "DRAWING_FLAT_SIDE_API_ERROR":
+                    return "Kiểm tra mặt trải phẳng (表/ウラ)";
+                case "BOM_QUANTITY":
+                    return "Số lượng từ dòng BOM";
+                case "DRAWING_PART_DIMENSION_MATCH":
+                case "DRAWING_PART_BOM_DIMENSION_MATCH":
+                case "DRAWING_PART_DIMENSION_MISMATCH":
+                    return "Đối chiếu kích thước Drawing 2D và Part 3D";
+                case "DRAWING_PART_BOM_DIMENSION_MISMATCH":
+                    return "Đối chiếu kích thước Drawing 2D, Part 3D và BOM";
+                case "DRAWING_DIMENSION_UNVERIFIED":
+                    return "Chưa đọc được kích thước trên Drawing 2D";
+                case "PART_DIMENSION_UNVERIFIED":
+                case "DRAWING_AND_PART_DIMENSION_UNVERIFIED":
+                    return "Chưa xác minh được Custom Property của Part 3D";
+                case "MANUAL_OR_STATIC":
+                    return "Giá trị đọc trên Drawing";
+                default:
+                    if (key.StartsWith("SHEET_VIEW:", StringComparison.OrdinalIgnoreCase))
+                        return "View tham chiếu trên Sheet Drawing";
+                    return key;
+            }
+        }
+
         public static void ExportToFile(DrawingBatchCheckResult result, string outputPath)
         {
             if (string.IsNullOrWhiteSpace(outputPath))
@@ -529,15 +600,19 @@ namespace ADDIN.Commands
                        StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string GetEffectiveSummaryStatus(DrawingCheckItemResult item)
+        internal static string GetEffectiveSummaryStatus(DrawingCheckItemResult item)
         {
-            return (item?.Status ?? DrawingBomCheckStatus.Warning).ToString();
+            if (item == null) return "Warning";
+            if (item.Status == DrawingBomCheckStatus.NotApplicable) return "N/A";
+            return item.Status.ToString();
         }
 
-        private static string GetEffectiveFieldStatus(
+        internal static string GetEffectiveFieldStatus(
             string fieldName, DrawingBomFieldResult field)
         {
-            return field == null ? "-" : field.Status.ToString();
+            if (field == null) return "-";
+            if (field.Status == DrawingBomCheckStatus.NotApplicable) return "N/A";
+            return field.Status.ToString();
         }
 
         private static bool ContainsField(
@@ -923,12 +998,13 @@ namespace ADDIN.Commands
             // Grouped blocks intentionally have no AutoFilter.
         }
 
-        private static string GobanFriendlyStatus(DrawingBomCheckStatus status)
+        internal static string GobanFriendlyStatus(DrawingBomCheckStatus status)
         {
             switch (status)
             {
-                case DrawingBomCheckStatus.OK: return "Đúng";
-                case DrawingBomCheckStatus.NG: return "Sai";
+                case DrawingBomCheckStatus.OK: return "OK";
+                case DrawingBomCheckStatus.NG: return "NG";
+                case DrawingBomCheckStatus.NotApplicable: return "N/A";
                 default: return "Chưa xác minh";
             }
         }
@@ -966,7 +1042,7 @@ namespace ADDIN.Commands
                     rows.Add(new object[] {
                         "COMPONENT INo " + item.BomItemNumber +
                         " | " + (item.Component ?? "") + " | " + file +
-                        " | Kết quả tổng: " + GobanFriendlyStatus(item.Status),
+                        " | Kết quả tổng: " + GetEffectiveSummaryStatus(item),
                         null, null, null, null, null, null, null, null, null, null
                     });
 
@@ -978,7 +1054,7 @@ namespace ADDIN.Commands
 
                         rows.Add(new object[] {
                             index, field.FieldName, field.DisplayOrReferenceValue,
-                            field.DisplayOrReferenceSource, field.DrawingRaw,
+                            FormatReadableSource(field.DisplayOrReferenceSource), field.DrawingRaw,
                             field.PropertyValue, field.BomValue,
                             GobanFriendlyStatus(field.LinkStatus),
                             GobanFriendlyStatus(field.PropertyStatus),
@@ -1073,7 +1149,8 @@ namespace ADDIN.Commands
             string status, string address)
         {
             string key = (status ?? "").Trim().ToUpperInvariant();
-            if (key != "OK" && key != "NG" && key != "WARNING")
+            if (key == "N/A" || key == "-") key = "NOTAPPLICABLE";
+            if (key != "OK" && key != "NG" && key != "WARNING" && key != "NOTAPPLICABLE")
                 return;
             List<string> addresses;
             if (!ranges.TryGetValue(key, out addresses))
@@ -1778,6 +1855,23 @@ namespace ADDIN.Commands
 
                 range.Font.Bold =
                     true;
+            }
+            else if (normalized == "NOTAPPLICABLE" || normalized == "N/A" || normalized == "-")
+            {
+                range.Interior.Color =
+                    Rgb(
+                        245,
+                        245,
+                        245);
+
+                range.Font.Color =
+                    Rgb(
+                        128,
+                        128,
+                        128);
+
+                range.Font.Bold =
+                    false;
             }
         }
 
