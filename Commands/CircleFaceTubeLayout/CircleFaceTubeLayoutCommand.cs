@@ -44,7 +44,9 @@ namespace ADDIN.Commands.CircleFaceTubeLayout
                 path = Path.Combine(folder, "TUBE_FACE_" + DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", CultureInfo.InvariantCulture) + ".log");
                 writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read),
                     new UTF8Encoding(false)) { AutoFlush = true };
-                Log("START solver=2 addin=" + GetType().Assembly.FullName);
+                Log("START solver=3 addin=" + GetType().Assembly.FullName +
+                    " assembly_path=" + GetType().Assembly.Location +
+                    " MVID=" + GetType().Module.ModuleVersionId);
                 Log("SOLIDWORKS revision=" + app?.RevisionNumber());
                 model = app?.ActiveDoc as ModelDoc2;
                 if (model == null || (model.GetType() != (int)swDocumentTypes_e.swDocPART &&
