@@ -15,6 +15,7 @@ Không sửa hoặc thay DLL XTool, TAI TOOL hay KIKUKAWA CAD. Không thay logic
 
 - SolidWorks Professional 2024 SP5.0; executable/interop cài đặt `32.5.0.48`.
 - Kadai branch: `feature/kadai-parametric-panel-ribs-20261117`; code nền đã kiểm thử: `7139a704d0e9082fa4f245a5ae696c8f8119a03f`.
+- Commit công cụ điều tra và kết quả đối chứng: `ce3aea441e1240f105fcd91e16c50b0b6dc25756`. Không deploy commit này vào DLL production.
 - Module liên quan: `%LOCALAPPDATA%\XTool\XToolPro-Parallel-Test\XToolProParallelTest.dll`.
 - Assembly: `XToolProParallelTest, Version=3.3.46.222, Culture=neutral, PublicKeyToken=null`.
 - MVID: `50f769b6-9e8c-48a2-8c7b-ba82855121b5`.
