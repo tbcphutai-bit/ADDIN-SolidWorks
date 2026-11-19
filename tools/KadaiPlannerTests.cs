@@ -4,7 +4,7 @@ using ADDIN.Commands.Kadai;
 public static class KadaiPlannerTests
 {
     static int checks;
-    static void Check(bool value, string name) { checks++; if (!value) throw new Exception(name); }
+    static void Check(bool value, string name) { checks++; if (!value) { Console.Error.WriteLine(name); throw new Exception(name); } }
     static void Reject(Action action, string name) { try { action(); } catch (ArgumentException) { checks++; return; }
         catch (InvalidOperationException) { checks++; return; } throw new Exception("Did not reject " + name); }
     public static int Main()
@@ -19,6 +19,13 @@ public static class KadaiPlannerTests
         }
         var singleton = KadaiPlanner.Build(new KadaiRequest { LongRibCount = 1, CrossRibCount = 1 });
         Check(singleton.LongRibs[0].CoordinateMm == 1125 && singleton.CrossRibs[0].CoordinateMm == 725, "Centered singleton");
+        var baseLayout = KadaiPlanner.Build(new KadaiRequest { StartClearanceMm = 50, EndClearanceMm = 80 });
+        Check(baseLayout.LongRibs.First().CoordinateMm == 50 && baseLayout.LongRibs.Last().CoordinateMm == 2250 - 80,
+            "Exact offsets from the U edges");
+        Check(baseLayout.CrossRibs.First().CoordinateMm == 50 && baseLayout.CrossRibs.Last().CoordinateMm == 1450 - 80,
+            "Exact offsets from the V edges");
+        Check(KadaiPlanner.EvenPositions(1000, 50, 150, 3).SequenceEqual(new[] { 50d, 450, 850 }), "Asymmetric equal pitch");
+        Reject(() => KadaiPlanner.Build(new KadaiRequest { StartClearanceMm = 100, EndClearanceMm = 1400 }), "base clearances consume span");
         var kf = KadaiPlanner.Build(KadaiRequest.ForPreset("KF3"));
         Check(kf.Warnings.Any(x => x.Contains("zero nominal")), "Zero clearance warning");
         var mutable = new KadaiRequest(); var snapshot = KadaiPlanner.Build(mutable); mutable.LongRibCount = 99;

@@ -24,6 +24,9 @@ namespace ADDIN.Commands.Kadai
         public KadaiPanelSource Source;
         public int HeightAxis, HeightSign;
         public double PlaneCoordinateMm;
+        public double[] BoundsInPanelMeters;
+        public double MinPanelHeightMm;
+        public string MaterialName, MaterialDatabase;
     }
 
     internal sealed class KadaiProfile3D

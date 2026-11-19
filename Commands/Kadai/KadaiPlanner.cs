@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text;
 
 namespace ADDIN.Commands.Kadai
 {
@@ -19,6 +18,13 @@ namespace ADDIN.Commands.Kadai
         public int CrossRibCount = 4;
         public double LongEndMarginMm = 50;
         public double CrossEndMarginMm = 150.9;
+        public double? StartClearanceMm;
+        public double? EndClearanceMm;
+        public KadaiRibDirection? PanelRibDirection;
+        public bool OpensAtBottom(KadaiRibDirection direction)
+        {
+            return direction == (PanelRibDirection ?? KadaiRibDirection.Longitudinal);
+        }
         public double LongThicknessMm = 1.6;
         public double CrossThicknessMm = 1.6;
         public double LongSlotExtraMm = 0.2; // TOTAL extra width in notch on long rib
@@ -77,24 +83,6 @@ namespace ADDIN.Commands.Kadai
         public readonly List<KadaiSlotPlan> CandidateSlots = new List<KadaiSlotPlan>();
         public readonly List<string> Warnings = new List<string>();
         public int CrossingCount { get { return checked(LongRibs.Count * CrossRibs.Count); } }
-        public string ToReport()
-        {
-            var s = new StringBuilder();
-            s.AppendLine("KADAI / P0 layout only - NOT SolidWorks geometry");
-            s.AppendLine("Preset: " + Settings.Preset);
-            s.AppendLine("Longitudinal: " + LongRibs.Count + " / Transverse: " + CrossRibs.Count);
-            s.AppendLine("Candidate intersections: " + CrossingCount);
-            s.AppendLine("Potential notch regions (2 per crossing): " + CandidateSlots.Count);
-            s.AppendLine("3D positions identify rib CENTER planes; calibrate datum/margins against the selected panel.");
-            s.AppendLine("Long notch width: " + F(Settings.CrossThicknessMm + Settings.LongSlotExtraMm) + " mm");
-            s.AppendLine("Cross notch width: " + F(Settings.LongThicknessMm + Settings.CrossSlotExtraMm) + " mm");
-            s.AppendLine("Long positions (mm): " + string.Join(", ", LongRibs.Select(p => F(p.CoordinateMm))));
-            s.AppendLine("Cross positions (mm): " + string.Join(", ", CrossRibs.Select(p => F(p.CoordinateMm))));
-            foreach (var w in Warnings) s.AppendLine("WARNING: " + w);
-            s.AppendLine("Layout contains no CAD profiles/cuts. Use Preview 3D; production Apply/Export remain locked.");
-            return s.ToString();
-        }
-        private static string F(double n) { return n.ToString("0.###", CultureInfo.InvariantCulture); }
     }
 
     internal static class KadaiPlanner
@@ -125,13 +113,20 @@ namespace ADDIN.Commands.Kadai
                 throw new ArgumentOutOfRangeException("count", "Count must be 1..100.");
             if ((long)settings.LongRibCount * settings.CrossRibCount > 2000)
                 throw new InvalidOperationException("Maximum preview budget is 2000 crossings.");
-            if (2 * settings.LongEndMarginMm >= settings.LengthXmm
-                || 2 * settings.CrossEndMarginMm >= settings.LengthZmm)
-                throw new ArgumentException("Margins overlap. Reduce margin or enlarge the span.");
+            if (settings.StartClearanceMm.HasValue != settings.EndClearanceMm.HasValue)
+                throw new ArgumentException("Nhập cả khoảng chừa đầu và khoảng chừa cuối.");
+            double uStart = settings.StartClearanceMm ?? settings.LongEndMarginMm;
+            double uEnd = settings.EndClearanceMm ?? settings.LongEndMarginMm;
+            double vStart = settings.StartClearanceMm ?? settings.CrossEndMarginMm;
+            double vEnd = settings.EndClearanceMm ?? settings.CrossEndMarginMm;
+            Nonnegative(uStart, "Khoảng chừa đầu");
+            Nonnegative(uEnd, "Khoảng chừa cuối");
+            if (uStart + uEnd >= settings.LengthXmm || vStart + vEnd >= settings.LengthZmm)
+                throw new ArgumentException("Hai khoảng chừa chiếm hết chiều dài base. Giảm khoảng chừa đầu hoặc cuối.");
 
             var plan = new KadaiPlan { Settings = settings };
-            var xs = EvenPositions(settings.LengthXmm, settings.LongEndMarginMm, settings.LongRibCount);
-            var zs = EvenPositions(settings.LengthZmm, settings.CrossEndMarginMm, settings.CrossRibCount);
+            var xs = EvenPositions(settings.LengthXmm, uStart, uEnd, settings.LongRibCount);
+            var zs = EvenPositions(settings.LengthZmm, vStart, vEnd, settings.CrossRibCount);
             for (int i = 0; i < xs.Count; i++)
                 plan.LongRibs.Add(new KadaiRibPosition
                 {
@@ -176,11 +171,11 @@ namespace ADDIN.Commands.Kadai
             if (settings.LongRibCount == 1 || settings.CrossRibCount == 1)
                 plan.Warnings.Add("One-rib configuration is centered; review the mating arrangement.");
             if (settings.LongRibCount > 1
-                && (settings.LengthXmm - 2 * settings.LongEndMarginMm) / (settings.LongRibCount - 1)
+                && (settings.LengthXmm - uStart - uEnd) / (settings.LongRibCount - 1)
                    <= settings.LongThicknessMm)
                 plan.Warnings.Add("Long rib pitch is not greater than thickness.");
             if (settings.CrossRibCount > 1
-                && (settings.LengthZmm - 2 * settings.CrossEndMarginMm) / (settings.CrossRibCount - 1)
+                && (settings.LengthZmm - vStart - vEnd) / (settings.CrossRibCount - 1)
                    <= settings.CrossThicknessMm)
                 plan.Warnings.Add("Cross rib pitch is not greater than thickness.");
             plan.Warnings.Add("Widths are orthogonal nominal PREVIEW formulas, not verified cuts at oblique joints.");
@@ -190,10 +185,17 @@ namespace ADDIN.Commands.Kadai
 
         internal static List<double> EvenPositions(double extent, double margin, int count)
         {
+            return EvenPositions(extent, margin, margin, count);
+        }
+
+        internal static List<double> EvenPositions(double extent, double start, double end, int count)
+        {
             var result = new List<double>();
-            if (count == 1) { result.Add(extent / 2); return result; }
-            double span = extent - 2 * margin;
-            for (int i = 0; i < count; i++) result.Add(margin + span * i / (count - 1));
+            double span = extent - start - end;
+            if (count == 1) { result.Add((extent + (start - end)) / 2); return result; }
+            result.Add(start);
+            for (int i = 1; i < count - 1; i++) result.Add(start + span * i / (count - 1));
+            result.Add(extent - end);
             return result;
         }
         private static string StationKey(string direction, int heightAxis, double worldCoordinateMm)

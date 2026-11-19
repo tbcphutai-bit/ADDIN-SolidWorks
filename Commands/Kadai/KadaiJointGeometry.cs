@@ -28,13 +28,15 @@ namespace ADDIN.Commands.Kadai
 
             double seam = seamMm * .001;
             double clearance = depthClearanceMm * .001;
-            var specifications = plan.CandidateSlots.ToLookup(slot => slot.OwnerRibId);
+            var specifications = plan.CandidateSlots.Where(slot => !plan.Settings.PanelRibDirection.HasValue ||
+                HasCrossing(byId[slot.OwnerRibId], byId[slot.CrossingRibId])).ToLookup(slot => slot.OwnerRibId);
             var result = new Dictionary<string, List<KadaiJointCut>>();
             foreach (var profile in profiles)
             {
                 var rib = ribs[profile.RibId];
                 bool isLong = rib.Direction == KadaiRibDirection.Longitudinal;
                 var settings = plan.Settings;
+                bool opensAtBottom = settings.OpensAtBottom(rib.Direction);
                 double expected = (isLong ? settings.LongThicknessMm : settings.CrossThicknessMm) * .001;
                 if (profile.Direction != rib.Direction || !Finite(profile.ThicknessMeters)
                     || Math.Abs(profile.ThicknessMeters - expected) > GeometryTolerance)
@@ -75,26 +77,42 @@ namespace ADDIN.Commands.Kadai
                     double halfWidth = slot.WidthMm * .0005;
                     double left = center - halfWidth, right = center + halfWidth;
                     if (left - previousRight < minWeb || end - right < minWeb)
-                        throw new InvalidOperationException(slot.Id + ": rãnh vượt biên hoặc quá gần đầu thanh/rãnh kế bên.");
+                        throw new InvalidOperationException("Rãnh " + rib.Id + " / " + mate.RibId
+                            + " quá sát đầu thanh hoặc rãnh kế bên. Đổi khoảng chừa hoặc số thanh.");
 
                     var heights = points.Take(contourCount).Where(p => p[0] > left && p[0] < right)
                         .Select(p => p[1]).Concat(new[] { HeightAt(points, contourCount, left), HeightAt(points, contourCount, right) });
                     if (seam - clearance < minWeb || heights.Min() - seam < minWeb)
                         throw new InvalidOperationException(slot.Id + ": thiếu vật liệu quanh mặt ghép hoặc độ hở sâu quá lớn.");
 
-                    // Long ribs have an open bottom slot. Cross ribs move up from below,
-                    // with an open top slot that overlaps the lower cut by clearance.
                     cuts.Add(new KadaiJointCut { SlotId = slot.Id, MatingRibId = slot.CrossingRibId,
-                        Left = left, Right = right, Bottom = isLong ? -SketchOverrun : seam - clearance,
-                        Top = isLong ? seam : heights.Max() + SketchOverrun });
+                        Left = left, Right = right, Bottom = opensAtBottom ? -SketchOverrun : seam - clearance,
+                        Top = opensAtBottom ? seam : heights.Max() + SketchOverrun });
                     previousRight = right;
                 }
-                int expectedCuts = isLong ? plan.CrossRibs.Count : plan.LongRibs.Count;
+                int expectedCuts = settings.PanelRibDirection.HasValue ? specifications[rib.Id].Count()
+                    : (isLong ? plan.CrossRibs.Count : plan.LongRibs.Count);
                 if (cuts.Count != expectedCuts || cuts.Select(cut => cut.MatingRibId).Distinct().Count() != expectedCuts)
                     throw new InvalidOperationException(rib.Id + ": thiếu hoặc trùng rãnh ghép.");
                 result.Add(rib.Id, cuts);
             }
             return result;
+        }
+
+        private static bool HasCrossing(KadaiProfile3D a, KadaiProfile3D b)
+        {
+            double aStart = Dot(a.PointsWorldMeters[0], a.AlongDirection);
+            double aEnd = Dot(a.PointsWorldMeters[a.PointsWorldMeters.Count - 2], a.AlongDirection);
+            double atB = Dot(b.PointsWorldMeters[0], a.AlongDirection);
+            double bStart = Dot(b.PointsWorldMeters[0], b.AlongDirection);
+            double bEnd = Dot(b.PointsWorldMeters[b.PointsWorldMeters.Count - 2], b.AlongDirection);
+            double atA = Dot(a.PointsWorldMeters[0], b.AlongDirection);
+            if (atB >= aStart && atB <= aEnd && atA >= bStart && atA <= bEnd) return true;
+            if (atB + b.ThicknessMeters / 2 > aStart + GeometryTolerance && atB - b.ThicknessMeters / 2 < aEnd - GeometryTolerance
+                && atA + a.ThicknessMeters / 2 > bStart + GeometryTolerance && atA - a.ThicknessMeters / 2 < bEnd - GeometryTolerance)
+                throw new InvalidOperationException(a.RibId + " / " + b.RibId
+                    + " chạm sát đầu thanh, không đủ chỗ tạo rãnh. Đổi khoảng chừa.");
+            return false;
         }
 
         internal static double[][] LocalPoints(KadaiProfile3D profile, double bottomMm)
@@ -118,7 +136,7 @@ namespace ADDIN.Commands.Kadai
                 var points = LocalPoints(blank, bottom);
                 int contourCount = points.Length - 2;
                 var perimeter = new List<double[]>();
-                if (blank.Direction == KadaiRibDirection.Longitudinal)
+                if (plan.Settings.OpensAtBottom(blank.Direction))
                 {
                     perimeter.AddRange(points.Take(contourCount + 1));
                     foreach (var cut in joints[blank.RibId].AsEnumerable().Reverse())
@@ -159,32 +177,6 @@ namespace ADDIN.Commands.Kadai
                 result.Add(notched);
             }
             return result;
-        }
-
-        internal static string SuggestMargins(KadaiPlan plan, IList<KadaiProfile3D> profiles)
-        {
-            var settings = plan.Settings;
-            double longMargin = settings.LongEndMarginMm;
-            double crossMargin = settings.CrossEndMarginMm;
-            foreach (var profile in profiles)
-            {
-                bool isLong = profile.Direction == KadaiRibDirection.Longitudinal;
-                double datum = isLong ? settings.OriginVmm : settings.OriginUmm;
-                double span = isLong ? settings.LengthZmm : settings.LengthXmm;
-                var coordinates = profile.PointsWorldMeters.Select(p => Dot(p, profile.AlongDirection) * 1000 - datum);
-                double slotWidth = isLong ? settings.CrossThicknessMm + settings.LongSlotExtraMm
-                    : settings.LongThicknessMm + settings.CrossSlotExtraMm;
-                double reserve = slotWidth / 2 + profile.ThicknessMeters * 1000 + .01;
-                double margin = Math.Ceiling(Math.Max(coordinates.Min() + reserve, span - coordinates.Max() + reserve) * 10) / 10;
-                if (isLong) crossMargin = Math.Max(crossMargin, margin);
-                else longMargin = Math.Max(longMargin, margin);
-            }
-            if (longMargin >= settings.LengthXmm / 2 || crossMargin >= settings.LengthZmm / 2)
-                return "Không tìm được khoảng chung đối xứng trên các contour hiện tại.";
-            if (longMargin == settings.LongEndMarginMm && crossMargin == settings.CrossEndMarginMm)
-                return string.Empty;
-            return "Gợi ý từ các contour hiện tại: lề dọc " + longMargin.ToString("0.0")
-                + " mm, lề ngang " + crossMargin.ToString("0.0") + " mm. Đổi lề rồi Preview lại để kiểm tra.";
         }
 
         private static double HeightAt(double[][] points, int count, double coordinate)

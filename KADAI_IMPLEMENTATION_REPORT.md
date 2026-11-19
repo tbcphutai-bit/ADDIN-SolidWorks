@@ -175,3 +175,23 @@ Preview thử lề đang nhập trước. Với tùy chọn tự tìm lề, các
 Build Debug/Release x64 trên nhánh và source TAI TOOL đạt. Đối chiếu 47.298 mục IL/metadata/tài nguyên ngoài Kadai cho 0 sai khác. Các file trên nhánh gồm `KadaiCadContracts.cs`, `KadaiPlanner.cs`, `KadaiJointGeometry.cs`, `KadaiPreviewBackend.cs`, `UI/KadaiForm.cs` và `tools/KadaiJointGeometryTests.cs`. Log kiểm thử nằm trong thư mục local `kadai-assembly-6866/face-pick-cad-02`. **Apply vẫn khóa.**
 
 TAI TOOL đã được cập nhật khi SolidWorks đóng. DLL cài có MVID `103a06d5-5a5a-4ca1-86b9-127315f818e1` và SHA256 `72677A85918D84100A2C6261F252C15FC3A74C1AA26E789C4C1D7828F339BFDF`, khớp bản ứng viên đã kiểm thử. Cùng đợt này bản cài nhận code writer thử ST từ mục 8. Đối chiếu 31 file nguồn 6866 cho 0 sai khác và t7 khớp bản sao tham chiếu.
+
+## 10. Bố trí theo mép base và chọn phương bám panel
+
+Giao diện giữ thao tác chọn hai mặt, số thanh dọc/ngang, hai khoảng chừa áp dụng chung và chọn **Dọc** hoặc **Ngang** bám panel. Sơ đồ dùng chiều dài các thanh preview thực tế. Trạng thái ngắn thay khung log. Các preset, mục thông số nâng cao, ô chiều dày riêng và nút tính layout 2D đã bỏ khỏi form.
+
+Mỗi phương đo khoảng chừa từ biên của mặt base đã chọn đến tim thanh đầu và cuối. Pitch bằng chiều dài đo theo phương bố trí trừ hai khoảng chừa, chia cho số khoảng giữa các thanh. Một thanh đặt ở giữa phạm vi sau khi trừ hai khoảng chừa. Kadai lấy cực trị hình học của mặt base trong hệ Part panel, rồi giới hạn các thanh theo biên mặt thật. Thanh bám panel lấy tiết diện từ panel và mở rãnh từ đáy. Thanh vuông góc có đỉnh thẳng dưới panel và mở rãnh từ trên. Lưới giữ nguyên khoảng chừa người dùng nhập. Vị trí ngoài biên thanh không sinh rãnh. Vị trí giao sát đầu thanh và thiếu chỗ tạo rãnh dừng Preview, báo cặp thanh cụ thể. [API đo điểm trên mặt SolidWorks](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.iface2~getclosestpointon.html)
+
+Preview dùng chiều dày thanh chung 1,6 mm và độ hở rãnh tổng 0,2 mm theo mẫu 4315. Phần đỉnh thẳng lấy mốc 170 mm và giảm khi cần để chừa ít nhất 1 mm dưới điểm thấp nhất của panel. Cao độ ghép lấy mốc 100 mm hoặc điểm giữa khi thanh đỡ thấp hơn. Đây là quy tắc đang dùng cho Preview. Đọc lại vật liệu custom dùng cặp tên vật liệu và thư viện gán cho configuration của base. Cả hai base bản sao trả về `kiku_板材_材料 2019 / StSA-`.
+
+| Assembly bản sao, 11 dọc × 6 ngang | Kết quả trên SOLIDWORKS 2024 SP5.0 |
+|---|---|
+| 4315-KDA1, mặt bs1 | Chừa 50/80 mm. Hai phương bám panel đều đạt. Pitch 212 mm và 126 mm. Có 38 vị trí giao thực tế trên 66 giao điểm lưới. |
+| 6866, mặt bs-new | Chừa 50/50 mm. Hai phương đều đạt. Pitch 215 mm và 270 mm. Có 48 vị trí giao thực tế trên 66 giao điểm lưới. |
+| 6866, đối chứng 50/80 mm | Preview báo rãnh L-010 / C-006 sát đầu thanh. Khoảng chừa nhập giữ nguyên. |
+
+Đo tim thanh trong hình học preview xác nhận hai khoảng chừa và pitch. Kiểm tra SolidWorks Modeler không phát hiện giao thể tích giữa hai nhóm thanh xẻ rãnh ở các lượt đạt. Test form xác nhận bốn ô số, một lựa chọn phương bám panel và Apply bị khóa. Save flag và update stamp không đổi qua lượt Preview. Build Debug/Release x64 đạt. Log local nằm trong `kadai-assembly-6866/base-layout-cad-03`. Các file sửa thuộc Kadai và hai test planner/joint. **Apply vẫn khóa.**
+
+Bản cài TAI TOOL có MVID `ac27e86c-189c-41c9-ab0e-0bf7e638230a` và SHA256 `50B4A9587AC368337117208BD20220C95898ECDC3E88B673DABD25A85CA348D0`. Đối chiếu DLL đang dùng trước đợt này, bản dựng kiểm thử và DLL cài không thấy sai khác qua 47.274 mục IL/metadata/tài nguyên ngoài Kadai. Đã sao lưu DLL/PDB và đúng năm file nguồn Kadai trước khi cài.
+
+Lượt cuối nạp đúng DLL từ đường dẫn cài đặt và chạy lại trên bản sao mới của file 6866 đã lưu ngày 19/11/2026. Kết quả hình học và UI trùng bảng trên. 17 file CAD nguồn của bộ 6866 khớp SHA256 trước và sau lượt thử. Log local bắt đầu ở `kadai-assembly-6866/base-layout-cad-04/run.log`.

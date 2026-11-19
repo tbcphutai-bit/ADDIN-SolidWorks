@@ -15,6 +15,8 @@ namespace ADDIN.Commands.Kadai
         {
             public KadaiPlan Plan;
             public List<KadaiProfile3D> Profiles;
+            public List<KadaiProfile3D> Blanks;
+            public int JoinedCrossings;
         }
 
         private readonly ISldWorks app;
@@ -100,8 +102,14 @@ namespace ADDIN.Commands.Kadai
             double mid = (bounds[axis] + bounds[axis + 3]) / 2;
             if (Math.Abs(mid - planeCoordinate) <= 1e-6)
                 throw new InvalidOperationException("Mặt đế trùng mặt panel. Chọn mặt tỳ khác.");
-            return new KadaiBaseDatum { Source = selected, HeightAxis = axis,
-                HeightSign = mid > planeCoordinate ? 1 : -1, PlaneCoordinateMm = planeCoordinate * 1000 };
+            int sign = mid > planeCoordinate ? 1 : -1;
+            string materialDatabase;
+            string material = ((PartDoc)selected.PanelPart).GetMaterialPropertyName2(selected.PanelConfiguration, out materialDatabase);
+            return new KadaiBaseDatum { Source = selected, HeightAxis = axis, HeightSign = sign,
+                PlaneCoordinateMm = planeCoordinate * 1000,
+                BoundsInPanelMeters = MeasureBounds(face, selected, panel),
+                MinPanelHeightMm = sign * (bounds[sign > 0 ? axis : axis + 3] - planeCoordinate) * 1000,
+                MaterialName = material, MaterialDatabase = materialDatabase };
         }
 
         private static double[] IntoPanelFrame(double[] value, double[] from, double[] panel, bool point)
@@ -162,6 +170,11 @@ namespace ADDIN.Commands.Kadai
         internal static double[] Unit(int axis) { var p = new double[3]; p[axis] = 1; return p; }
         internal double[] MeasureBounds(Face2 face)
         {
+            return MeasureBounds(face, null, null);
+        }
+
+        private double[] MeasureBounds(Face2 face, KadaiPanelSource from, KadaiPanelSource to)
+        {
             CheckThread();
             Body2 sheet = null;
             try {
@@ -170,15 +183,23 @@ namespace ADDIN.Commands.Kadai
                 var bounds = new double[6];
                 for (int axis = 0; axis < 3; axis++) foreach (int sign in new[] { -1, 1 }) {
                     var direction = Unit(axis); direction[axis] = sign;
+                    direction = IntoPanelFrame(direction, to?.ComponentPlacement, from?.ComponentPlacement, false);
                     double x, y, z;
                     if (!sheet.GetExtremePoint(direction[0], direction[1], direction[2], out x, out y, out z))
                         throw new InvalidOperationException("Không đo được cực trị face.");
-                    bounds[axis + (sign > 0 ? 3 : 0)] = new[] { x, y, z }[axis];
+                    var point = IntoPanelFrame(new[] { x, y, z }, from?.ComponentPlacement, to?.ComponentPlacement, true);
+                    bounds[axis + (sign > 0 ? 3 : 0)] = point[axis];
                 }
                 return bounds;
             } finally { ReleaseOwned(sheet); }
         }
         public List<KadaiProfile3D> CalculateProfiles(KadaiPlan plan, KadaiPanelSource panel)
+        {
+            return CalculateProfiles(plan, panel, null, 0);
+        }
+
+        private List<KadaiProfile3D> CalculateProfiles(KadaiPlan plan, KadaiPanelSource panel,
+            KadaiBaseDatum datum, double straightHeightMm)
         {
             CheckThread();
             var face = Resolve(panel);
@@ -186,6 +207,7 @@ namespace ADDIN.Commands.Kadai
                 throw new NotSupportedException("P2 chưa hỗ trợ face có lỗ/nhiều loop; chọn một face liên tục.");
             var surface = (Surface)face.GetSurface();
             var modeler = (Modeler)app.GetModeler();
+            var baseFace = datum == null ? null : Resolve(datum.Source);
             var settings = plan.Settings;
             int h = settings.HeightAxis, sign = settings.HeightSign, u = UAxis(h), v = VAxis(h);
             double[] box = (double[])face.GetBox();
@@ -197,9 +219,26 @@ namespace ADDIN.Commands.Kadai
                 double start = (longitudinal ? settings.OriginVmm : settings.OriginUmm) * .001;
                 double span = (longitudinal ? settings.LengthZmm : settings.LengthXmm) * .001;
                 double fixedCoordinate = ((longitudinal ? settings.OriginUmm : settings.OriginVmm) + rib.CoordinateMm) * .001;
-                Func<double, double[]> intersect = coordinate => Intersect(face, surface, modeler,
-                    h, along, across, coordinate, fixedCoordinate, box[h] - 1, box[h + 3] + 1,
-                    sign * settings.GapToPanelMm * .001);
+                bool followsPanel = datum == null || rib.Direction == settings.PanelRibDirection;
+                Func<double, double[]> intersect = coordinate =>
+                {
+                    if (baseFace != null)
+                    {
+                        var point = new double[3];
+                        point[h] = datum.PlaneCoordinateMm * .001;
+                        point[along] = coordinate;
+                        point[across] = fixedCoordinate;
+                        var onBase = IntoPanelFrame(point, panel.ComponentPlacement, datum.Source.ComponentPlacement, true);
+                        if (!IsOnFace(baseFace, onBase)) return null;
+                        if (!followsPanel)
+                        {
+                            point[h] += sign * straightHeightMm * .001;
+                            return point;
+                        }
+                    }
+                    return Intersect(face, surface, modeler, h, along, across, coordinate, fixedCoordinate,
+                        box[h] - 1, box[h + 3] + 1, sign * settings.GapToPanelMm * .001);
+                };
                 var samples = new List<double[]>();
                 int first = -1, last = -1;
                 // Discover one connected projected interval; never bridge a hole or
@@ -209,19 +248,24 @@ namespace ADDIN.Commands.Kadai
                     grid[i] = intersect(start + span * i / 64);
                     if (grid[i] != null) { if (first < 0) first = i; last = i; }
                 }
-                if (first < 0 || first == last) throw new InvalidOperationException(rib.Id + ": mặt không giao footprint hoặc quá hẹp.");
+                if (first < 0 || first == last)
+                    throw new InvalidOperationException(rib.Id + (followsPanel
+                        ? " nằm ngoài vùng chung của panel và base. Kiểm tra khoảng chừa."
+                        : " nằm ngoài mặt base. Kiểm tra khoảng chừa."));
                 for (int i = first; i <= last; i++)
                     if (grid[i] == null) throw new InvalidOperationException(rib.Id + ": section bị tách; dừng preview.");
-                if (first > 0) samples.Add(Boundary(intersect, start + span * (first - 1) / 64, grid[first], along));
-                samples.Add(grid[first]);
-                for (int i = first + 1; i <= last; i++)
-                    Refine(intersect, samples, samples[samples.Count - 1], grid[i], along, h,
-                        settings.PreviewChordToleranceMm * .001, 0);
-                if (last < 64) {
-                    var end = Boundary(intersect, start + span * (last + 1) / 64, grid[last], along);
-                    Refine(intersect, samples, samples[samples.Count - 1], end, along, h,
+                var sectionStart = first == 0 ? grid[first] : Boundary(intersect, start + span * (first - 1) / 64, grid[first], along);
+                var sectionEnd = last == 64 ? grid[last] : Boundary(intersect, start + span * (last + 1) / 64, grid[last], along);
+                samples.Add(sectionStart);
+                if (followsPanel)
+                {
+                    for (int i = first; i <= last; i++)
+                        Refine(intersect, samples, samples[samples.Count - 1], grid[i], along, h,
+                            settings.PreviewChordToleranceMm * .001, 0);
+                    Refine(intersect, samples, samples[samples.Count - 1], sectionEnd, along, h,
                         settings.PreviewChordToleranceMm * .001, 0);
                 }
+                else samples.Add(sectionEnd);
                 double bottom = settings.BottomMm * .001;
                 if (samples.Any(p => sign * p[h] <= bottom + .0001))
                     throw new InvalidOperationException(rib.Id + ": mặt đế ở sai phía panel hoặc quá sát. Kiểm tra hướng cao và mặt đế.");
@@ -239,32 +283,38 @@ namespace ADDIN.Commands.Kadai
             return results;
         }
 
-        internal SlottedLayout BuildLayout(KadaiRequest settings, KadaiPanelSource panel,
-            double seamMm, double clearanceMm, bool autoMargins)
+        internal SlottedLayout BuildBaseLayout(KadaiRequest settings, KadaiPanelSource panel, KadaiBaseDatum datum)
         {
-            string rejection = null, suggestion = null;
-            var factors = autoMargins ? new[] { 0d, .12, .22, .30, .36, .42 } : new[] { 0d };
-            foreach (double factor in factors)
-            {
-                var adjusted = settings.Snapshot();
-                adjusted.LongEndMarginMm = Math.Max(settings.LongEndMarginMm, Math.Ceiling(settings.LengthXmm * factor * 10) / 10);
-                adjusted.CrossEndMarginMm = Math.Max(settings.CrossEndMarginMm, Math.Ceiling(settings.LengthZmm * factor * 10) / 10);
-                var plan = KadaiPlanner.Build(adjusted);
-                List<KadaiProfile3D> profiles = null;
-                try
-                {
-                    profiles = CalculateProfiles(plan, panel);
-                    var cuts = KadaiJointGeometry.Build(plan, profiles, seamMm, clearanceMm);
-                    return new SlottedLayout { Plan = plan, Profiles = KadaiJointGeometry.NotchedProfiles(plan, profiles, cuts) };
-                }
-                catch (InvalidOperationException ex)
-                {
-                    if (rejection == null) rejection = ex.Message;
-                    if (profiles != null) suggestion = KadaiJointGeometry.SuggestMargins(plan, profiles);
-                }
-            }
-            throw new InvalidOperationException(rejection + (string.IsNullOrEmpty(suggestion) ? "" : " " + suggestion));
+            if (datum == null || !IsSourceCurrent(datum.Source))
+                throw new InvalidOperationException("Chọn mặt phẳng base trước khi Preview.");
+            if (!settings.PanelRibDirection.HasValue || !settings.StartClearanceMm.HasValue || !settings.EndClearanceMm.HasValue)
+                throw new ArgumentException("Chọn phương bám panel và nhập hai khoảng chừa.");
+            var bounds = datum.BoundsInPanelMeters;
+            var request = settings.Snapshot();
+            request.HeightAxis = datum.HeightAxis;
+            request.HeightSign = datum.HeightSign;
+            request.BottomMm = datum.PlaneCoordinateMm * datum.HeightSign;
+            int u = UAxis(datum.HeightAxis), v = VAxis(datum.HeightAxis);
+            request.OriginUmm = bounds[u] * 1000;
+            request.OriginVmm = bounds[v] * 1000;
+            request.LengthXmm = (bounds[u + 3] - bounds[u]) * 1000;
+            request.LengthZmm = (bounds[v + 3] - bounds[v]) * 1000;
+            // KDA1 reference dimensions, with a positive gap to the lowest point
+            // of the panel when the available depth is smaller.
+            const double secondaryGapMm = 1;
+            const double depthClearanceMm = .1;
+            double straightHeight = Math.Min(170, datum.MinPanelHeightMm - secondaryGapMm);
+            double thickness = Math.Max(request.LongThicknessMm, request.CrossThicknessMm);
+            if (straightHeight <= 2 * thickness + depthClearanceMm)
+                throw new InvalidOperationException("Panel quá sát base để tạo thanh đỡ và rãnh ghép.");
+            double seamMm = straightHeight >= 100 + thickness ? 100 : (straightHeight + depthClearanceMm) / 2;
+            var plan = KadaiPlanner.Build(request);
+            var blanks = CalculateProfiles(plan, panel, datum, straightHeight);
+            var cuts = KadaiJointGeometry.Build(plan, blanks, seamMm, depthClearanceMm);
+            return new SlottedLayout { Plan = plan, Blanks = blanks, JoinedCrossings = cuts.Values.Sum(list => list.Count) / 2,
+                Profiles = KadaiJointGeometry.NotchedProfiles(plan, blanks, cuts) };
         }
+
         private static double[] Boundary(Func<double, double[]> intersect, double outside, double[] inside, int along)
         {
             for (int i = 0; i < 24 && Math.Abs(inside[along] - outside) > .00001; i++) {
@@ -301,14 +351,20 @@ namespace ADDIN.Commands.Kadai
                 var hits = new List<double[]>();
                 for (int i = 0; i + 2 < xyz.Length; i += 3) {
                     var p = new[] { xyz[i], xyz[i + 1], xyz[i + 2] };
-                    var q = face.GetClosestPointOn(p[0], p[1], p[2]) as double[];
-                    if (q != null && Enumerable.Range(0, 3).Sum(k => (p[k] - q[k]) * (p[k] - q[k])) < 1e-14
+                    if (IsOnFace(face, p)
                         && !hits.Any(q0 => Math.Abs(q0[height] - p[height]) < 1e-7)) hits.Add(p);
                 }
                 if (hits.Count > 1) throw new NotSupportedException("Panel không single-valued theo datum đã chọn.");
                 if (hits.Count == 0) return null;
                 hits[0][height] -= gap; return hits[0];
             } finally { ReleaseOwned(bounded); ReleaseOwned(line); }
+        }
+
+        private static bool IsOnFace(Face2 face, double[] point)
+        {
+            var closest = face.GetClosestPointOn(point[0], point[1], point[2]) as double[];
+            return closest != null && Enumerable.Range(0, 3).Sum(i =>
+                (point[i] - closest[i]) * (point[i] - closest[i])) < 1e-14;
         }
         internal Body2 CreatePreviewBody(KadaiProfile3D profile)
         {

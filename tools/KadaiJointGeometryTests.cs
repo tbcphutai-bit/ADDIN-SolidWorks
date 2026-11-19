@@ -56,6 +56,22 @@ internal static class KadaiJointGeometryTests
             rib.HeightDirection[1] == -1 && rib.PointsWorldMeters.All(point => point[1] <= -reversedRequest.BottomMm * .001)),
             "Wrong datum or height on negative axis.");
         Console.WriteLine("PASS signed height axis and notch perimeter");
+        var swappedRequest = request.Snapshot();
+        swappedRequest.PanelRibDirection = KadaiRibDirection.Transverse;
+        var swapped = KadaiPlanner.Build(swappedRequest);
+        var swappedProfiles = Profiles(swapped);
+        var first = swappedProfiles[0];
+        first.PointsWorldMeters[0][2] += .06;
+        first.PointsWorldMeters[first.PointsWorldMeters.Count - 1][2] += .06;
+        var swappedCuts = KadaiJointGeometry.Build(swapped, swappedProfiles, 100, .1);
+        Require(swappedCuts.Values.Sum(cuts => cuts.Count) == swapped.CandidateSlots.Count - 2,
+            "Both slots must be skipped for a non-crossing pair.");
+        Require(swappedCuts[first.RibId].All(c => c.Bottom > 0)
+            && swappedCuts[swapped.CrossRibs[0].Id].All(c => c.Bottom < 0),
+            "Slot entry did not follow the selected panel direction.");
+        var swappedNotches = KadaiJointGeometry.NotchedProfiles(swapped, swappedProfiles, swappedCuts);
+        Require(swappedNotches.Count == swappedProfiles.Count, "Swapped layout dropped a rib.");
+        Console.WriteLine("PASS swapped slot entry and paired omission outside trimmed contour");
         Reject(() => KadaiJointGeometry.Build(valid, Profiles(valid), 100, 0), "zero depth clearance");
         Reject(() => KadaiJointGeometry.Build(valid, Profiles(valid), 159.5, .1), "insufficient top web");
         Reject(() => KadaiJointGeometry.Build(valid, Profiles(valid), 2, .3), "insufficient bottom web");
