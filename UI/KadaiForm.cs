@@ -19,24 +19,27 @@ namespace ADDIN.UI
         private readonly NumericUpDown countC = Number(1, 100, 4, 0);
         private readonly NumericUpDown startClearance = Number(0, 99999, 50, 1);
         private readonly NumericUpDown endClearance = Number(0, 99999, 50, 1);
+        private readonly NumericUpDown fixedHeight = Number(.1m, 99999, 170, 1);
         private readonly ComboBox panelDirection = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
         private readonly Label panelName = FaceLabel();
         private readonly Label baseName = FaceLabel();
         private readonly Label status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft };
         private readonly Panel map = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
         private readonly Button preview = new Button { Text = "Preview 3D", AutoSize = true, Enabled = false };
+        private readonly Button apply = new Button { Text = "Apply", AutoSize = true, Enabled = false };
         private KadaiPanelSource source;
         private KadaiBaseDatum baseDatum;
         private KadaiPreviewBackend.SlottedLayout layout;
         private PickTarget picking;
         private ModelDoc2 pickDocument;
+        private bool applying;
 
         internal KadaiForm(ISldWorks app)
         {
             this.app = app;
             backend = new KadaiPreviewBackend(app);
             Text = "Kadai";
-            ClientSize = new Size(505, 384);
+            ClientSize = new Size(505, 416);
             MinimumSize = new Size(465, 422);
             StartPosition = FormStartPosition.Manual;
             var workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
@@ -59,10 +62,10 @@ namespace ADDIN.UI
             AddRow(form, Caption("Phương bám panel"), panelDirection);
             AddRow(form, Caption("Khoảng chừa đầu base (mm)"), startClearance);
             AddRow(form, Caption("Khoảng chừa cuối base (mm)"), endClearance);
+            AddRow(form, Caption("Chiều cao thanh cố định (mm)"), fixedHeight);
             AddFullRow(form, map, new RowStyle(SizeType.Percent, 100));
             AddFullRow(form, status, new RowStyle(SizeType.Absolute, 42));
 
-            var apply = new Button { Text = "Apply", AutoSize = true, Enabled = false };
             var clear = new Button { Text = "Xóa Preview", AutoSize = true };
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true,
                 FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
@@ -71,6 +74,12 @@ namespace ADDIN.UI
             Controls.Add(form);
 
             preview.Click += (s, e) => Preview3D();
+            apply.Click += (s, e) =>
+            {
+                using (var folder = new FolderBrowserDialog { Description = "Chọn nơi lưu bộ chi tiết Kadai",
+                    SelectedPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments) })
+                    if (folder.ShowDialog(this) == DialogResult.OK) ApplyToFolder(folder.SelectedPath);
+            };
             clear.Click += (s, e) =>
             {
                 picking = PickTarget.None;
@@ -79,7 +88,7 @@ namespace ADDIN.UI
                 UpdateSelectionStatus();
             };
             map.Paint += DrawLayout;
-            foreach (var input in new[] { countL, countC, startClearance, endClearance })
+            foreach (var input in new[] { countL, countC, startClearance, endClearance, fixedHeight })
                 input.ValueChanged += (s, e) => ResetPreview();
             panelDirection.SelectedIndexChanged += (s, e) => ResetPreview();
             UpdateSelectionStatus();
@@ -135,6 +144,7 @@ namespace ADDIN.UI
             panelName.Text = SourceName(source);
             baseName.Text = SourceName(baseDatum?.Source);
             preview.Enabled = baseDatum != null && picking == PickTarget.None;
+            apply.Enabled = layout != null && picking == PickTarget.None;
             if (picking != PickTarget.None)
                 status.Text = picking == PickTarget.Panel ? "Chọn một mặt panel trong vùng đồ họa." : "Chọn mặt phẳng tỳ của base.";
             else if (baseDatum != null)
@@ -155,6 +165,7 @@ namespace ADDIN.UI
                 {
                     LongRibCount = (int)countL.Value, CrossRibCount = (int)countC.Value,
                     StartClearanceMm = (double)startClearance.Value, EndClearanceMm = (double)endClearance.Value,
+                    FixedHeightMm = (double)fixedHeight.Value,
                     PanelRibDirection = panelDirection.SelectedIndex == 0 ? KadaiRibDirection.Longitudinal : KadaiRibDirection.Transverse,
                     LongThicknessMm = ribThicknessMm, CrossThicknessMm = ribThicknessMm,
                     LongSlotExtraMm = slotClearanceMm, CrossSlotExtraMm = slotClearanceMm
@@ -162,11 +173,43 @@ namespace ADDIN.UI
                 var result = backend.BuildBaseLayout(request, source, baseDatum);
                 backend.ShowTemporaryPreview(source, result.Profiles);
                 layout = result;
+                apply.Enabled = true;
                 map.Invalidate();
                 int outside = layout.Plan.CrossingCount - layout.JoinedCrossings;
                 status.Text = outside == 0 ? "Đã tạo Preview." : "Đã tạo Preview. " + outside + " giao điểm nằm ngoài biên thanh.";
             }
             catch (Exception ex) { ClearPreview(); status.Text = ex.Message; }
+        }
+
+        private string ApplyToFolder(string parentDirectory)
+        {
+            if (applying || layout == null) return null;
+            applying = true;
+            var ready = layout;
+            apply.Enabled = false;
+            Enabled = false;
+            try
+            {
+                string target = backend.ApplyBaseLayout(ready, source, baseDatum, parentDirectory, message =>
+                {
+                    status.Text = message.StartsWith("START ", StringComparison.Ordinal) ? "Đang tạo " + message.Substring(6) : status.Text;
+                    status.Refresh();
+                });
+                ClearPreview();
+                status.Text = "Đã lưu bộ Kadai tại " + target;
+                return target;
+            }
+            catch (Exception ex)
+            {
+                ClearPreview();
+                status.Text = ex.Message;
+                return null;
+            }
+            finally
+            {
+                applying = false;
+                Enabled = true;
+            }
         }
 
         private void ResetPreview()
@@ -179,11 +222,13 @@ namespace ADDIN.UI
         {
             backend.ClearTemporaryPreview(null);
             layout = null;
+            apply.Enabled = false;
             map.Invalidate();
         }
 
         private void CheckSourceLifecycle()
         {
+            if (applying) return;
             try
             {
                 var active = app.ActiveDoc as ModelDoc2;

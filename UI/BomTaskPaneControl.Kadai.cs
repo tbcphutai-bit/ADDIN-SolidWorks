@@ -18,7 +18,7 @@ namespace ADDIN
                 Tone = ModernButtonTone.Accent, AutoSize = false, Visible = true };
             btnKadai.Click += btnKadai_Click;
             tabModelMacroPage.Controls.Add(btnKadai);
-            SetBomCommandToolTip(btnKadai, "Kadai: bố trí thanh và Preview 3D theo mặt panel. Apply chưa nghiệm thu.");
+            SetBomCommandToolTip(btnKadai, "Kadai: bố trí, Preview 3D và tạo bộ chi tiết trong thư mục mới.");
         }
 
         private void btnKadai_Click(object sender, EventArgs e)

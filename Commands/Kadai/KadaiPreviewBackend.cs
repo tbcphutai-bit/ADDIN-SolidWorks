@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -17,6 +18,7 @@ namespace ADDIN.Commands.Kadai
             public List<KadaiProfile3D> Profiles;
             public List<KadaiProfile3D> Blanks;
             public int JoinedCrossings;
+            public Dictionary<string, List<KadaiJointCut>> Joints;
         }
 
         private readonly ISldWorks app;
@@ -112,7 +114,7 @@ namespace ADDIN.Commands.Kadai
                 MaterialName = material, MaterialDatabase = materialDatabase };
         }
 
-        private static double[] IntoPanelFrame(double[] value, double[] from, double[] panel, bool point)
+        internal static double[] IntoPanelFrame(double[] value, double[] from, double[] panel, bool point)
         {
             // SolidWorks stores three local basis vectors followed by translation.
             // Transform2 has unit scale, so the inverse rotation is the transpose.
@@ -220,9 +222,18 @@ namespace ADDIN.Commands.Kadai
                 double span = (longitudinal ? settings.LengthZmm : settings.LengthXmm) * .001;
                 double fixedCoordinate = ((longitudinal ? settings.OriginUmm : settings.OriginVmm) + rib.CoordinateMm) * .001;
                 bool followsPanel = datum == null || rib.Direction == settings.PanelRibDirection;
-                Func<double, double[]> intersect = coordinate =>
+                Func<double, double[]> panelAt = coordinate => Intersect(face, surface, modeler, h, along, across,
+                    coordinate, fixedCoordinate, box[h] - 1, box[h + 3] + 1, sign * settings.GapToPanelMm * .001);
+                List<double[]> samples;
+                if (baseFace == null)
                 {
-                    if (baseFace != null)
+                    samples = TraceSection(panelAt, start, start + span, along, h, settings.PreviewChordToleranceMm * .001);
+                    if (samples.Count == 0)
+                        throw new InvalidOperationException(rib.Id + " nằm ngoài mặt panel.");
+                }
+                else
+                {
+                    Func<double, double[]> baseAt = coordinate =>
                     {
                         var point = new double[3];
                         point[h] = datum.PlaneCoordinateMm * .001;
@@ -230,42 +241,26 @@ namespace ADDIN.Commands.Kadai
                         point[across] = fixedCoordinate;
                         var onBase = IntoPanelFrame(point, panel.ComponentPlacement, datum.Source.ComponentPlacement, true);
                         if (!IsOnFace(baseFace, onBase)) return null;
-                        if (!followsPanel)
+                        point[h] += sign * straightHeightMm * .001;
+                        return point;
+                    };
+                    var baseSection = TraceSection(baseAt, start, start + span, along, h, 0);
+                    if (baseSection.Count == 0)
+                        throw new InvalidOperationException(rib.Id + " nằm ngoài mặt base. Kiểm tra khoảng chừa.");
+                    samples = baseSection;
+                    if (followsPanel)
+                    {
+                        var contact = TraceSection(panelAt, baseSection[0][along], baseSection[1][along],
+                            along, h, settings.PreviewChordToleranceMm * .001);
+                        if (contact.Count > 0)
                         {
-                            point[h] += sign * straightHeightMm * .001;
-                            return point;
+                            // Carry the nearest contact height horizontally to each edge of the base.
+                            ExtendToBaseEdge(contact, baseSection[0][along], along, true);
+                            ExtendToBaseEdge(contact, baseSection[1][along], along, false);
+                            samples = contact;
                         }
                     }
-                    return Intersect(face, surface, modeler, h, along, across, coordinate, fixedCoordinate,
-                        box[h] - 1, box[h + 3] + 1, sign * settings.GapToPanelMm * .001);
-                };
-                var samples = new List<double[]>();
-                int first = -1, last = -1;
-                // Discover one connected projected interval; never bridge a hole or
-                // silently join two surface branches. Boundary refinement is 0.01 mm.
-                var grid = new double[65][];
-                for (int i = 0; i < grid.Length; i++) {
-                    grid[i] = intersect(start + span * i / 64);
-                    if (grid[i] != null) { if (first < 0) first = i; last = i; }
                 }
-                if (first < 0 || first == last)
-                    throw new InvalidOperationException(rib.Id + (followsPanel
-                        ? " nằm ngoài vùng chung của panel và base. Kiểm tra khoảng chừa."
-                        : " nằm ngoài mặt base. Kiểm tra khoảng chừa."));
-                for (int i = first; i <= last; i++)
-                    if (grid[i] == null) throw new InvalidOperationException(rib.Id + ": section bị tách; dừng preview.");
-                var sectionStart = first == 0 ? grid[first] : Boundary(intersect, start + span * (first - 1) / 64, grid[first], along);
-                var sectionEnd = last == 64 ? grid[last] : Boundary(intersect, start + span * (last + 1) / 64, grid[last], along);
-                samples.Add(sectionStart);
-                if (followsPanel)
-                {
-                    for (int i = first; i <= last; i++)
-                        Refine(intersect, samples, samples[samples.Count - 1], grid[i], along, h,
-                            settings.PreviewChordToleranceMm * .001, 0);
-                    Refine(intersect, samples, samples[samples.Count - 1], sectionEnd, along, h,
-                        settings.PreviewChordToleranceMm * .001, 0);
-                }
-                else samples.Add(sectionEnd);
                 double bottom = settings.BottomMm * .001;
                 if (samples.Any(p => sign * p[h] <= bottom + .0001))
                     throw new InvalidOperationException(rib.Id + ": mặt đế ở sai phía panel hoặc quá sát. Kiểm tra hướng cao và mặt đế.");
@@ -273,7 +268,7 @@ namespace ADDIN.Commands.Kadai
                 var profile = new KadaiProfile3D { RibId = rib.Id, Direction = rib.Direction,
                     ThicknessMeters = (longitudinal ? settings.LongThicknessMm : settings.CrossThicknessMm) * .001,
                     ExtrusionDirection = Unit(across), AlongDirection = Unit(along), HeightDirection = heightDirection,
-                    Closed = true, ValidationMessage = "Preview polyline; midpoint tolerance " + settings.PreviewChordToleranceMm + " mm. Manufacturing gate remains closed." };
+                    Closed = true, ValidationMessage = "Panel section midpoint tolerance " + settings.PreviewChordToleranceMm + " mm." };
                 profile.PointsWorldMeters.AddRange(samples);
                 var bottomEnd = (double[])samples.Last().Clone(); bottomEnd[h] = sign * bottom;
                 var bottomStart = (double[])samples.First().Clone(); bottomStart[h] = sign * bottom;
@@ -299,20 +294,148 @@ namespace ADDIN.Commands.Kadai
             request.OriginVmm = bounds[v] * 1000;
             request.LengthXmm = (bounds[u + 3] - bounds[u]) * 1000;
             request.LengthZmm = (bounds[v + 3] - bounds[v]) * 1000;
-            // KDA1 reference dimensions, with a positive gap to the lowest point
-            // of the panel when the available depth is smaller.
-            const double secondaryGapMm = 1;
             const double depthClearanceMm = .1;
-            double straightHeight = Math.Min(170, datum.MinPanelHeightMm - secondaryGapMm);
+            double straightHeight = request.FixedHeightMm;
             double thickness = Math.Max(request.LongThicknessMm, request.CrossThicknessMm);
-            if (straightHeight <= 2 * thickness + depthClearanceMm)
-                throw new InvalidOperationException("Panel quá sát base để tạo thanh đỡ và rãnh ghép.");
+            if (double.IsNaN(straightHeight) || double.IsInfinity(straightHeight) || straightHeight <= 2 * thickness + depthClearanceMm)
+                throw new InvalidOperationException("Chiều cao thanh cố định quá thấp để tạo rãnh ghép.");
+            if (straightHeight >= datum.MinPanelHeightMm - .05)
+                throw new InvalidOperationException("Chiều cao thanh cố định chạm hoặc quá sát panel. Giảm chiều cao.");
             double seamMm = straightHeight >= 100 + thickness ? 100 : (straightHeight + depthClearanceMm) / 2;
             var plan = KadaiPlanner.Build(request);
             var blanks = CalculateProfiles(plan, panel, datum, straightHeight);
             var cuts = KadaiJointGeometry.Build(plan, blanks, seamMm, depthClearanceMm);
-            return new SlottedLayout { Plan = plan, Blanks = blanks, JoinedCrossings = cuts.Values.Sum(list => list.Count) / 2,
+            return new SlottedLayout { Plan = plan, Blanks = blanks, Joints = cuts, JoinedCrossings = cuts.Values.Sum(list => list.Count) / 2,
                 Profiles = KadaiJointGeometry.NotchedProfiles(plan, blanks, cuts) };
+        }
+
+        internal string ApplyBaseLayout(SlottedLayout layout, KadaiPanelSource panel, KadaiBaseDatum datum,
+            string parentDirectory, Action<string> progress)
+        {
+            CheckThread();
+            if (layout == null || !IsSourceCurrent(panel) || datum == null || !IsSourceCurrent(datum.Source))
+                throw new InvalidOperationException("Mô hình đã thay đổi. Hãy tạo lại Preview trước khi Apply.");
+            if (!Directory.Exists(parentDirectory))
+                throw new InvalidOperationException("Chọn thư mục để lưu bộ chi tiết Kadai.");
+
+            string materialPath = ResolveMaterialDatabase(datum.MaterialDatabase);
+            const string bendTable = @"C:\sw共有ライブラリ\テーブル\菊川ベンドテーブル_170905\BD_Kiku_ST_2020.xlsx";
+            if (string.IsNullOrWhiteSpace(datum.MaterialName))
+                throw new InvalidOperationException("Mặt đế chưa có vật liệu. Gán vật liệu cho Part base rồi chọn lại mặt.");
+            if (materialPath == null)
+                throw new InvalidOperationException("Không tìm thấy thư viện vật liệu " + datum.MaterialDatabase + ".");
+            if (!File.Exists(bendTable))
+                throw new InvalidOperationException("Không tìm thấy bảng uốn BD_Kiku_ST_2020.xlsx.");
+
+            string partTemplate = RequiredTemplate(swUserPreferenceStringValue_e.swDefaultTemplatePart, "Part");
+            RequiredTemplate(swUserPreferenceStringValue_e.swDefaultTemplateDrawing, "Drawing");
+            string assemblyTemplate = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly);
+            if (!File.Exists(assemblyTemplate))
+            {
+                var candidates = Directory.GetFiles(Path.GetDirectoryName(partTemplate), "*.asmdot");
+                if (candidates.Length != 1)
+                {
+                    int revision;
+                    if (int.TryParse(app.RevisionNumber().Split('.')[0], out revision))
+                    {
+                        string installed = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.CommonApplicationData),
+                            "SOLIDWORKS", "SOLIDWORKS " + (1992 + revision), "templates");
+                        if (Directory.Exists(installed)) candidates = Directory.GetFiles(installed, "*.asmdot");
+                    }
+                }
+                if (candidates.Length != 1)
+                    throw new InvalidOperationException("Chọn template Assembly mặc định trong SolidWorks rồi Apply lại.");
+                assemblyTemplate = candidates[0];
+            }
+
+            string name = "Kadai-" + DateTime.Now.ToString("yyyyMMdd-HHmmss")
+                + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
+            string target = Path.Combine(parentDirectory, name);
+            ClearTemporaryPreview(null);
+            try
+            {
+                var writer = new KadaiNativePrototype(app, materialPath, datum.MaterialName, bendTable);
+                writer.WriteLayoutPackage(layout, target, assemblyTemplate, panel.ComponentPlacement, progress);
+                return target;
+            }
+            catch (Exception ex)
+            {
+                if (Directory.Exists(target))
+                    throw new InvalidOperationException(ex.Message + " Gói chưa hoàn tất: " + target, ex);
+                throw;
+            }
+            finally
+            {
+                int error = 0;
+                app.ActivateDoc3(panel.DocumentTransient.GetTitle(), false, 1, ref error);
+            }
+        }
+
+        private string ResolveMaterialDatabase(string database)
+        {
+            if (string.IsNullOrWhiteSpace(database)) return null;
+            if (Path.IsPathRooted(database) && File.Exists(database)) return database;
+            const string companyDatabase = @"C:\sw共有ライブラリ\材料ﾃﾞｰﾀﾍﾞｰｽ\kiku_板材_材料 2019.sldmat";
+            string name = Path.GetFileNameWithoutExtension(database);
+            var registered = app.GetMaterialDatabases() as object[] ?? new object[0];
+            var matches = registered.OfType<string>().Concat(new[] { companyDatabase })
+                .Where(path => File.Exists(path) && string.Equals(Path.GetFileNameWithoutExtension(path), name, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            return matches.Length == 1 ? matches[0] : null;
+        }
+
+        private string RequiredTemplate(swUserPreferenceStringValue_e setting, string type)
+        {
+            string template = app.GetUserPreferenceStringValue((int)setting);
+            if (!File.Exists(template))
+                throw new InvalidOperationException("Chọn template " + type + " mặc định trong SolidWorks rồi Apply lại.");
+            return template;
+        }
+
+        private static List<double[]> TraceSection(Func<double, double[]> at, double start, double end,
+            int along, int height, double chordTolerance)
+        {
+            var samples = new List<double[]>();
+            const int intervals = 64;
+            double step = (end - start) / intervals;
+            var grid = new double[intervals + 1][];
+            int first = -1, last = -1;
+            for (int i = 0; i <= intervals; i++)
+            {
+                grid[i] = at(i == intervals ? end : start + step * i);
+                if (grid[i] != null) { if (first < 0) first = i; last = i; }
+            }
+            if (first < 0) return samples;
+            if (first == last)
+                throw new InvalidOperationException("Vùng tiếp xúc quá hẹp để dựng một thanh.");
+            for (int i = first + 1; i < last; i++)
+                if (grid[i] == null)
+                    throw new InvalidOperationException("Mặt được chọn tạo đoạn thanh bị ngắt. Kiểm tra biên base và panel.");
+            var left = first == 0 ? grid[first] : Boundary(at, start + step * (first - 1), grid[first], along);
+            var right = last == intervals ? grid[last] : Boundary(at, start + step * (last + 1), grid[last], along);
+            samples.Add(left);
+            if (chordTolerance == 0) samples.Add(right);
+            else
+            {
+                for (int i = first; i <= last; i++)
+                    Refine(at, samples, samples[samples.Count - 1], grid[i], along, height, chordTolerance, 0);
+                Refine(at, samples, samples[samples.Count - 1], right, along, height, chordTolerance, 0);
+            }
+            return samples;
+        }
+
+        private static void ExtendToBaseEdge(List<double[]> top, double coordinate, int along, bool first)
+        {
+            int index = first ? 0 : top.Count - 1;
+            if (Math.Abs(top[index][along] - coordinate) <= 1e-7)
+            {
+                top[index][along] = coordinate;
+                return;
+            }
+            var end = (double[])top[index].Clone();
+            end[along] = coordinate;
+            if (first) top.Insert(0, end);
+            else top.Add(end);
         }
 
         private static double[] Boundary(Func<double, double[]> intersect, double outside, double[] inside, int along)
@@ -326,7 +449,7 @@ namespace ADDIN.Commands.Kadai
         private static void Refine(Func<double, double[]> intersect, List<double[]> samples,
             double[] a, double[] b, int along, int height, double tolerance, int depth)
         {
-            if (Math.Abs(a[along] - b[along]) < 1e-8) return;
+            if (Math.Abs(a[along] - b[along]) <= 1e-7) return;
             var mid = intersect((a[along] + b[along]) * .5);
             if (mid == null) throw new InvalidOperationException("Section có khoảng trống; không nối tắt qua biên face.");
             if (Math.Abs(mid[height] - (a[height] + b[height]) * .5) > tolerance) {

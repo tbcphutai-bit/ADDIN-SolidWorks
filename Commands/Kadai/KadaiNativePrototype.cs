@@ -7,9 +7,7 @@ using SolidWorks.Interop.swconst;
 
 namespace ADDIN.Commands.Kadai
 {
-    // Laboratory P3/P5 only. Never called by the production Apply button.
-    // Creates a fresh package; neither overwrites existing parts nor recreates
-    // user features. Exact-curve and regeneration gates remain outstanding.
+    // Writes new native documents into a separate package.
     internal sealed class KadaiNativePrototype
     {
         readonly ISldWorks app;
@@ -39,7 +37,7 @@ namespace ADDIN.Commands.Kadai
                 if (f.GetTypeName2() == "ProfileFeature" && app.IsSame(f.GetSpecificFeature2(), sketch) == 1) return f;
             throw new InvalidOperationException("Cannot resolve the new sketch by COM identity.");
         }
-        private ModelDoc2 WritePart(KadaiProfile3D profile, double bottomMm, string path, List<KadaiJointCut> cuts)
+        private ModelDoc2 WritePart(KadaiProfile3D profile, double bottomMm, string path, List<KadaiJointCut> cuts, bool prototype)
         {
             Require(!File.Exists(path), "Refusing to overwrite " + path);
             var local = KadaiJointGeometry.LocalPoints(profile, bottomMm);
@@ -79,6 +77,9 @@ namespace ADDIN.Commands.Kadai
                 ((PartDoc)doc).SetMaterialPropertyName2(doc.ConfigurationManager.ActiveConfiguration.Name,
                     materialDatabasePath, materialName);
             }
+            Feature cut = null;
+            if (cuts.Count > 0)
+            {
             doc.ClearSelection2(true); Require(plane.Select2(false, 0), "Cannot select slot plane.");
             sketch.InsertSketch(true);
             var slotSketchObject = sketch.ActiveSketch;
@@ -97,15 +98,17 @@ namespace ADDIN.Commands.Kadai
             Require(slotSketch != null && slotSketch.Select2(false, 0), "Slot sketch missing.");
             slotSketch.Name = "Kadai_Slots_" + profile.RibId;
             // Through-all both directions, NormalCut=true, single native Part body.
-            var cut = doc.FeatureManager.FeatureCut4(false, false, false, 1, 1, 0, 0,
+            cut = doc.FeatureManager.FeatureCut4(false, false, false, 1, 1, 0, 0,
                 false, false, false, false, 0, 0, false, false, false, false,
                 true, true, true, false, false, false, 0, 0, false, true);
             Require(cut != null, "Part-level Cut-Extrude failed."); cut.Name = "Kadai_JointCut_" + profile.RibId;
+            }
             doc.EditRebuild3();
             Require(doc.Extension.NeedsRebuild2 == 0, "Part requires a rebuild.");
             var bodies = Items(((PartDoc)doc).GetBodies2(0, false)).OfType<Body2>().ToList();
             Require(bodies.Count == 1 && bodies[0].IsSheetMetal(), "Expected one native Sheet Metal body.");
-            bool warning; Require(cut.GetErrorCode2(out warning) == 0 && !warning, "Cut rebuild error/warning.");
+            bool warning;
+            if (cut != null) Require(cut.GetErrorCode2(out warning) == 0 && !warning, "Cut rebuild error/warning.");
             Feature flat = null;
             for (Feature f = doc.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature)
                 if (f.GetTypeName2() == "FlatPattern") flat = f;
@@ -115,7 +118,7 @@ namespace ADDIN.Commands.Kadai
             Require(flat.SetSuppression2(0, 1, null), "Cannot restore folded Part."); doc.EditRebuild3();
             VerifyManufacturingSettings(doc, profile.ThicknessMeters);
             doc.Extension.CustomPropertyManager[""].Add3("Kadai_RibId", 30, profile.RibId, 2);
-            doc.Extension.CustomPropertyManager[""].Add3("Kadai_Status", 30, "PROTOTYPE - NOT FOR MANUFACTURE", 2);
+            if (prototype) doc.Extension.CustomPropertyManager[""].Add3("Kadai_Status", 30, "PROTOTYPE - NOT FOR MANUFACTURE", 2);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             int error = 0, saveWarning = 0;
             Require(doc.Extension.SaveAs(path, 0, 1, null, ref error, ref saveWarning) && error == 0 && saveWarning == 0,
@@ -177,9 +180,31 @@ namespace ADDIN.Commands.Kadai
         {
             // Validate the entire grid before opening or writing any output document.
             var cuts = KadaiJointGeometry.Build(plan, profiles, jointHeightMm, jointDepthClearanceMm);
+            WritePackage(plan, profiles, cuts, directory, export, assemblyTemplate, progress, null, null);
+        }
+
+        internal void WriteLayoutPackage(KadaiPreviewBackend.SlottedLayout layout, string directory,
+            string assemblyTemplate, double[] placement, Action<string> progress)
+        {
+            string name = Path.GetFileName(Path.GetFullPath(directory));
+            WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, assemblyTemplate, progress, name, placement);
+        }
+
+        private static string PartName(string ribId, string packageName)
+        {
+            return packageName == null ? ribId : packageName + "-" + ribId;
+        }
+
+        private void WritePackage(KadaiPlan plan, List<KadaiProfile3D> profiles,
+            Dictionary<string, List<KadaiJointCut>> cuts, string directory, bool export, string assemblyTemplate,
+            Action<string> progress, string packageName, double[] placement)
+        {
             directory = Path.GetFullPath(directory);
             Require(!Directory.Exists(directory) && !File.Exists(directory), "A new output folder is required.");
             Directory.CreateDirectory(directory);
+            bool prototype = packageName == null;
+            string incomplete = Path.Combine(directory, "INCOMPLETE.txt");
+            File.WriteAllText(incomplete, "Kadai generation has not completed.");
             var culture = System.Globalization.CultureInfo.InvariantCulture;
             var rows = new List<string> { "SlotId,RibId,MatingRibId,LeftMm,RightMm,BottomMm,TopMm" };
             foreach (var profile in profiles)
@@ -192,21 +217,24 @@ namespace ADDIN.Commands.Kadai
                 new[] { "RibId,StationKey" }.Concat(plan.LongRibs.Concat(plan.CrossRibs)
                     .Select(rib => rib.Id + "," + rib.StationKey)));
             foreach (var profile in profiles) {
-                string partPath = Path.Combine(directory, profile.RibId + ".SLDPRT");
+                string name = PartName(profile.RibId, packageName);
+                string partPath = Path.Combine(directory, name + ".SLDPRT");
                 progress?.Invoke("START " + profile.RibId);
-                var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId]);
+                var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype);
                 try {
                     if (export) {
-                        ExportFlatDxf(part, Path.Combine(directory, profile.RibId + ".dxf"));
-                        string drawingPath = Path.Combine(directory, profile.RibId + ".SLDDRW");
-                        CreateFlatDrawing(part, drawingPath);
+                        ExportFlatDxf(part, Path.Combine(directory, name + ".dxf"));
+                        string drawingPath = Path.Combine(directory, name + ".SLDDRW");
+                        CreateFlatDrawing(part, drawingPath, prototype);
                         app.CloseDoc(drawingPath);
                     }
                     progress?.Invoke("PASS " + profile.RibId + " native SheetMetal/Cut/Flat" + (export ? "/Drawing/DXF" : ""));
                 } finally { app.CloseDoc(partPath); }
             }
-            CreateAssembly(profiles, directory, plan.Settings.BottomMm, assemblyTemplate);
-            File.WriteAllText(Path.Combine(directory, "PASS.txt"), "Native prototype only; production gate closed.");
+            CreateAssembly(profiles, directory, plan.Settings.BottomMm, assemblyTemplate, packageName, placement);
+            File.WriteAllText(Path.Combine(directory, "PASS.txt"), prototype
+                ? "Native prototype only; production gate closed." : "Kadai package completed.");
+            File.Delete(incomplete);
         }
         internal void ExportFlatDxf(ModelDoc2 doc, string path)
         {
@@ -216,9 +244,10 @@ namespace ADDIN.Commands.Kadai
                 null, false, false, 1, null), "Flat Pattern DXF export failed.");
             Require(File.Exists(path) && new FileInfo(path).Length > 0, "Missing DXF output.");
         }
-        internal void CreateAssembly(List<KadaiProfile3D> profiles, string directory, double bottomMm, string explicitTemplate = null)
+        internal void CreateAssembly(List<KadaiProfile3D> profiles, string directory, double bottomMm, string explicitTemplate = null,
+            string packageName = null, double[] placement = null)
         {
-            string path = Path.Combine(directory, "Kadai-Prototype.SLDASM");
+            string path = Path.Combine(directory, (packageName ?? "Kadai-Prototype") + ".SLDASM");
             Require(!File.Exists(path), "Refusing to overwrite Assembly.");
             string template = explicitTemplate ?? app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly);
             Require(File.Exists(template), "Missing Assembly template.");
@@ -229,7 +258,7 @@ namespace ADDIN.Commands.Kadai
             var assembly = (AssemblyDoc)doc;
             var bom = new List<string> { "RibId,Part,Quantity,Status" };
             foreach (var profile in profiles) {
-                string partPath = Path.Combine(directory, profile.RibId + ".SLDPRT");
+                string partPath = Path.Combine(directory, PartName(profile.RibId, packageName) + ".SLDPRT");
                 int error = 0, warning = 0;
                 var part = app.GetOpenDocumentByName(partPath) as ModelDoc2;
                 bool openedHere = part == null;
@@ -245,6 +274,13 @@ namespace ADDIN.Commands.Kadai
                 var origin = (double[])profile.PointsWorldMeters[0].Clone();
                 double localHeight = Dot(origin, h) - bottomMm * .001;
                 for (int k = 0; k < 3; k++) origin[k] -= h[k] * localHeight + n[k] * (box[2] + box[5]) / 2;
+                if (placement != null)
+                {
+                    a = KadaiPreviewBackend.IntoPanelFrame(a, placement, null, false);
+                    h = KadaiPreviewBackend.IntoPanelFrame(h, placement, null, false);
+                    n = KadaiPreviewBackend.IntoPanelFrame(n, placement, null, false);
+                    origin = KadaiPreviewBackend.IntoPanelFrame(origin, placement, null, true);
+                }
                 var data = a.Concat(h).Concat(n).Concat(origin).Concat(new[] { 1d, 0, 0, 0 }).ToArray();
                 var transform = (MathTransform)((MathUtility)app.GetMathUtility()).CreateTransform(data);
                 app.ActivateDoc3(doc.GetTitle(), false, 0, ref error);
@@ -254,7 +290,7 @@ namespace ADDIN.Commands.Kadai
                 var actual = (double[])component.Transform2.ArrayData;
                 Require(Enumerable.Range(0, 13).All(i => Math.Abs(actual[i] - data[i]) < 1e-8), "Assembly transform differs from source frame.");
                 component.Select4(false, null, false); assembly.FixComponent(); doc.ClearSelection2(true);
-                bom.Add(profile.RibId + "," + Path.GetFileName(partPath) + ",1,PROTOTYPE");
+                bom.Add(profile.RibId + "," + Path.GetFileName(partPath) + ",1," + (packageName == null ? "PROTOTYPE" : "KADAI"));
             }
             doc.EditRebuild3(); doc.ShowNamedView2("*Isometric", 7); doc.ViewZoomtofit2();
             Require(Items(assembly.GetComponents(false)).Length == profiles.Count, "Unexpected Assembly component count.");
@@ -278,7 +314,7 @@ namespace ADDIN.Commands.Kadai
                 foreach (string partPath in openedParts) app.CloseDoc(partPath);
             }
         }
-        internal ModelDoc2 CreateFlatDrawing(ModelDoc2 part, string path)
+        internal ModelDoc2 CreateFlatDrawing(ModelDoc2 part, string path, bool prototype = true)
         {
             Require(!File.Exists(path), "Refusing to overwrite Drawing.");
             string template = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateDrawing);
@@ -306,7 +342,8 @@ namespace ADDIN.Commands.Kadai
             Require(outline[0] >= .02 && outline[1] >= .02 && outline[2] <= width + .08 && outline[3] <= height + .08
                 && Math.Abs(view.ScaleDecimal - 1) < 1e-9,
                 "Flat view falls outside the drawing sheet: " + string.Join(",", outline) + " expected width/height=" + width + "/" + height);
-            var note = drawing.InsertNote("KADAI PROTOTYPE - NOT FOR MANUFACTURE. Flat view 1:1, mm.") as Note;
+            var note = drawing.InsertNote(prototype ? "KADAI PROTOTYPE - NOT FOR MANUFACTURE. Flat view 1:1, mm."
+                : "KADAI - Flat view 1:1, mm.") as Note;
             if (note != null) ((Annotation)note.GetAnnotation()).SetPosition2(.05, .02, 0);
             drawing.ClearSelection2(true); drawing.ViewZoomtofit2();
             int error = 0, warning = 0;
