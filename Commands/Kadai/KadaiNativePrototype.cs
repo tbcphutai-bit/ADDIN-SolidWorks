@@ -216,22 +216,37 @@ namespace ADDIN.Commands.Kadai
             File.WriteAllLines(Path.Combine(directory, "Stations.csv"),
                 new[] { "RibId,StationKey" }.Concat(plan.LongRibs.Concat(plan.CrossRibs)
                     .Select(rib => rib.Id + "," + rib.StationKey)));
-            foreach (var profile in profiles) {
-                string name = PartName(profile.RibId, packageName);
-                string partPath = Path.Combine(directory, name + ".SLDPRT");
-                progress?.Invoke("START " + profile.RibId);
-                var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype);
-                try {
-                    if (export) {
-                        ExportFlatDxf(part, Path.Combine(directory, name + ".dxf"));
-                        string drawingPath = Path.Combine(directory, name + ".SLDDRW");
-                        CreateFlatDrawing(part, drawingPath, prototype);
-                        app.CloseDoc(drawingPath);
+            string assemblyPath = AssemblyPath(directory, packageName);
+            var assemblyDoc = StartAssembly(assemblyPath, assemblyTemplate);
+            var bom = new List<string> { "RibId,Part,Quantity,Status" };
+            try
+            {
+                foreach (var profile in profiles)
+                {
+                    string name = PartName(profile.RibId, packageName);
+                    string partPath = Path.Combine(directory, name + ".SLDPRT");
+                    progress?.Invoke("START " + profile.RibId);
+                    var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype);
+                    try
+                    {
+                        if (export)
+                        {
+                            ExportFlatDxf(part, Path.Combine(directory, name + ".dxf"));
+                            string drawingPath = Path.Combine(directory, name + ".SLDDRW");
+                            CreateFlatDrawing(part, drawingPath, prototype);
+                            app.CloseDoc(drawingPath);
+                        }
+                        // AddComponent5 needs the Part in memory. Insert it before closing its window
+                        // to avoid reopening all the generated Parts during Apply.
+                        bom.Add(InsertOpenPart(assemblyDoc, part, partPath, profile, plan.Settings.BottomMm,
+                            placement, prototype));
+                        progress?.Invoke("PASS " + profile.RibId + " native SheetMetal/Cut/Flat" + (export ? "/Drawing/DXF" : ""));
                     }
-                    progress?.Invoke("PASS " + profile.RibId + " native SheetMetal/Cut/Flat" + (export ? "/Drawing/DXF" : ""));
-                } finally { app.CloseDoc(partPath); }
+                    finally { app.CloseDoc(partPath); }
+                }
+                SaveAssembly(assemblyDoc, assemblyPath, profiles.Count, bom);
             }
-            CreateAssembly(profiles, directory, plan.Settings.BottomMm, assemblyTemplate, packageName, placement);
+            finally { CloseAssembly(assemblyDoc); }
             File.WriteAllText(Path.Combine(directory, "PASS.txt"), prototype
                 ? "Native prototype only; production gate closed." : "Kadai package completed.");
             File.Delete(incomplete);
@@ -247,53 +262,92 @@ namespace ADDIN.Commands.Kadai
         internal void CreateAssembly(List<KadaiProfile3D> profiles, string directory, double bottomMm, string explicitTemplate = null,
             string packageName = null, double[] placement = null)
         {
-            string path = Path.Combine(directory, (packageName ?? "Kadai-Prototype") + ".SLDASM");
+            string path = AssemblyPath(directory, packageName);
+            var doc = StartAssembly(path, explicitTemplate);
+            var openedParts = new List<string>();
+            try
+            {
+                var bom = new List<string> { "RibId,Part,Quantity,Status" };
+                foreach (var profile in profiles)
+                {
+                    string partPath = Path.Combine(directory, PartName(profile.RibId, packageName) + ".SLDPRT");
+                    int error = 0, warning = 0;
+                    var part = app.GetOpenDocumentByName(partPath) as ModelDoc2;
+                    if (part == null)
+                    {
+                        part = app.OpenDoc6(partPath, 1, 3, "", ref error, ref warning) as ModelDoc2;
+                        Require(part != null, "Cannot load prototype Part for Assembly: " + partPath + " error/warning=" + error + "/" + warning);
+                        if (string.Equals(part.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase))
+                            openedParts.Add(partPath);
+                    }
+                    bom.Add(InsertOpenPart(doc, part, partPath, profile, bottomMm, placement, packageName == null));
+                }
+                SaveAssembly(doc, path, profiles.Count, bom);
+            }
+            finally
+            {
+                CloseAssembly(doc);
+                foreach (string partPath in openedParts) app.CloseDoc(partPath);
+            }
+        }
+
+        private static string AssemblyPath(string directory, string packageName)
+        {
+            return Path.Combine(directory, (packageName ?? "Kadai-Prototype") + ".SLDASM");
+        }
+
+        private ModelDoc2 StartAssembly(string path, string explicitTemplate)
+        {
             Require(!File.Exists(path), "Refusing to overwrite Assembly.");
             string template = explicitTemplate ?? app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly);
             Require(File.Exists(template), "Missing Assembly template.");
             var doc = app.NewDocument(template, 0, 0, 0) as ModelDoc2;
             Require(doc != null, "Cannot create Assembly.");
-            var openedParts = new List<string>();
-            try {
-            var assembly = (AssemblyDoc)doc;
-            var bom = new List<string> { "RibId,Part,Quantity,Status" };
-            foreach (var profile in profiles) {
-                string partPath = Path.Combine(directory, PartName(profile.RibId, packageName) + ".SLDPRT");
-                int error = 0, warning = 0;
-                var part = app.GetOpenDocumentByName(partPath) as ModelDoc2;
-                bool openedHere = part == null;
-                if (openedHere) part = app.OpenDoc6(partPath, 1, 3, "", ref error, ref warning) as ModelDoc2;
-                Require(part != null, "Cannot load prototype Part for Assembly: " + partPath + " error/warning=" + error + "/" + warning);
-                Require(string.Equals(part.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase), "Part filename conflict with another open document.");
-                if (openedHere) openedParts.Add(partPath);
-                VerifyManufacturingSettings(part, profile.ThicknessMeters);
-                var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
-                var box = (double[])body.GetBodyBox();
-                double[] a = profile.AlongDirection, h = profile.HeightDirection;
-                var n = new[] { a[1] * h[2] - a[2] * h[1], a[2] * h[0] - a[0] * h[2], a[0] * h[1] - a[1] * h[0] };
-                var origin = (double[])profile.PointsWorldMeters[0].Clone();
-                double localHeight = Dot(origin, h) - bottomMm * .001;
-                for (int k = 0; k < 3; k++) origin[k] -= h[k] * localHeight + n[k] * (box[2] + box[5]) / 2;
-                if (placement != null)
-                {
-                    a = KadaiPreviewBackend.IntoPanelFrame(a, placement, null, false);
-                    h = KadaiPreviewBackend.IntoPanelFrame(h, placement, null, false);
-                    n = KadaiPreviewBackend.IntoPanelFrame(n, placement, null, false);
-                    origin = KadaiPreviewBackend.IntoPanelFrame(origin, placement, null, true);
-                }
-                var data = a.Concat(h).Concat(n).Concat(origin).Concat(new[] { 1d, 0, 0, 0 }).ToArray();
-                var transform = (MathTransform)((MathUtility)app.GetMathUtility()).CreateTransform(data);
-                app.ActivateDoc3(doc.GetTitle(), false, 0, ref error);
-                var component = assembly.AddComponent5(partPath, 0, "", false, "", 0, 0, 0);
-                Require(component != null, "Cannot insert rib component.");
-                component.Transform2 = transform;
-                var actual = (double[])component.Transform2.ArrayData;
-                Require(Enumerable.Range(0, 13).All(i => Math.Abs(actual[i] - data[i]) < 1e-8), "Assembly transform differs from source frame.");
-                component.Select4(false, null, false); assembly.FixComponent(); doc.ClearSelection2(true);
-                bom.Add(profile.RibId + "," + Path.GetFileName(partPath) + ",1," + (packageName == null ? "PROTOTYPE" : "KADAI"));
+            return doc;
+        }
+
+        private string InsertOpenPart(ModelDoc2 doc, ModelDoc2 part, string partPath, KadaiProfile3D profile,
+            double bottomMm, double[] placement, bool prototype)
+        {
+            Require(string.Equals(part.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase), "Part filename conflict with another open document.");
+            VerifyManufacturingSettings(part, profile.ThicknessMeters);
+            var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
+            var box = (double[])body.GetBodyBox();
+            double[] a = profile.AlongDirection, h = profile.HeightDirection;
+            var n = new[] { a[1] * h[2] - a[2] * h[1], a[2] * h[0] - a[0] * h[2], a[0] * h[1] - a[1] * h[0] };
+            var origin = (double[])profile.PointsWorldMeters[0].Clone();
+            double localHeight = Dot(origin, h) - bottomMm * .001;
+            for (int k = 0; k < 3; k++) origin[k] -= h[k] * localHeight + n[k] * (box[2] + box[5]) / 2;
+            if (placement != null)
+            {
+                a = KadaiPreviewBackend.IntoPanelFrame(a, placement, null, false);
+                h = KadaiPreviewBackend.IntoPanelFrame(h, placement, null, false);
+                n = KadaiPreviewBackend.IntoPanelFrame(n, placement, null, false);
+                origin = KadaiPreviewBackend.IntoPanelFrame(origin, placement, null, true);
             }
+            var data = a.Concat(h).Concat(n).Concat(origin).Concat(new[] { 1d, 0, 0, 0 }).ToArray();
+            var transform = (MathTransform)((MathUtility)app.GetMathUtility()).CreateTransform(data);
+            int error = 0;
+            var active = app.ActivateDoc3(doc.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
+            Require(active != null && app.IsSame(active, doc) == 1, "Cannot activate the generated Assembly: " + error);
+            var assembly = (AssemblyDoc)doc;
+            var component = assembly.AddComponent5(partPath, 0, "", false, "", 0, 0, 0);
+            Require(component != null, "Cannot insert rib component: " + profile.RibId);
+            component.Transform2 = transform;
+            var actual = (double[])component.Transform2.ArrayData;
+            Require(Enumerable.Range(0, 13).All(i => Math.Abs(actual[i] - data[i]) < 1e-8), "Assembly transform differs from source frame.");
+            Require(component.Select4(false, null, false), "Cannot select rib component: " + profile.RibId);
+            assembly.FixComponent();
+            doc.ClearSelection2(true);
+            Require(component.IsFixed(), "Cannot fix rib component: " + profile.RibId);
+            return profile.RibId + "," + Path.GetFileName(partPath) + ",1," + (prototype ? "PROTOTYPE" : "KADAI");
+        }
+
+        private static void SaveAssembly(ModelDoc2 doc, string path, int componentCount, List<string> bom)
+        {
+            var assembly = (AssemblyDoc)doc;
             doc.EditRebuild3(); doc.ShowNamedView2("*Isometric", 7); doc.ViewZoomtofit2();
-            Require(Items(assembly.GetComponents(false)).Length == profiles.Count, "Unexpected Assembly component count.");
+            Require(Items(assembly.GetComponents(false)).Length == componentCount, "Unexpected Assembly component count.");
             Require(doc.Extension.NeedsRebuild2 == 0, "Assembly requires a rebuild.");
             var interference = assembly.InterferenceDetectionManager;
             Require(interference != null, "Cannot check native interference.");
@@ -307,12 +361,13 @@ namespace ADDIN.Commands.Kadai
             int saveError = 0, saveWarning = 0;
             Require(doc.Extension.SaveAs(path, 0, 1, null, ref saveError, ref saveWarning) && saveError == 0 && saveWarning == 0,
                 "Assembly save failed: " + saveError + "/" + saveWarning);
-            File.WriteAllLines(Path.Combine(directory, "BOM.csv"), bom);
-            } finally {
-                string savedPath = doc.GetPathName();
-                app.CloseDoc(string.IsNullOrEmpty(savedPath) ? doc.GetTitle() : savedPath);
-                foreach (string partPath in openedParts) app.CloseDoc(partPath);
-            }
+            File.WriteAllLines(Path.Combine(Path.GetDirectoryName(path), "BOM.csv"), bom);
+        }
+
+        private void CloseAssembly(ModelDoc2 doc)
+        {
+            string savedPath = doc.GetPathName();
+            app.CloseDoc(string.IsNullOrEmpty(savedPath) ? doc.GetTitle() : savedPath);
         }
         internal ModelDoc2 CreateFlatDrawing(ModelDoc2 part, string path, bool prototype = true)
         {
