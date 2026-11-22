@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -14,11 +16,16 @@ namespace ADDIN.Commands.Kadai
         private readonly string materialDatabasePath;
         private readonly string materialName;
         private readonly string bendTablePath;
+        private readonly string partTemplate;
+        private readonly string drawingTemplate;
 
         internal KadaiNativePrototype(ISldWorks app, string materialDatabasePath = null,
-            string materialName = null, string bendTablePath = null)
+            string materialName = null, string bendTablePath = null, string partTemplate = null,
+            string drawingTemplate = null)
         {
             this.app = app;
+            this.partTemplate = partTemplate;
+            this.drawingTemplate = drawingTemplate;
             if (materialDatabasePath == null && materialName == null && bendTablePath == null) return;
             Require(!string.IsNullOrWhiteSpace(materialName), "Specify the native material name.");
             Require(File.Exists(materialDatabasePath) && string.Equals(Path.GetExtension(materialDatabasePath),
@@ -41,7 +48,7 @@ namespace ADDIN.Commands.Kadai
         {
             Require(!File.Exists(path), "Refusing to overwrite " + path);
             var local = KadaiJointGeometry.LocalPoints(profile, bottomMm);
-            string template = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
+            string template = partTemplate ?? app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplatePart);
             Require(File.Exists(template), "Missing native Part template: " + template);
             var doc = app.NewDocument(template, 0, 0, 0) as ModelDoc2;
             Require(doc != null, "Cannot create native Part.");
@@ -184,10 +191,10 @@ namespace ADDIN.Commands.Kadai
         }
 
         internal void WriteLayoutPackage(KadaiPreviewBackend.SlottedLayout layout, string directory,
-            string assemblyTemplate, double[] placement, Action<string> progress)
+            string assemblyTemplate, double[] placement, Action<string> progress, KadaiApplyOptions options)
         {
             string name = Path.GetFileName(Path.GetFullPath(directory));
-            WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, assemblyTemplate, progress, name, placement);
+            WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, assemblyTemplate, progress, name, placement, options);
         }
 
         private static string PartName(string ribId, string packageName)
@@ -197,7 +204,7 @@ namespace ADDIN.Commands.Kadai
 
         private void WritePackage(KadaiPlan plan, List<KadaiProfile3D> profiles,
             Dictionary<string, List<KadaiJointCut>> cuts, string directory, bool export, string assemblyTemplate,
-            Action<string> progress, string packageName, double[] placement)
+            Action<string> progress, string packageName, double[] placement, KadaiApplyOptions options = null)
         {
             directory = Path.GetFullPath(directory);
             Require(!Directory.Exists(directory) && !File.Exists(directory), "A new output folder is required.");
@@ -217,36 +224,62 @@ namespace ADDIN.Commands.Kadai
                 new[] { "RibId,StationKey" }.Concat(plan.LongRibs.Concat(plan.CrossRibs)
                     .Select(rib => rib.Id + "," + rib.StationKey)));
             string assemblyPath = AssemblyPath(directory, packageName);
-            var assemblyDoc = StartAssembly(assemblyPath, assemblyTemplate);
+            ModelDoc2 assemblyDoc = null;
             var bom = new List<string> { "RibId,Part,Quantity,Status" };
+            string step = "Tạo Assembly";
+            Action<string> markStep = message =>
+            {
+                step = message;
+                File.WriteAllText(incomplete, step);
+            };
             try
             {
+                markStep(step);
+                assemblyDoc = StartAssembly(assemblyPath, assemblyTemplate);
                 foreach (var profile in profiles)
                 {
-                    string name = PartName(profile.RibId, packageName);
+                    string name = options == null ? PartName(profile.RibId, packageName) : options.PartName(profile.RibId);
                     string partPath = Path.Combine(directory, name + ".SLDPRT");
-                    progress?.Invoke("START " + profile.RibId);
+                    markStep("Tạo Part " + name);
+                    progress?.Invoke(step);
                     var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype);
                     try
                     {
                         if (export)
                         {
-                            ExportFlatDxf(part, Path.Combine(directory, name + ".dxf"));
-                            string drawingPath = Path.Combine(directory, name + ".SLDDRW");
-                            CreateFlatDrawing(part, drawingPath, prototype);
-                            app.CloseDoc(drawingPath);
+                            markStep("Xuất DXF " + name);
+                            string dxfPath = Path.Combine(directory, name + ".dxf");
+                            if (options == null) ExportFlatDxf(part, dxfPath);
+                            else WriteRibDxf(part, dxfPath, profile.ThicknessMeters);
                         }
-                        // AddComponent5 needs the Part in memory. Insert it before closing its window
-                        // to avoid reopening all the generated Parts during Apply.
+                        // Insert before the Drawing can close or replace the Part's open document.
+                        // AddComponent5 requires the Part to remain loaded.
+                        markStep("Chèn vào Assembly " + name);
                         bom.Add(InsertOpenPart(assemblyDoc, part, partPath, profile, plan.Settings.BottomMm,
                             placement, prototype));
-                        progress?.Invoke("PASS " + profile.RibId + " native SheetMetal/Cut/Flat" + (export ? "/Drawing/DXF" : ""));
+                        if (export)
+                        {
+                            string drawingPath = Path.Combine(directory, name + ".SLDDRW");
+                            CreateFlatDrawing(partPath, drawingPath, prototype, detail => markStep(detail + " " + name));
+                            markStep("Đóng Drawing " + name);
+                            app.CloseDoc(drawingPath);
+                        }
                     }
                     finally { app.CloseDoc(partPath); }
                 }
+                markStep("Kiểm tra và lưu Assembly");
+                progress?.Invoke(step);
                 SaveAssembly(assemblyDoc, assemblyPath, profiles.Count, bom);
             }
-            finally { CloseAssembly(assemblyDoc); }
+            catch (Exception ex)
+            {
+                var failure = new InvalidOperationException(step + " — " + ex.Message, ex);
+                try { File.WriteAllText(incomplete, failure.ToString()); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                throw failure;
+            }
+            finally { if (assemblyDoc != null) CloseAssembly(assemblyDoc); }
             File.WriteAllText(Path.Combine(directory, "PASS.txt"), prototype
                 ? "Native prototype only; production gate closed." : "Kadai package completed.");
             File.Delete(incomplete);
@@ -258,6 +291,59 @@ namespace ADDIN.Commands.Kadai
             Require(((PartDoc)doc).ExportToDWG2(path, doc.GetPathName(), 1, true,
                 null, false, false, 1, null), "Flat Pattern DXF export failed.");
             Require(File.Exists(path) && new FileInfo(path).Length > 0, "Missing DXF output.");
+        }
+
+        private static void WriteRibDxf(ModelDoc2 doc, string path, double thickness)
+        {
+            // Kadai ribs are unbent single sheets. The two broad faces of the generated
+            // Part have the same perimeter, including the actual Part-level slots.
+            var body = Items(((PartDoc)doc).GetBodies2(0, false)).OfType<Body2>().Single();
+            var face = Items(body.GetFaces()).OfType<Face2>()
+                .Where(f => f.Normal is double[] normal && Math.Abs(normal[2]) > .999999)
+                .OrderByDescending(f => f.GetArea()).FirstOrDefault();
+            Require(face != null, "Không tìm được mặt phẳng của thanh tấm để xuất DXF.");
+            var edges = Items(face.GetEdges()).OfType<Edge>().ToArray();
+            var segments = new List<double[][]>(edges.Length);
+            foreach (var edge in edges)
+            {
+                var curve = edge.GetCurve() as Curve;
+                var start = edge.GetStartVertex() as Vertex;
+                var end = edge.GetEndVertex() as Vertex;
+                Require(curve != null && curve.IsLine() && start != null && end != null,
+                    "Biên thanh có đoạn không phải đường thẳng.");
+                segments.Add(new[] { (double[])start.GetPoint(), (double[])end.GetPoint() });
+            }
+            Require(segments.Count >= 3, "Biên DXF của thanh không đủ cạnh.");
+            var points = segments.SelectMany(pair => pair).ToArray();
+            double z = points[0][2];
+            Require(Items(body.GetVertices()).OfType<Vertex>().Select(v => (double[])v.GetPoint()).All(p =>
+            {
+                double distance = Math.Abs(p[2] - z);
+                return distance < 1e-8 || Math.Abs(distance - thickness) < 1e-8;
+            }), "DXF Kadai yêu cầu thanh tấm phẳng có một chiều dày.");
+
+            double minX = points.Min(p => p[0]);
+            double maxY = points.Max(p => p[1]);
+            using (var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write), Encoding.ASCII))
+            {
+                writer.WriteLine("0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n0\r\nENDSEC");
+                writer.WriteLine("0\r\nSECTION\r\n2\r\nENTITIES");
+                foreach (var segment in segments)
+                {
+                    writer.WriteLine("0\r\nLINE\r\n8\r\n0");
+                    for (int i = 0; i < segment.Length; i++)
+                    {
+                        var point = segment[i];
+                        writer.WriteLine(10 + i);
+                        writer.WriteLine(((point[0] - minX) * 1000).ToString("R", CultureInfo.InvariantCulture));
+                        writer.WriteLine(20 + i);
+                        writer.WriteLine(((maxY - point[1]) * 1000).ToString("R", CultureInfo.InvariantCulture));
+                        writer.WriteLine(30 + i);
+                        writer.WriteLine("0");
+                    }
+                }
+                writer.WriteLine("0\r\nENDSEC\r\n0\r\nEOF");
+            }
         }
         internal void CreateAssembly(List<KadaiProfile3D> profiles, string directory, double bottomMm, string explicitTemplate = null,
             string packageName = null, double[] placement = null)
@@ -327,9 +413,7 @@ namespace ADDIN.Commands.Kadai
             }
             var data = a.Concat(h).Concat(n).Concat(origin).Concat(new[] { 1d, 0, 0, 0 }).ToArray();
             var transform = (MathTransform)((MathUtility)app.GetMathUtility()).CreateTransform(data);
-            int error = 0;
-            var active = app.ActivateDoc3(doc.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
-            Require(active != null && app.IsSame(active, doc) == 1, "Cannot activate the generated Assembly: " + error);
+            ActivateAssembly(doc);
             var assembly = (AssemblyDoc)doc;
             var component = assembly.AddComponent5(partPath, 0, "", false, "", 0, 0, 0);
             Require(component != null, "Cannot insert rib component: " + profile.RibId);
@@ -340,11 +424,21 @@ namespace ADDIN.Commands.Kadai
             assembly.FixComponent();
             doc.ClearSelection2(true);
             Require(component.IsFixed(), "Cannot fix rib component: " + profile.RibId);
-            return profile.RibId + "," + Path.GetFileName(partPath) + ",1," + (prototype ? "PROTOTYPE" : "KADAI");
+            string partFile = Path.GetFileName(partPath);
+            if (partFile.Contains(",")) partFile = "\"" + partFile + "\"";
+            return profile.RibId + "," + partFile + ",1," + (prototype ? "PROTOTYPE" : "KADAI");
         }
 
-        private static void SaveAssembly(ModelDoc2 doc, string path, int componentCount, List<string> bom)
+        private void ActivateAssembly(ModelDoc2 doc)
         {
+            int error = 0;
+            var active = app.ActivateDoc3(doc.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
+            Require(active != null && app.IsSame(active, doc) == 1, "Cannot activate the generated Assembly: " + error);
+        }
+
+        private void SaveAssembly(ModelDoc2 doc, string path, int componentCount, List<string> bom)
+        {
+            ActivateAssembly(doc);
             var assembly = (AssemblyDoc)doc;
             doc.EditRebuild3(); doc.ShowNamedView2("*Isometric", 7); doc.ViewZoomtofit2();
             Require(Items(assembly.GetComponents(false)).Length == componentCount, "Unexpected Assembly component count.");
@@ -369,17 +463,27 @@ namespace ADDIN.Commands.Kadai
             string savedPath = doc.GetPathName();
             app.CloseDoc(string.IsNullOrEmpty(savedPath) ? doc.GetTitle() : savedPath);
         }
-        internal ModelDoc2 CreateFlatDrawing(ModelDoc2 part, string path, bool prototype = true)
+        internal ModelDoc2 CreateFlatDrawing(ModelDoc2 part, string path, bool prototype = true, Action<string> markStep = null)
+        {
+            return CreateFlatDrawing(part.GetPathName(), path, prototype, markStep);
+        }
+
+        private ModelDoc2 CreateFlatDrawing(string partPath, string path, bool prototype, Action<string> markStep)
         {
             Require(!File.Exists(path), "Refusing to overwrite Drawing.");
-            string template = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateDrawing);
+            string template = drawingTemplate ?? app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateDrawing);
             Require(File.Exists(template), "Missing Drawing template: " + template);
+            markStep?.Invoke("Mở template Drawing");
             var drawing = app.NewDocument(template, 0, 0, 0) as ModelDoc2;
             Require(drawing != null, "Drawing creation failed.");
             try {
             drawing.SetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swUnitsLinear, (int)swLengthUnit_e.swMM);
-            var view = ((DrawingDoc)drawing).CreateFlatPatternViewFromModelView3(part.GetPathName(), "", .15, .15, 0, false, false);
+            markStep?.Invoke("Tạo hình chiếu Flat Pattern");
+            var view = ((DrawingDoc)drawing).CreateFlatPatternViewFromModelView3(partPath, "", .15, .15, 0, false, false);
             Require(view != null, "Flat drawing view failed.");
+            if (drawingTemplate != null) FitFlatViewToTemplate(drawing, view, markStep);
+            else
+            {
             view.UseSheetScale = 0; view.ScaleDecimal = 1;
             drawing.EditRebuild3();
             var outline = (double[])view.GetOutline();
@@ -400,6 +504,8 @@ namespace ADDIN.Commands.Kadai
             var note = drawing.InsertNote(prototype ? "KADAI PROTOTYPE - NOT FOR MANUFACTURE. Flat view 1:1, mm."
                 : "KADAI - Flat view 1:1, mm.") as Note;
             if (note != null) ((Annotation)note.GetAnnotation()).SetPosition2(.05, .02, 0);
+            }
+            markStep?.Invoke("Lưu Drawing");
             drawing.ClearSelection2(true); drawing.ViewZoomtofit2();
             int error = 0, warning = 0;
             Require(drawing.Extension.SaveAs(path, 0, 1, null, ref error, ref warning) && error == 0 && warning == 0,
@@ -410,6 +516,43 @@ namespace ADDIN.Commands.Kadai
                 app.CloseDoc(string.IsNullOrEmpty(savedPath) ? drawing.GetTitle() : savedPath);
                 throw;
             }
+        }
+
+        private static void FitFlatViewToTemplate(ModelDoc2 drawing, View view, Action<string> markStep)
+        {
+            markStep?.Invoke("Đo khổ giấy và hình chiếu");
+            var sheet = (Sheet)((DrawingDoc)drawing).GetCurrentSheet();
+            double width = 0, height = 0;
+            sheet.GetSize(ref width, ref height);
+            Require(width > 0 && height > 0, "Khổ giấy của template bản vẽ không hợp lệ.");
+
+            view.UseSheetScale = 1;
+            drawing.EditRebuild3();
+            var bounds = (double[])view.GetOutline();
+            double viewWidth = bounds[2] - bounds[0], viewHeight = bounds[3] - bounds[1];
+            Require(viewWidth > 0 && viewHeight > 0, "Không đo được hình trải phẳng.");
+            // Reserve space for the template border and title block.
+            double fit = Math.Min(width * .80 / viewWidth, height * .57 / viewHeight);
+            if (fit < 1)
+            {
+                double targetScale = view.ScaleDecimal * fit;
+                Require(targetScale > 0 && !double.IsInfinity(targetScale), "Tỉ lệ hình chiếu không hợp lệ.");
+                markStep?.Invoke("Điều chỉnh tỉ lệ hình chiếu");
+                view.UseSheetScale = 0;
+                view.ScaleDecimal = 1 / Math.Ceiling(1 / targetScale);
+                drawing.EditRebuild3();
+                bounds = (double[])view.GetOutline();
+            }
+            markStep?.Invoke("Đặt vị trí hình chiếu trên giấy");
+            view.PositionLocked = false;
+            var position = (double[])view.Position;
+            position[0] += width * .5 - (bounds[0] + bounds[2]) / 2;
+            position[1] += height * .60 - (bounds[1] + bounds[3]) / 2;
+            view.Position = position;
+            drawing.EditRebuild3();
+            bounds = (double[])view.GetOutline();
+            Require(bounds[0] >= 0 && bounds[1] >= 0 && bounds[2] <= width && bounds[3] <= height,
+                "Hình trải phẳng vượt khổ giấy của template đã chọn.");
         }
     }
 }

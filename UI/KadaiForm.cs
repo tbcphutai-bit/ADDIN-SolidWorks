@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using ADDIN.Commands.Kadai;
@@ -11,6 +14,9 @@ namespace ADDIN.UI
     internal sealed class KadaiForm : Form
     {
         private enum PickTarget { None, Panel, Base }
+        // SOLIDWORKS swCommands_e values from swcommands, without a new interop dependency.
+        private const int NewDocumentCommand = 1;
+        private const int EditMaterialCommand = 501;
 
         private readonly ISldWorks app;
         private readonly KadaiPreviewBackend backend;
@@ -74,12 +80,7 @@ namespace ADDIN.UI
             Controls.Add(form);
 
             preview.Click += (s, e) => Preview3D();
-            apply.Click += (s, e) =>
-            {
-                using (var folder = new FolderBrowserDialog { Description = "Chọn nơi lưu bộ chi tiết Kadai",
-                    SelectedPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments) })
-                    if (folder.ShowDialog(this) == DialogResult.OK) ApplyToFolder(folder.SelectedPath);
-            };
+            apply.Click += (s, e) => RunApply();
             clear.Click += (s, e) =>
             {
                 picking = PickTarget.None;
@@ -181,34 +182,202 @@ namespace ADDIN.UI
             catch (Exception ex) { ClearPreview(); status.Text = ex.Message; }
         }
 
-        private string ApplyToFolder(string parentDirectory)
+        private void RunApply()
         {
-            if (applying || layout == null) return null;
-            applying = true;
+            if (applying || layout == null) return;
+            string previousStatus = status.Text;
             var ready = layout;
+            var sourceDocument = source;
+            applying = true;
             apply.Enabled = false;
             Enabled = false;
             try
             {
-                string target = backend.ApplyBaseLayout(ready, source, baseDatum, parentDirectory, message =>
+                string partTemplate = SelectTemplate(".prtdot", "1. Chọn template ở tab Part.");
+                if (partTemplate == null) return;
+                string materialDatabase;
+                string material = SelectMaterial(partTemplate, out materialDatabase);
+                if (material == null) return;
+                int activateError = 0;
+                app.ActivateDoc3(sourceDocument.DocumentTransient.GetTitle(), false,
+                    (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activateError);
+
+                Dictionary<string, string> names;
+                using (var dialog = new PartNamesDialog(ready.Blanks, material))
                 {
-                    status.Text = message.StartsWith("START ", StringComparison.Ordinal) ? "Đang tạo " + message.Substring(6) : status.Text;
-                    status.Refresh();
-                });
-                ClearPreview();
-                status.Text = "Đã lưu bộ Kadai tại " + target;
-                return target;
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                    names = dialog.Names;
+                }
+                string drawingTemplate = SelectTemplate(".drwdot", "4. Chọn template ở tab Draw.");
+                if (drawingTemplate == null) return;
+
+                using (var folder = new FolderBrowserDialog
+                {
+                    Description = "5. Chọn nơi lưu bộ chi tiết Kadai",
+                    SelectedPath = Path.GetDirectoryName(sourceDocument.DocumentPath) ?? string.Empty
+                })
+                {
+                    if (folder.ShowDialog(this) != DialogResult.OK) return;
+                    var options = new KadaiApplyOptions(partTemplate, drawingTemplate, material, materialDatabase, names);
+                    previousStatus = "Đã lưu bộ Kadai tại " + ApplyToFolder(folder.SelectedPath, options);
+                }
             }
             catch (Exception ex)
             {
-                ClearPreview();
-                status.Text = ex.Message;
-                return null;
+                previousStatus = ex.Message;
             }
             finally
             {
+                status.Text = previousStatus;
                 applying = false;
                 Enabled = true;
+                apply.Enabled = layout != null;
+            }
+        }
+
+        private string ApplyToFolder(string parentDirectory, KadaiApplyOptions options)
+        {
+            try { return backend.ApplyBaseLayout(layout, source, baseDatum, parentDirectory, options, SetApplyStatus); }
+            finally { ClearPreview(); }
+        }
+
+        private void SetApplyStatus(string message)
+        {
+            status.Text = message;
+            status.Refresh();
+        }
+
+        private string SelectTemplate(string extension, string instruction)
+        {
+            SetApplyStatus(instruction);
+            var events = (DSldWorksEvents_Event)app;
+            while (true)
+            {
+                string selected = null;
+                DSldWorksEvents_FileNewPreNotifyEventHandler capture = (type, path) =>
+                {
+                    selected = path;
+                    return 1; // Capture the template and cancel creating a document.
+                };
+                events.FileNewPreNotify += capture;
+                try { app.RunCommand(NewDocumentCommand, ""); }
+                finally { events.FileNewPreNotify -= capture; }
+                if (string.IsNullOrEmpty(selected)) return null;
+                try
+                {
+                    KadaiApplyOptions.RequireTemplate(selected, extension);
+                    return selected;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    if (MessageBox.Show(this, ex.Message + "\n" + instruction, "Kadai", MessageBoxButtons.RetryCancel,
+                        MessageBoxIcon.Information) != DialogResult.Retry) return null;
+                }
+            }
+        }
+
+        private string SelectMaterial(string partTemplate, out string databasePath)
+        {
+            databasePath = null;
+            SetApplyStatus("2. Chọn vật liệu, bấm Apply rồi đóng hộp thoại Material.");
+            var scratch = app.NewDocument(partTemplate, 0, 0, 0) as ModelDoc2;
+            if (scratch == null)
+                throw new InvalidOperationException("SolidWorks không mở được Part tạm từ template đã chọn.");
+            try
+            {
+                var part = (PartDoc)scratch;
+                string config = scratch.ConfigurationManager.ActiveConfiguration.Name;
+                string baseDatabase = backend.ResolveMaterialDatabase(baseDatum.MaterialDatabase);
+                if (!string.IsNullOrEmpty(baseDatabase) && !string.IsNullOrWhiteSpace(baseDatum.MaterialName))
+                    part.SetMaterialPropertyName2(config, baseDatabase, baseDatum.MaterialName);
+                if (!app.RunCommand(EditMaterialCommand, ""))
+                    throw new InvalidOperationException("SolidWorks không mở được hộp thoại Material cho Part tạm.");
+                string database;
+                string material = part.GetMaterialPropertyName2(config, out database);
+                if (string.IsNullOrWhiteSpace(material)) return null;
+                databasePath = backend.ResolveMaterialDatabase(database);
+                if (databasePath == null)
+                    throw new InvalidOperationException("Không tìm thấy thư viện của vật liệu đã chọn: " + database);
+                return material;
+            }
+            finally { app.CloseDoc(scratch.GetTitle()); }
+        }
+
+        private sealed class PartNamesDialog : Form
+        {
+            private readonly DataGridView grid = new DataGridView
+            {
+                Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.CellSelect
+            };
+            private readonly Label validation = new Label { AutoSize = true, ForeColor = Color.Firebrick };
+            internal Dictionary<string, string> Names { get; private set; }
+
+            internal PartNamesDialog(IReadOnlyList<KadaiProfile3D> ribs, string material)
+            {
+                Text = "Kadai · Tên Part";
+                StartPosition = FormStartPosition.CenterParent;
+                ClientSize = new Size(475, 408);
+                MinimumSize = new Size(430, 330);
+                ShowInTaskbar = false;
+
+                var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
+                content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
+                content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                AddFullRow(content, Caption("Vật liệu: " + material), new RowStyle(SizeType.AutoSize));
+                var longSeed = new TextBox { Text = "L-001", Dock = DockStyle.Fill };
+                var crossSeed = new TextBox { Text = "C-001", Dock = DockStyle.Fill };
+                AddRow(content, Caption("Tên bắt đầu · Dọc"), longSeed);
+                AddRow(content, Caption("Tên bắt đầu · Ngang"), crossSeed);
+
+                grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Thanh", ReadOnly = true,
+                    SortMode = DataGridViewColumnSortMode.NotSortable, FillWeight = 38 });
+                grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Tên Part", SortMode = DataGridViewColumnSortMode.NotSortable });
+                foreach (var rib in ribs)
+                    grid.Rows[grid.Rows.Add(rib.RibId, rib.RibId)].Tag = rib;
+                AddFullRow(content, grid, new RowStyle(SizeType.Percent, 100));
+                AddFullRow(content, validation, new RowStyle(SizeType.AutoSize));
+                var next = new Button { Text = "Tiếp tục", AutoSize = true };
+                var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+                var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill,
+                    FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+                actions.Controls.AddRange(new Control[] { next, cancel });
+                AddFullRow(content, actions, new RowStyle(SizeType.AutoSize));
+                Controls.Add(content);
+                AcceptButton = next;
+                CancelButton = cancel;
+
+                longSeed.TextChanged += (s, e) => SetSeries(longSeed.Text, KadaiRibDirection.Longitudinal);
+                crossSeed.TextChanged += (s, e) => SetSeries(crossSeed.Text, KadaiRibDirection.Transverse);
+                next.Click += (s, e) =>
+                {
+                    try
+                    {
+                        KadaiApplyOptions.NumberedNames(longSeed.Text, ribs.Count(rib => rib.Direction == KadaiRibDirection.Longitudinal));
+                        KadaiApplyOptions.NumberedNames(crossSeed.Text, ribs.Count(rib => rib.Direction == KadaiRibDirection.Transverse));
+                        grid.EndEdit();
+                        var names = grid.Rows.Cast<DataGridViewRow>().ToDictionary(row => ((KadaiProfile3D)row.Tag).RibId,
+                            row => (Convert.ToString(row.Cells[1].Value) ?? "").Trim(), StringComparer.Ordinal);
+                        KadaiApplyOptions.ValidateNames(names.Values);
+                        Names = names;
+                        DialogResult = DialogResult.OK;
+                    }
+                    catch (InvalidOperationException ex) { validation.Text = ex.Message; }
+                };
+            }
+
+            private void SetSeries(string seed, KadaiRibDirection direction)
+            {
+                try
+                {
+                    var group = grid.Rows.Cast<DataGridViewRow>()
+                        .Where(row => ((KadaiProfile3D)row.Tag).Direction == direction).ToArray();
+                    var names = KadaiApplyOptions.NumberedNames(seed, group.Length);
+                    for (int i = 0; i < group.Length; i++) group[i].Cells[1].Value = names[i];
+                    validation.Text = "";
+                }
+                catch (InvalidOperationException ex) { validation.Text = ex.Message; }
             }
         }
 

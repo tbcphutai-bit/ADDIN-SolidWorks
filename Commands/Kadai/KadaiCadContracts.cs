@@ -1,6 +1,10 @@
 // Kadai CAD contracts. All lengths crossing the CAD boundary are in meters.
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
 using SolidWorks.Interop.sldworks;
 
 namespace ADDIN.Commands.Kadai
@@ -27,6 +31,70 @@ namespace ADDIN.Commands.Kadai
         public double[] BoundsInPanelMeters;
         public double MinPanelHeightMm;
         public string MaterialName, MaterialDatabase;
+    }
+
+    internal sealed class KadaiApplyOptions
+    {
+        internal readonly string PartTemplate, DrawingTemplate, MaterialName, MaterialDatabase;
+        private readonly Dictionary<string, string> partNames;
+
+        internal KadaiApplyOptions(string partTemplate, string drawingTemplate, string materialName,
+            string materialDatabase, Dictionary<string, string> partNames)
+        {
+            PartTemplate = partTemplate;
+            DrawingTemplate = drawingTemplate;
+            MaterialName = materialName;
+            MaterialDatabase = materialDatabase;
+            this.partNames = new Dictionary<string, string>(partNames, StringComparer.Ordinal);
+        }
+
+        internal string PartName(string ribId) { return partNames[ribId]; }
+
+        internal void Validate(IEnumerable<KadaiProfile3D> ribs)
+        {
+            RequireTemplate(PartTemplate, ".prtdot");
+            RequireTemplate(DrawingTemplate, ".drwdot");
+            if (string.IsNullOrWhiteSpace(MaterialName) || !File.Exists(MaterialDatabase))
+                throw new InvalidOperationException("Chọn vật liệu từ thư viện SolidWorks có thể truy cập.");
+            var ids = ribs.Select(rib => rib.RibId).ToArray();
+            if (ids.Length != partNames.Count || ids.Any(id => !partNames.ContainsKey(id)))
+                throw new InvalidOperationException("Danh sách tên Part không khớp với Preview.");
+            ValidateNames(ids.Select(PartName));
+        }
+
+        internal static void RequireTemplate(string path, string extension)
+        {
+            if (!File.Exists(path) || !string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Không tìm thấy template " + extension + " đã chọn.");
+        }
+
+        internal static void ValidateNames(IEnumerable<string> names)
+        {
+            var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string name in names)
+            {
+                if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                    name.EndsWith(".", StringComparison.Ordinal) || name.EndsWith(" ", StringComparison.Ordinal) ||
+                    Regex.IsMatch(name, @"^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])\s*(\.|$)", RegexOptions.IgnoreCase) ||
+                    Regex.IsMatch(name, @"\.(sldprt|slddrw|sldasm|dxf)$", RegexOptions.IgnoreCase))
+                    throw new InvalidOperationException("Tên Part không hợp lệ: " + name);
+                if (!unique.Add(name))
+                    throw new InvalidOperationException("Tên Part bị trùng: " + name);
+            }
+        }
+
+        internal static string[] NumberedNames(string seed, int count)
+        {
+            seed = seed.Trim();
+            Match number = Regex.Match(seed, @"[0-9]+$");
+            long first;
+            if (!number.Success || !long.TryParse(number.Value, NumberStyles.None, CultureInfo.InvariantCulture, out first)
+                || first > long.MaxValue - (count - 1))
+                throw new InvalidOperationException("Nhập tên bắt đầu có số ở cuối, ví dụ KDA-t01.");
+            string prefix = seed.Substring(0, number.Index);
+            return Enumerable.Range(0, count).Select(i =>
+                prefix + (first + i).ToString(CultureInfo.InvariantCulture).PadLeft(number.Length, '0')).ToArray();
+        }
     }
 
     internal sealed class KadaiProfile3D

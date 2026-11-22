@@ -310,7 +310,7 @@ namespace ADDIN.Commands.Kadai
         }
 
         internal string ApplyBaseLayout(SlottedLayout layout, KadaiPanelSource panel, KadaiBaseDatum datum,
-            string parentDirectory, Action<string> progress)
+            string parentDirectory, KadaiApplyOptions options, Action<string> progress)
         {
             CheckThread();
             if (layout == null || !IsSourceCurrent(panel) || datum == null || !IsSourceCurrent(datum.Source))
@@ -318,21 +318,24 @@ namespace ADDIN.Commands.Kadai
             if (!Directory.Exists(parentDirectory))
                 throw new InvalidOperationException("Chọn thư mục để lưu bộ chi tiết Kadai.");
 
-            string materialPath = ResolveMaterialDatabase(datum.MaterialDatabase);
+            options.Validate(layout.Blanks);
+            var openParts = ((app.GetDocuments() as object[]) ?? new object[0]).OfType<ModelDoc2>()
+                .Where(doc => doc.GetType() == (int)swDocumentTypes_e.swDocPART)
+                .Select(doc => Path.GetFileNameWithoutExtension(doc.GetPathName()))
+                .Where(stem => !string.IsNullOrEmpty(stem));
+            var conflict = openParts.Intersect(layout.Blanks.Select(rib => options.PartName(rib.RibId)),
+                StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+            if (conflict != null)
+                throw new InvalidOperationException("Đang mở một Part có tên " + conflict + ". Hãy chọn tên khác.");
+
             const string bendTable = @"C:\sw共有ライブラリ\テーブル\菊川ベンドテーブル_170905\BD_Kiku_ST_2020.xlsx";
-            if (string.IsNullOrWhiteSpace(datum.MaterialName))
-                throw new InvalidOperationException("Mặt đế chưa có vật liệu. Gán vật liệu cho Part base rồi chọn lại mặt.");
-            if (materialPath == null)
-                throw new InvalidOperationException("Không tìm thấy thư viện vật liệu " + datum.MaterialDatabase + ".");
             if (!File.Exists(bendTable))
                 throw new InvalidOperationException("Không tìm thấy bảng uốn BD_Kiku_ST_2020.xlsx.");
 
-            string partTemplate = RequiredTemplate(swUserPreferenceStringValue_e.swDefaultTemplatePart, "Part");
-            RequiredTemplate(swUserPreferenceStringValue_e.swDefaultTemplateDrawing, "Drawing");
             string assemblyTemplate = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly);
             if (!File.Exists(assemblyTemplate))
             {
-                var candidates = Directory.GetFiles(Path.GetDirectoryName(partTemplate), "*.asmdot");
+                var candidates = Directory.GetFiles(Path.GetDirectoryName(options.PartTemplate), "*.asmdot");
                 if (candidates.Length != 1)
                 {
                     int revision;
@@ -354,8 +357,9 @@ namespace ADDIN.Commands.Kadai
             ClearTemporaryPreview(null);
             try
             {
-                var writer = new KadaiNativePrototype(app, materialPath, datum.MaterialName, bendTable);
-                writer.WriteLayoutPackage(layout, target, assemblyTemplate, panel.ComponentPlacement, progress);
+                var writer = new KadaiNativePrototype(app, options.MaterialDatabase, options.MaterialName, bendTable,
+                    options.PartTemplate, options.DrawingTemplate);
+                writer.WriteLayoutPackage(layout, target, assemblyTemplate, panel.ComponentPlacement, progress, options);
                 return target;
             }
             catch (Exception ex)
@@ -371,7 +375,7 @@ namespace ADDIN.Commands.Kadai
             }
         }
 
-        private string ResolveMaterialDatabase(string database)
+        internal string ResolveMaterialDatabase(string database)
         {
             if (string.IsNullOrWhiteSpace(database)) return null;
             if (Path.IsPathRooted(database) && File.Exists(database)) return database;
@@ -382,14 +386,6 @@ namespace ADDIN.Commands.Kadai
                 .Where(path => File.Exists(path) && string.Equals(Path.GetFileNameWithoutExtension(path), name, StringComparison.OrdinalIgnoreCase))
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             return matches.Length == 1 ? matches[0] : null;
-        }
-
-        private string RequiredTemplate(swUserPreferenceStringValue_e setting, string type)
-        {
-            string template = app.GetUserPreferenceStringValue((int)setting);
-            if (!File.Exists(template))
-                throw new InvalidOperationException("Chọn template " + type + " mặc định trong SolidWorks rồi Apply lại.");
-            return template;
         }
 
         private static List<double[]> TraceSection(Func<double, double[]> at, double start, double end,
