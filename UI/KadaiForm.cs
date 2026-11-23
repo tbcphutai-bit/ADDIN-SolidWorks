@@ -207,12 +207,10 @@ namespace ADDIN.UI
                     (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activateError);
 
                 step = "Đặt tên Part";
-                Dictionary<string, string> names;
-                using (var dialog = new PartNamesDialog(ready.Blanks, material))
-                {
-                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                    names = dialog.Names;
-                }
+                // Switching to the material Part may discard the displayed bodies.
+                backend.ShowTemporaryPreview(sourceDocument, ready.Profiles);
+                var names = ChoosePartNames(ready.Blanks, material);
+                if (names == null) return;
                 step = "Chọn Template Drawing";
                 string drawingTemplate = SelectTemplate(".drwdot", "Draw", "Kadai · 4/5 · Template bản vẽ");
                 if (drawingTemplate == null) return;
@@ -242,6 +240,27 @@ namespace ADDIN.UI
                 applying = false;
                 Enabled = true;
                 apply.Enabled = layout != null;
+            }
+        }
+
+        private Dictionary<string, string> ChoosePartNames(IReadOnlyList<KadaiProfile3D> ribs, string material)
+        {
+            var workArea = Screen.FromControl(this).WorkingArea;
+            bool wasVisible = Visible;
+            using (var dialog = new PartNamesDialog(ribs, material, backend.SetHighlightedRib))
+            {
+                dialog.StartPosition = FormStartPosition.Manual;
+                dialog.Location = new Point(Math.Max(workArea.Left, workArea.Right - dialog.Width - 16),
+                    Math.Max(workArea.Top, workArea.Top + (workArea.Height - dialog.Height) / 2));
+                Hide();
+                try { return dialog.ShowDialog(this) == DialogResult.OK ? dialog.Names : null; }
+                finally
+                {
+                    try { backend.SetHighlightedRib(null); }
+                    catch (COMException ex) { Trace.WriteLine("[KADAI] Reset naming highlight: " + ex); }
+                    catch (InvalidOperationException ex) { Trace.WriteLine("[KADAI] Reset naming highlight: " + ex); }
+                    if (wasVisible && !IsDisposed) Show();
+                }
             }
         }
 
@@ -410,10 +429,9 @@ namespace ADDIN.UI
             private readonly Label validation = new Label { AutoSize = true, ForeColor = Color.Firebrick };
             internal Dictionary<string, string> Names { get; private set; }
 
-            internal PartNamesDialog(IReadOnlyList<KadaiProfile3D> ribs, string material)
+            internal PartNamesDialog(IReadOnlyList<KadaiProfile3D> ribs, string material, Action<string> highlight)
             {
                 Text = "Kadai · Tên Part";
-                StartPosition = FormStartPosition.CenterParent;
                 ClientSize = new Size(475, 408);
                 MinimumSize = new Size(430, 330);
                 ShowInTaskbar = false;
@@ -427,6 +445,8 @@ namespace ADDIN.UI
                 AddRow(content, Caption("Tên bắt đầu · Dọc"), longSeed);
                 AddRow(content, Caption("Tên bắt đầu · Ngang"), crossSeed);
 
+                var hint = Caption("Chọn một dòng để làm nổi bật thanh trong Preview 3D.");
+                AddFullRow(content, hint, new RowStyle(SizeType.AutoSize));
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Thanh", ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.NotSortable, FillWeight = 38 });
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Tên Part", SortMode = DataGridViewColumnSortMode.NotSortable });
@@ -444,6 +464,22 @@ namespace ADDIN.UI
                 AcceptButton = next;
                 CancelButton = cancel;
 
+                void UpdateHighlight()
+                {
+                    if (!(grid.CurrentRow?.Tag is KadaiProfile3D rib)) return;
+                    try
+                    {
+                        highlight(rib.RibId);
+                        hint.Text = "Thanh " + rib.RibId + " đang được tô hồng trong Preview 3D.";
+                    }
+                    catch (Exception ex) when (ex is COMException || ex is InvalidOperationException)
+                    {
+                        hint.Text = "Không thể làm nổi bật thanh " + rib.RibId + ".";
+                        Trace.WriteLine("[KADAI] Naming highlight: " + ex);
+                    }
+                }
+                grid.CurrentCellChanged += (s, e) => UpdateHighlight();
+                Shown += (s, e) => UpdateHighlight();
                 longSeed.TextChanged += (s, e) => SetSeries(longSeed.Text, KadaiRibDirection.Longitudinal);
                 crossSeed.TextChanged += (s, e) => SetSeries(crossSeed.Text, KadaiRibDirection.Transverse);
                 next.Click += (s, e) =>

@@ -23,9 +23,12 @@ namespace ADDIN.Commands.Kadai
 
         private readonly ISldWorks app;
         private readonly int threadId = Thread.CurrentThread.ManagedThreadId;
-        private readonly List<Body2> visibleBodies = new List<Body2>();
+        private const int HighlightColor = 0xD000FF;
+        private readonly Dictionary<string, (Body2 Body, int Color)> visibleBodies =
+            new Dictionary<string, (Body2 Body, int Color)>(StringComparer.Ordinal);
         private ModelDoc2 previewDocument;
         private object previewContext;
+        private string highlightedRibId;
         internal int VisibleBodyCount { get { return visibleBodies.Count; } }
         internal KadaiPreviewBackend(ISldWorks app) { this.app = app; }
         private void CheckThread()
@@ -545,24 +548,64 @@ namespace ADDIN.Commands.Kadai
             previewContext = (object)component ?? document;
             try {
                 foreach (var rib in ribs) {
-                    var body = CreatePreviewBody(rib); visibleBodies.Add(body);
+                    int color = rib.Direction == KadaiRibDirection.Longitudinal ? 0x70C040 : 0x4090F0;
+                    var body = CreatePreviewBody(rib);
+                    visibleBodies.Add(rib.RibId, (body, color));
                     // Display3 with a Component2 applies its placement to Part-local geometry.
                     // swTempBodySelectOptionNone = 0. Bodies cannot steal source face selection.
-                    int result = body.Display3(previewContext, rib.Direction == KadaiRibDirection.Longitudinal ? 0x70C040 : 0x4090F0, 0);
-                    if (result != 0) throw new InvalidOperationException("Display3 failed: " + result);
+                    DisplayPreviewBody(body, color);
                 }
                 document.GraphicsRedraw2();
                 if (document.GetSaveFlag() != dirty) throw new InvalidOperationException("Preview unexpectedly changed document save state.");
             } catch { ClearTemporaryPreview(null); throw; }
         }
+
+        internal void SetHighlightedRib(string ribId)
+        {
+            CheckThread();
+            if (ribId == highlightedRibId) return;
+            var active = app.ActiveDoc as ModelDoc2;
+            if (previewDocument == null || active == null || !SameDocument(previewDocument, active))
+                throw new InvalidOperationException("Kích hoạt lại tài liệu chứa Preview 3D.");
+            if (ribId != null && !visibleBodies.ContainsKey(ribId))
+                throw new InvalidOperationException("Không tìm thấy thanh trong Preview 3D: " + ribId);
+
+            try
+            {
+                if (highlightedRibId != null)
+                {
+                    var previous = visibleBodies[highlightedRibId];
+                    previous.Body.Hide(previewContext);
+                    DisplayPreviewBody(previous.Body, previous.Color);
+                }
+                if (ribId != null)
+                {
+                    var current = visibleBodies[ribId].Body;
+                    current.Hide(previewContext);
+                    DisplayPreviewBody(current, HighlightColor);
+                }
+                highlightedRibId = ribId;
+                previewDocument.GraphicsRedraw2();
+            }
+            catch { ClearTemporaryPreview(null); throw; }
+        }
+
+        private void DisplayPreviewBody(Body2 body, int color)
+        {
+            int result = body.Display3(previewContext, color, 0);
+            if (result != 0) throw new InvalidOperationException("Display3 failed: " + result);
+        }
+
         public void ClearTemporaryPreview(ModelDoc2 ignored)
         {
             CheckThread();
-            foreach (var body in visibleBodies) {
+            foreach (var preview in visibleBodies.Values) {
+                var body = preview.Body;
                 try { if (previewContext != null) body.Hide(previewContext); } catch (COMException) { }
                 finally { ReleaseOwned(body); }
             }
             visibleBodies.Clear();
+            highlightedRibId = null;
             try { if (previewDocument != null) previewDocument.GraphicsRedraw2(); } catch (COMException) { }
             previewDocument = null;
             previewContext = null;

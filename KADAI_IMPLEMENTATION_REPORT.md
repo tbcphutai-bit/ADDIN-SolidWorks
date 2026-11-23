@@ -251,3 +251,13 @@ Apply có hai lượt chọn mẫu cho cả gói. Trước khi mở hộp thoạ
 Kiểm thử API trên SolidWorks 2024 SP5.0 xác nhận nhận được đường dẫn hai template công ty khi SolidWorks phát sự kiện tạo tài liệu. Apply trên 6866 tạo 11 Part Sheet Metal, 11 Drawing, 11 DXF và mở lại được Assembly. Drawing kiểm tra có hình chiếu Flat Pattern và giữ khung A4 đã chọn. Phép thử dùng API để truyền các lựa chọn vào form. Log local tại `kadai-assembly-6866/preview-resize-cad-01/run.log`. Build Debug/Release x64 đạt. MVID DLL kiểm thử `e8ef3b4a-4e55-44a4-8ce3-3e624877a367`, SHA256 `469FAD7BD9E7A8E52AC3799AAE94D95CC31D6EB5FE1C28A7D3F70CCC78103F5D`.
 
 Đối chiếu 11 DXF với bộ native tham chiếu cho kết quả trùng biên dạng 1:1 và đủ 56 rãnh. 17 file CAD nguồn 6866 giữ nguyên mã băm. Bản đã thử được cài vào TAI TOOL khi SolidWorks đóng. File phần mềm cập nhật là `UI/KadaiForm.cs`, DLL và PDB. Đối chiếu DLL đã cài cho 0 sai khác tại 47.645 mục ngoài Kadai.
+
+## 16. Nhận diện thanh trong 3D khi đặt tên Part
+
+Ở bước **Tên Part**, Kadai khôi phục các body Preview sau khi quay lại từ Part tạm dùng để chọn vật liệu. Bảng tên nằm ở mép màn hình và cửa sổ Kadai chính tạm ẩn để chừa chỗ xem mô hình. Dòng hiện tại trong bảng làm thanh tương ứng nổi màu hồng. Liên kết dùng mã thanh cố định, nên sửa tên Part không đổi vị trí được tô. Chuyển dòng hoặc đóng bảng khôi phục màu nhóm ban đầu. Hai file sửa là `UI/KadaiForm.cs` và `Commands/Kadai/KadaiPreviewBackend.cs`. [SOLIDWORKS Display3](https://help.solidworks.com/2024/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IBody2~Display3.html)
+
+Log Debug thực tế ngày 23/11 xác nhận SolidWorks trả đúng đường dẫn hai template đã chọn. Gói người dùng xuất lúc 11:59, `Kadai-20261123-115949-252858`, có 11 Part, 11 Drawing, 11 DXF, một Assembly và `PASS.txt`. Hai ngoại lệ chung trong log xuất hiện trước khi chọn template. Không có lỗi Apply được ghi sau đó.
+
+Trên bản sao 6866 trong SolidWorks 2024 SP5.0, phép thử đổi dòng `L-001` sang `C-004` và sửa tên trong bảng thực. Hai ảnh đồ họa xác nhận vùng màu hồng chuyển sang vị trí khác. Hủy bảng khôi phục Preview, bật lại cửa sổ Kadai chính và giữ nguyên cờ lưu cùng update stamp của Assembly. Ảnh và log ở `kadai-assembly-6866/naming-highlight-cad-01`.
+
+Apply sau lượt thử tô sáng xuất đủ 11 Part, 11 Drawing và 11 DXF. Assembly mở lại được. 11 DXF trùng biên dạng 1:1 với mẫu native, đủ 56 rãnh. 17 file CAD nguồn giữ nguyên mã băm. Build Debug/Release x64 đạt. Bản thử được cài sau khi SolidWorks đóng và đối chiếu cho 0 sai khác tại 47.742 mục ngoài Kadai. MVID `b71a9f43-f2bb-42e9-b190-add2b0ec65b5`, SHA256 `B57A76D4F74BCAFCC84F4D1E5CC1D1B8382310C973E749AACB421ED90C4C62AE`.
