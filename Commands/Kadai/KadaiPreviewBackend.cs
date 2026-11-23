@@ -24,12 +24,12 @@ namespace ADDIN.Commands.Kadai
         private readonly ISldWorks app;
         private readonly int threadId = Thread.CurrentThread.ManagedThreadId;
         private const int HighlightColor = 0xFFB060;
-        private const int UraColor = 0xB87CFF;
         private readonly Dictionary<string, (Body2 Body, int Color, double[] Across)> visibleBodies =
             new Dictionary<string, (Body2 Body, int Color, double[] Across)>(StringComparer.Ordinal);
         private ModelDoc2 previewDocument;
         private object previewContext;
         private string highlightedRibId;
+        private string isolatedRibId;
         private KadaiUraSide highlightedSide;
         private Body2 uraPreview;
         internal int VisibleBodyCount { get { return visibleBodies.Count; } }
@@ -572,7 +572,8 @@ namespace ADDIN.Commands.Kadai
                 {
                     var previous = visibleBodies[highlightedRibId];
                     previous.Body.Hide(previewContext);
-                    DisplayPreviewBody(previous.Body, previous.Color);
+                    if (isolatedRibId == null || isolatedRibId == highlightedRibId)
+                        DisplayPreviewBody(previous.Body, previous.Color);
                 }
                 if (ribId != null)
                 {
@@ -592,7 +593,7 @@ namespace ADDIN.Commands.Kadai
                         var transform = ((MathUtility)app.GetMathUtility()).CreateTransform(shift) as MathTransform;
                         if (!uraPreview.ApplyTransform(transform))
                             throw new InvalidOperationException("Không hiển thị được mặt ウラ đã chọn.");
-                        DisplayPreviewBody(uraPreview, UraColor);
+                        DisplayPreviewBody(uraPreview, KadaiUraAppearance.ColorRef);
                     }
                 }
                 highlightedRibId = ribId;
@@ -600,6 +601,107 @@ namespace ADDIN.Commands.Kadai
                 previewDocument.GraphicsRedraw2();
             }
             catch { ClearTemporaryPreview(null); throw; }
+        }
+
+        internal void SetInspectionIsolation(string ribId)
+        {
+            CheckThread();
+            if (isolatedRibId == ribId) return;
+            if (previewDocument == null || (ribId != null && !visibleBodies.ContainsKey(ribId)))
+                throw new InvalidOperationException("Không tìm được thanh trong Preview.");
+            try
+            {
+                foreach (var entry in visibleBodies)
+                {
+                    var body = entry.Value;
+                    body.Body.Hide(previewContext);
+                    if (ribId == null || ribId == entry.Key)
+                        DisplayPreviewBody(body.Body, entry.Key == highlightedRibId ? HighlightColor : body.Color);
+                }
+                isolatedRibId = ribId;
+                previewDocument.GraphicsRedraw2();
+            }
+            catch { ClearTemporaryPreview(null); throw; }
+        }
+
+        internal InspectionView BeginInspection(KadaiPanelSource source)
+        {
+            CheckThread();
+            if (!IsSourceCurrent(source) || !(source.DocumentTransient.ActiveView is ModelView view))
+                throw new InvalidOperationException("Mở lại Assembly để xem mặt ウラ.");
+            return new InspectionView(this, source, view);
+        }
+
+        internal sealed class InspectionView : IDisposable
+        {
+            private readonly KadaiPreviewBackend backend;
+            private readonly KadaiPanelSource source;
+            private readonly ModelView view;
+            private readonly MathUtility math;
+            private readonly double[] orientation, translation;
+            private readonly double scale;
+            private bool adjusted;
+
+            internal InspectionView(KadaiPreviewBackend backend, KadaiPanelSource source, ModelView view)
+            {
+                this.backend = backend;
+                this.source = source;
+                this.view = view;
+                math = (MathUtility)backend.app.GetMathUtility();
+                orientation = (double[])view.Orientation3.ArrayData;
+                translation = (double[])view.Translation3.ArrayData;
+                scale = view.Scale2;
+            }
+
+            internal KadaiUraSide VisibleSide(KadaiProfile3D rib)
+            {
+                var worldNormal = IntoPanelFrame(rib.ExtrusionDirection, source.ComponentPlacement, null, false);
+                var vector = (MathVector)math.CreateVector(worldNormal);
+                var relative = (MathVector)vector.MultiplyTransform(view.Orientation3);
+                var direction = (double[])relative.ArrayData;
+                if (Math.Abs(direction[2]) < .25 * Math.Sqrt(direction.Sum(value => value * value)))
+                    return KadaiUraSide.Unset;
+                return direction[2] < 0 ? KadaiUraSide.First : KadaiUraSide.Second;
+            }
+
+            internal void LookAt(KadaiProfile3D rib, KadaiUraSide side)
+            {
+                if (!backend.IsSourceCurrent(source) || !backend.visibleBodies.TryGetValue(rib.RibId, out var displayed))
+                    throw new InvalidOperationException("Quay lại Assembly đã Preview để xem thanh.");
+                var normal = IntoPanelFrame(rib.ExtrusionDirection, source.ComponentPlacement, null, false)
+                    .Select(value => value * (int)side).ToArray();
+                var up = IntoPanelFrame(rib.HeightDirection, source.ComponentPlacement, null, false);
+                var right = new[] { up[1] * normal[2] - up[2] * normal[1], up[2] * normal[0] - up[0] * normal[2],
+                    up[0] * normal[1] - up[1] * normal[0] };
+                var worldToView = new[] { right[0], up[0], normal[0], right[1], up[1], normal[1],
+                    right[2], up[2], normal[2], 0d, 0, 0, 1, 0, 0, 0 };
+                adjusted = true;
+                view.Orientation3 = (MathTransform)math.CreateTransform(worldToView);
+                var box = (double[])displayed.Body.GetBodyBox();
+                var corners = (from x in new[] { box[0], box[3] }
+                               from y in new[] { box[1], box[4] }
+                               from z in new[] { box[2], box[5] }
+                               select IntoPanelFrame(new[] { x, y, z }, source.ComponentPlacement, null, true)).ToArray();
+                const double padding = .02;
+                source.DocumentTransient.ViewZoomTo2(corners.Min(point => point[0]) - padding,
+                    corners.Min(point => point[1]) - padding, corners.Min(point => point[2]) - padding,
+                    corners.Max(point => point[0]) + padding, corners.Max(point => point[1]) + padding,
+                    corners.Max(point => point[2]) + padding);
+                source.DocumentTransient.GraphicsRedraw2();
+            }
+
+            public void Dispose()
+            {
+                try
+                {
+                    if (!adjusted || !backend.IsSourceCurrent(source)) return;
+                    view.Orientation3 = (MathTransform)math.CreateTransform(orientation);
+                    view.Translation3 = (MathVector)math.CreateVector(translation);
+                    view.Scale2 = scale;
+                    source.DocumentTransient.GraphicsRedraw2();
+                }
+                catch (COMException) { }
+            }
         }
 
         private void DisplayPreviewBody(Body2 body, int color)
@@ -619,6 +721,7 @@ namespace ADDIN.Commands.Kadai
             }
             visibleBodies.Clear();
             highlightedRibId = null;
+            isolatedRibId = null;
             highlightedSide = KadaiUraSide.Unset;
             try { if (previewDocument != null) previewDocument.GraphicsRedraw2(); } catch (COMException) { }
             previewDocument = null;

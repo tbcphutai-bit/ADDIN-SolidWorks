@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -116,10 +117,7 @@ namespace ADDIN.Commands.Kadai
             Require(bodies.Count == 1 && bodies[0].IsSheetMetal(), "Expected one native Sheet Metal body.");
             bool warning;
             if (cut != null) Require(cut.GetErrorCode2(out warning) == 0 && !warning, "Cut rebuild error/warning.");
-            Feature flat = null;
-            for (Feature f = doc.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature)
-                if (f.GetTypeName2() == "FlatPattern") flat = f;
-            Require(flat != null, "Flat Pattern missing.");
+            var flat = FindFlatPattern(doc);
             Require(flat.SetSuppression2(1, 1, null), "Cannot unsuppress Flat Pattern."); doc.EditRebuild3();
             Require(flat.GetErrorCode2(out warning) == 0 && !warning, "Flat Pattern failed.");
             Require(flat.SetSuppression2(0, 1, null), "Cannot restore folded Part."); doc.EditRebuild3();
@@ -140,6 +138,13 @@ namespace ADDIN.Commands.Kadai
             for (Feature feature = doc.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
                 if (feature.GetTypeName2() == "SheetMetal") return feature;
             throw new InvalidOperationException("Native Sheet Metal feature missing.");
+        }
+
+        private static Feature FindFlatPattern(ModelDoc2 doc)
+        {
+            for (var feature = doc.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
+                if (feature.GetTypeName2() == "FlatPattern") return feature;
+            throw new InvalidOperationException("Part chưa có feature Flat Pattern.");
         }
 
         private void SetBodyBendTable(ModelDoc2 doc)
@@ -421,11 +426,12 @@ namespace ADDIN.Commands.Kadai
             var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
             var face = Items(body.GetFaces()).OfType<Face2>().Single(candidate =>
                 candidate.Normal is double[] normal && uraNormal * normal[2] > .999999);
-            var pink = new[] { 1d, .49, .72, .5, .8, .5, .25, 0, 0 };
+            var pink = KadaiUraAppearance.MaterialValues();
             int configuration = (int)swInConfigurationOpts_e.swThisConfiguration;
             face.SetMaterialPropertyValues2(pink, configuration, null);
             var actual = face.GetMaterialPropertyValues2(configuration, null) as double[];
-            Require(actual != null && actual.Take(3).Zip(pink, (a, b) => Math.Abs(a - b)).Max() < .005,
+            Require(actual != null && actual.Length == pink.Length &&
+                actual.Zip(pink, (a, b) => Math.Abs(a - b)).All(delta => delta < .005),
                 "SolidWorks không giữ màu hồng của mặt ウラ.");
         }
 
@@ -544,8 +550,11 @@ namespace ADDIN.Commands.Kadai
             Require(drawing != null, "Drawing creation failed.");
             try {
             drawing.SetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swUnitsLinear, (int)swLengthUnit_e.swMM);
+            var drawingDoc = (DrawingDoc)drawing;
+            var templateSlot = uraNormal != 0 ? TakeTemplateFlatSlot(drawing, drawingDoc) : null;
             markStep?.Invoke("Tạo hình chiếu Flat Pattern");
-            var view = ((DrawingDoc)drawing).CreateFlatPatternViewFromModelView3(partPath, "", .15, .15, 0, false, false);
+            var center = templateSlot?.Position;
+            var view = drawingDoc.CreateFlatPatternViewFromModelView3(partPath, "", center?[0] ?? .15, center?[1] ?? .15, 0, false, false);
             Require(view != null, "Flat drawing view failed.");
             if (uraNormal != 0)
             {
@@ -557,9 +566,17 @@ namespace ADDIN.Commands.Kadai
                 if (UraFacesViewer(view, uraNormal)) view.FlipView = !view.FlipView;
                 drawing.EditRebuild3();
                 Require(view.IsFlatPatternView() && !UraFacesViewer(view, uraNormal), "View 展開 chưa nhìn mặt 表.");
-                SetJapaneseViewName((DrawingDoc)drawing, view);
+                if (templateSlot == null) SetJapaneseViewName(drawingDoc, view);
+                else
+                {
+                    Require(view.SetName2(templateSlot.Name), "Không đặt được tên view số 13 theo template.");
+                    view.UseSheetScale = 0;
+                    view.ScaleDecimal = templateSlot.Scale;
+                    ((Sheet)drawingDoc.GetCurrentSheet()).CustomPropertyView = view.GetName2();
+                    drawing.EditRebuild3();
+                }
             }
-            if (drawingTemplate != null) FitFlatViewToTemplate(drawing, view, markStep);
+            if (drawingTemplate != null) FitFlatViewToTemplate(drawing, view, markStep, center);
             else
             {
             view.UseSheetScale = 0; view.ScaleDecimal = 1;
@@ -610,6 +627,59 @@ namespace ADDIN.Commands.Kadai
             }
         }
 
+        private sealed class TemplateFlatSlot
+        {
+            internal string Name;
+            internal double[] Position;
+            internal double Scale;
+        }
+
+        private static IEnumerable<View> ActiveModelViews(DrawingDoc drawing)
+        {
+            var sheetView = drawing.GetFirstView() as View;
+            for (var view = sheetView?.GetNextView() as View; view != null; view = view.GetNextView() as View)
+                yield return view;
+        }
+
+        private static TemplateFlatSlot TakeTemplateFlatSlot(ModelDoc2 doc, DrawingDoc drawing)
+        {
+            var views = ActiveModelViews(drawing).ToArray();
+            var view13 = views.FirstOrDefault(view => IsEmptyTemplateView(view, "13"));
+            if (view13 == null) return null;
+            var view12 = views.FirstOrDefault(view => IsEmptyTemplateView(view, "12"));
+            var slot = new TemplateFlatSlot
+            {
+                Name = view13.GetName2(), Position = (double[])view13.Position, Scale = view13.ScaleDecimal
+            };
+            var names = new[] { view12?.GetName2(), slot.Name }.Where(name => name != null).ToArray();
+            foreach (var view in views)
+            {
+                if (names.Contains(view.GetName2())) continue;
+                var parent = view.GetBaseView() as View;
+                Require(parent == null || !names.Contains(parent.GetName2()),
+                    "View mẫu 12 hoặc 13 đang có một hình chiếu phụ thuộc.");
+            }
+
+            // Filling template view 13 only creates an isometric view, even with the flat configuration.
+            // Reuse its slot and name with a native Flat Pattern view so the drawing has a real boundary box.
+            doc.ClearSelection2(true);
+            foreach (string name in names)
+                Require(doc.Extension.SelectByID2(name, "DRAWINGVIEW", 0, 0, 0, true, 0, null, 0),
+                    "Không chọn được view mẫu " + name + ".");
+            Require(doc.Extension.DeleteSelection2(0), "Không thay được view mẫu 12/13.");
+            doc.ClearSelection2(true);
+            Require(!ActiveModelViews(drawing).Any(view => names.Contains(view.GetName2())),
+                "View mẫu 12/13 vẫn còn trên Drawing.");
+            return slot;
+        }
+
+        private static bool IsEmptyTemplateView(View view, string number)
+        {
+            string name = view.GetName2().Normalize(NormalizationForm.FormKC).Replace(" ", "").Replace("-", "");
+            return (name == "図面ビュー" + number || string.Equals(name, "DrawingView" + number, StringComparison.OrdinalIgnoreCase))
+                && string.IsNullOrEmpty(view.GetReferencedModelName());
+        }
+
         private static void PaintFlatConfiguration(ModelDoc2 part, string flatConfiguration, int uraNormal)
         {
             string folded = part.ConfigurationManager.ActiveConfiguration.Name;
@@ -618,13 +688,32 @@ namespace ADDIN.Commands.Kadai
             Require(part.ShowConfiguration2(flatConfiguration), "Không mở được cấu hình Flat Pattern của Part.");
             try
             {
+                var configuration = part.ConfigurationManager.ActiveConfiguration;
+                Require(configuration.Name == flatConfiguration && configuration.IsDerived(),
+                    "View 展開 cần tham chiếu cấu hình phái sinh của Part.");
+                var flat = FindFlatPattern(part);
+                int thisConfiguration = (int)swInConfigurationOpts_e.swThisConfiguration;
+                if (IsFlatSuppressed(flat, thisConfiguration))
+                    Require(flat.SetSuppression2((int)swFeatureSuppressionAction_e.swUnSuppressFeature, thisConfiguration, null),
+                        "Không bật được feature Flat Pattern trong cấu hình 展開.");
                 part.EditRebuild3();
+                Require(!IsFlatSuppressed(flat, thisConfiguration) && flat.GetErrorCode2(out bool featureWarning) == 0 && !featureWarning,
+                    "Cấu hình 展開 vẫn chưa mở phẳng được tấm.");
                 PaintUra(part, uraNormal);
             }
             finally { Require(part.ShowConfiguration2(folded), "Không khôi phục được cấu hình ban đầu của Part."); }
+            // Creating or rebuilding the derived configuration can replace the folded face.
+            PaintUra(part, uraNormal);
             int error = 0, warning = 0;
             Require(part.Save3((int)swSaveAsOptions_e.swSaveAsOptions_Silent, ref error, ref warning) && error == 0,
                 "Không lưu được màu mặt của Part: " + error + "/" + warning);
+        }
+
+        private static bool IsFlatSuppressed(Feature flat, int option)
+        {
+            var states = flat.IsSuppressed2(option, null) as Array;
+            Require(states != null && states.Length == 1, "Không đọc được trạng thái Flat Pattern.");
+            return Convert.ToBoolean(states.GetValue(states.GetLowerBound(0)));
         }
 
         private bool UraFacesViewer(View view, int uraNormal)
@@ -649,19 +738,74 @@ namespace ADDIN.Commands.Kadai
             Require(view.SetName2(prefix + number), "Không đặt được tên 図面ビュー cho hình chiếu.");
         }
 
-        private static void AddOmoteMark(ModelDoc2 drawing, View view)
+        private void AddOmoteMark(ModelDoc2 drawing, View view)
         {
             drawing.ClearSelection2(true);
             var bounds = (double[])view.GetOutline();
-            var note = drawing.InsertNote("表") as Note;
-            Require(note != null && note.SetBalloon((int)swBalloonStyle_e.swBS_Circular, (int)swBalloonFit_e.swBF_Tightest),
+            double x = (bounds[0] + bounds[2]) / 2, y = bounds[3] + .005;
+            var sketch = drawing.SketchManager;
+            var blocks = Items(sketch.GetSketchBlockDefinitions()).OfType<SketchBlockDefinition>().ToArray();
+            var omoteBlocks = blocks.Where(block => IsSideBlock(block, false)).ToArray();
+            var uraBlocks = blocks.Where(block => IsSideBlock(block, true));
+            foreach (var instance in uraBlocks.SelectMany(block => Items(block.GetInstances())).OfType<SketchBlockInstance>().ToArray())
+            {
+                Require(instance.Select(false, null) && drawing.Extension.DeleteSelection2(0),
+                    "Không xóa được ký hiệu ウラ có sẵn trong Drawing.");
+                drawing.ClearSelection2(true);
+            }
+
+            var annotations = Items(((DrawingDoc)drawing).GetViews()).SelectMany(Items).OfType<View>()
+                .SelectMany(candidate => Items(candidate.GetNotes())).OfType<Note>().ToArray();
+            var existingNote = annotations.FirstOrDefault(note => IsSideLabel(note.GetText(), false));
+            foreach (var ura in annotations.Where(note => IsSideLabel(note.GetText(), true)))
+            {
+                var annotation = ura.GetAnnotation() as Annotation;
+                Require(annotation != null && annotation.Select3(false, null) && drawing.Extension.DeleteSelection2(0),
+                    "Không xóa được ghi chú ký hiệu ウラ trong Drawing.");
+                drawing.ClearSelection2(true);
+            }
+
+            var omoteBlock = omoteBlocks.SelectMany(block => Items(block.GetInstances())).OfType<SketchBlockInstance>().FirstOrDefault();
+            var point = ((MathUtility)app.GetMathUtility()).CreatePoint(new[] { x, y, 0d }) as MathPoint;
+            if (omoteBlock != null)
+            {
+                omoteBlock.InstancePosition = point;
+                return;
+            }
+            if (omoteBlocks.Length != 0)
+            {
+                Require(sketch.InsertSketchBlockInstance(omoteBlocks[0], point, 1, 0) != null,
+                    "Không đặt được block 表 từ template.");
+                return;
+            }
+
+            if (existingNote != null)
+            {
+                var annotation = existingNote.GetAnnotation() as Annotation;
+                Require(annotation != null && annotation.SetPosition2(x, y, 0), "Không đặt được ký hiệu 表 của template.");
+                return;
+            }
+            var fallbackNote = drawing.InsertNote("表") as Note;
+            Require(fallbackNote != null && fallbackNote.SetBalloon((int)swBalloonStyle_e.swBS_Circular, (int)swBalloonFit_e.swBF_Tightest),
                 "Không tạo được ký hiệu mặt 表.");
-            var annotation = note.GetAnnotation() as Annotation;
-            Require(annotation != null && annotation.SetPosition2((bounds[0] + bounds[2]) / 2, bounds[3] + .005, 0),
+            var newAnnotation = fallbackNote.GetAnnotation() as Annotation;
+            Require(newAnnotation != null && newAnnotation.SetPosition2(x, y, 0),
                 "Không đặt được ký hiệu mặt 表 trên bản vẽ.");
         }
 
-        private static void FitFlatViewToTemplate(ModelDoc2 drawing, View view, Action<string> markStep)
+        private static bool IsSideBlock(SketchBlockDefinition block, bool ura)
+        {
+            var notes = Items(block.GetNotes()).OfType<Note>().ToArray();
+            return notes.Length == 1 && IsSideLabel(notes[0].GetText(), ura);
+        }
+
+        private static bool IsSideLabel(string text, bool ura)
+        {
+            string value = (text ?? "").Normalize(NormalizationForm.FormKC).Trim();
+            return ura ? value == "ウラ" || value == "裏" : value == "表" || value == "オモテ";
+        }
+
+        private static void FitFlatViewToTemplate(ModelDoc2 drawing, View view, Action<string> markStep, double[] center)
         {
             markStep?.Invoke("Đo khổ giấy và hình chiếu");
             var sheet = (Sheet)((DrawingDoc)drawing).GetCurrentSheet();
@@ -669,7 +813,7 @@ namespace ADDIN.Commands.Kadai
             sheet.GetSize(ref width, ref height);
             Require(width > 0 && height > 0, "Khổ giấy của template bản vẽ không hợp lệ.");
 
-            view.UseSheetScale = 1;
+            if (center == null) view.UseSheetScale = 1;
             drawing.EditRebuild3();
             var bounds = (double[])view.GetOutline();
             double viewWidth = bounds[2] - bounds[0], viewHeight = bounds[3] - bounds[1];
@@ -689,8 +833,11 @@ namespace ADDIN.Commands.Kadai
             markStep?.Invoke("Đặt vị trí hình chiếu trên giấy");
             view.PositionLocked = false;
             var position = (double[])view.Position;
-            position[0] += width * .5 - (bounds[0] + bounds[2]) / 2;
-            position[1] += height * .60 - (bounds[1] + bounds[3]) / 2;
+            double halfWidth = (bounds[2] - bounds[0]) / 2, halfHeight = (bounds[3] - bounds[1]) / 2;
+            double centerX = center == null ? width * .5 : Math.Max(.01 + halfWidth, Math.Min(center[0], width - .01 - halfWidth));
+            double centerY = center == null ? height * .60 : Math.Max(.025 + halfHeight, Math.Min(center[1], height - .025 - halfHeight));
+            position[0] += centerX - (bounds[0] + bounds[2]) / 2;
+            position[1] += centerY - (bounds[1] + bounds[3]) / 2;
             view.Position = position;
             drawing.EditRebuild3();
             bounds = (double[])view.GetOutline();

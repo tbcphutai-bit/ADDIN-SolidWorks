@@ -35,6 +35,20 @@ namespace ADDIN.Commands.Kadai
 
     internal enum KadaiUraSide { Unset = 0, First = -1, Second = 1 }
 
+    internal static class KadaiUraAppearance
+    {
+        // Face appearance from the native 4315 KDA1 t7 and d1 parts.
+        private const int Red = 255;
+        private const int Green = 192;
+        private const int Blue = 192;
+        internal const int ColorRef = Red | (Green << 8) | (Blue << 16);
+
+        internal static double[] MaterialValues()
+        {
+            return new[] { Red / 255d, Green / 255d, Blue / 255d, 1d, 1d, .5, .3125, 0, 0 };
+        }
+    }
+
     internal sealed class KadaiApplyOptions
     {
         internal readonly string PartTemplate, DrawingTemplate, MaterialName, MaterialDatabase;
