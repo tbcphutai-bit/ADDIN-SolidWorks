@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -89,6 +90,7 @@ namespace ADDIN.UI
                 UpdateSelectionStatus();
             };
             map.Paint += DrawLayout;
+            map.Resize += (s, e) => map.Invalidate();
             foreach (var input in new[] { countL, countC, startClearance, endClearance, fixedHeight })
                 input.ValueChanged += (s, e) => ResetPreview();
             panelDirection.SelectedIndexChanged += (s, e) => ResetPreview();
@@ -188,13 +190,15 @@ namespace ADDIN.UI
             string previousStatus = status.Text;
             var ready = layout;
             var sourceDocument = source;
+            string step = "Chọn Template Part";
             applying = true;
             apply.Enabled = false;
             Enabled = false;
             try
             {
-                string partTemplate = SelectTemplate(".prtdot", "1. Chọn template ở tab Part.");
+                string partTemplate = SelectTemplate(".prtdot", "Part", "Kadai · 1/5 · Template Part");
                 if (partTemplate == null) return;
+                step = "Chọn vật liệu";
                 string materialDatabase;
                 string material = SelectMaterial(partTemplate, out materialDatabase);
                 if (material == null) return;
@@ -202,15 +206,18 @@ namespace ADDIN.UI
                 app.ActivateDoc3(sourceDocument.DocumentTransient.GetTitle(), false,
                     (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activateError);
 
+                step = "Đặt tên Part";
                 Dictionary<string, string> names;
                 using (var dialog = new PartNamesDialog(ready.Blanks, material))
                 {
                     if (dialog.ShowDialog(this) != DialogResult.OK) return;
                     names = dialog.Names;
                 }
-                string drawingTemplate = SelectTemplate(".drwdot", "4. Chọn template ở tab Draw.");
+                step = "Chọn Template Drawing";
+                string drawingTemplate = SelectTemplate(".drwdot", "Draw", "Kadai · 4/5 · Template bản vẽ");
                 if (drawingTemplate == null) return;
 
+                step = "Chọn thư mục lưu";
                 using (var folder = new FolderBrowserDialog
                 {
                     Description = "5. Chọn nơi lưu bộ chi tiết Kadai",
@@ -219,12 +226,15 @@ namespace ADDIN.UI
                 {
                     if (folder.ShowDialog(this) != DialogResult.OK) return;
                     var options = new KadaiApplyOptions(partTemplate, drawingTemplate, material, materialDatabase, names);
+                    step = "Tạo gói Kadai";
                     previousStatus = "Đã lưu bộ Kadai tại " + ApplyToFolder(folder.SelectedPath, options);
                 }
             }
             catch (Exception ex)
             {
-                previousStatus = ex.Message;
+                previousStatus = step + " · " + ex.Message;
+                Trace.WriteLine("[KADAI] " + step + System.Environment.NewLine + ex);
+                MessageBox.Show(this, previousStatus, "Kadai", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally
             {
@@ -247,32 +257,118 @@ namespace ADDIN.UI
             status.Refresh();
         }
 
-        private string SelectTemplate(string extension, string instruction)
+        private string SelectTemplate(string extension, string tab, string caption)
         {
+            string instruction = "Trong hộp thoại SolidWorks, mở tab " + tab + " và chọn mẫu " + extension + ".";
             SetApplyStatus(instruction);
-            var events = (DSldWorksEvents_Event)app;
+            if (MessageBox.Show(this, instruction, caption, MessageBoxButtons.OKCancel,
+                MessageBoxIcon.Information) != DialogResult.OK)
+                return null;
+
             while (true)
             {
-                string selected = null;
-                DSldWorksEvents_FileNewPreNotifyEventHandler capture = (type, path) =>
+                string selected = CaptureTemplateSelection(() => app.RunCommand(NewDocumentCommand, ""));
+                if (selected == null) return null;
+                if (selected.Length == 0)
                 {
-                    selected = path;
-                    return 1; // Capture the template and cancel creating a document.
-                };
-                events.FileNewPreNotify += capture;
-                try { app.RunCommand(NewDocumentCommand, ""); }
-                finally { events.FileNewPreNotify -= capture; }
-                if (string.IsNullOrEmpty(selected)) return null;
-                try
-                {
-                    KadaiApplyOptions.RequireTemplate(selected, extension);
-                    return selected;
+                    Trace.WriteLine("[KADAI] The new document command did not report the template path.");
+                    return BrowseTemplateFile(extension);
                 }
-                catch (InvalidOperationException ex)
+                if (!string.Equals(Path.GetExtension(selected), extension, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (MessageBox.Show(this, ex.Message + "\n" + instruction, "Kadai", MessageBoxButtons.RetryCancel,
-                        MessageBoxIcon.Information) != DialogResult.Retry) return null;
+                    Trace.WriteLine("[KADAI] Expected " + extension + ", selected: " + selected);
+                    if (MessageBox.Show(this, instruction + "\nMục đã chọn là " + Path.GetFileName(selected) + ".",
+                        caption, MessageBoxButtons.RetryCancel, MessageBoxIcon.Information) != DialogResult.Retry)
+                        return null;
+                    continue;
                 }
+                KadaiApplyOptions.RequireTemplate(selected, extension);
+                return selected;
+            }
+        }
+
+        private string CaptureTemplateSelection(Action invoke)
+        {
+            var events = (DSldWorksEvents_Event)app;
+            var selection = new TemplateSelection();
+            ModelDoc2 scratch = null;
+            DSldWorksEvents_FileNewPreNotifyEventHandler beforeCreate = (type, path) =>
+            {
+                Trace.WriteLine("[KADAI] FileNewPreNotify " + type + ": " + path);
+                return selection.BeforeCreate(path);
+            };
+            DSldWorksEvents_FileNewNotify2EventHandler afterCreate = (document, type, path) =>
+            {
+                Trace.WriteLine("[KADAI] FileNewNotify2 " + type + ": " + path);
+                if (scratch == null) scratch = document as ModelDoc2;
+                selection.AfterCreate(path);
+                return 0;
+            };
+            events.FileNewPreNotify += beforeCreate;
+            try
+            {
+                events.FileNewNotify2 += afterCreate;
+                try { invoke(); }
+                finally { events.FileNewNotify2 -= afterCreate; }
+            }
+            finally
+            {
+                events.FileNewPreNotify -= beforeCreate;
+                if (scratch != null && string.IsNullOrEmpty(scratch.GetPathName()))
+                    app.CloseDoc(scratch.GetTitle());
+            }
+            return selection.Result;
+        }
+
+        private sealed class TemplateSelection
+        {
+            private string path;
+            private bool created;
+
+            // An extension-only pre-notification can be followed by cancellation.
+            public string Result => path ?? (created ? string.Empty : null);
+
+            public int BeforeCreate(string template)
+            {
+                if (!IsTemplatePath(template)) return 0;
+                path = template;
+                return 1; // A known template path can be used without creating a scratch document.
+            }
+
+            public void AfterCreate(string template)
+            {
+                created = true;
+                if (IsTemplatePath(template)) path = template;
+            }
+        }
+
+        private static bool IsTemplatePath(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !Path.IsPathRooted(path)) return false;
+            string extension = Path.GetExtension(path);
+            return string.Equals(extension, ".prtdot", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(extension, ".drwdot", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(extension, ".asmdot", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string BrowseTemplateFile(string extension)
+        {
+            var setting = extension == ".prtdot" ? swUserPreferenceStringValue_e.swDefaultTemplatePart :
+                swUserPreferenceStringValue_e.swDefaultTemplateDrawing;
+            string defaultPath = app.GetUserPreferenceStringValue((int)setting);
+            string templateFolders = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swFileLocationsDocumentTemplates);
+            string initialFolder = (templateFolders ?? "").Split(';').Select(path => path.Trim()).FirstOrDefault(Directory.Exists)
+                ?? Path.GetDirectoryName(defaultPath);
+            using (var dialog = new OpenFileDialog
+            {
+                Title = "Kadai · Chọn file template " + extension,
+                InitialDirectory = initialFolder ?? string.Empty,
+                Filter = "SolidWorks template (*" + extension + ")|*" + extension
+            })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) return null;
+                KadaiApplyOptions.RequireTemplate(dialog.FileName, extension);
+                return dialog.FileName;
             }
         }
 
@@ -434,19 +530,35 @@ namespace ADDIN.UI
             if (layout == null) return;
             var settings = layout.Plan.Settings;
             int u = KadaiPreviewBackend.UAxis(settings.HeightAxis), v = KadaiPreviewBackend.VAxis(settings.HeightAxis);
-            var box = new Rectangle(10, 8, Math.Max(1, map.ClientSize.Width - 21), Math.Max(1, map.ClientSize.Height - 17));
+            var box = FitPreviewBounds(map.ClientRectangle, settings.LengthXmm, settings.LengthZmm);
+            if (box.IsEmpty) return;
+            double pixelsPerMm = box.Width / settings.LengthXmm;
             PointF Project(double[] p) => new PointF(
-                box.Left + (float)((p[u] * 1000 - settings.OriginUmm) / settings.LengthXmm * box.Width),
-                box.Bottom - (float)((p[v] * 1000 - settings.OriginVmm) / settings.LengthZmm * box.Height));
+                box.Left + (float)((p[u] * 1000 - settings.OriginUmm) * pixelsPerMm),
+                box.Bottom - (float)((p[v] * 1000 - settings.OriginVmm) * pixelsPerMm));
             using (var border = new Pen(Color.LightSlateGray))
             using (var longitudinal = new Pen(Color.SeaGreen, 2f))
             using (var transverse = new Pen(Color.Chocolate, 2f))
             {
-                e.Graphics.DrawRectangle(border, box);
+                e.Graphics.DrawRectangle(border, box.X, box.Y, box.Width, box.Height);
                 foreach (var rib in layout.Blanks)
                     e.Graphics.DrawLine(rib.Direction == KadaiRibDirection.Longitudinal ? longitudinal : transverse,
                         Project(rib.PointsWorldMeters[0]), Project(rib.PointsWorldMeters[rib.PointsWorldMeters.Count - 2]));
             }
+        }
+
+        private static RectangleF FitPreviewBounds(Rectangle client, double widthMm, double heightMm)
+        {
+            const int horizontalPadding = 10, verticalPadding = 8;
+            if (!(widthMm > 0) || !(heightMm > 0)) return RectangleF.Empty;
+            double pixelsPerMm = Math.Min((client.Width - 2 * horizontalPadding) / widthMm,
+                (client.Height - 2 * verticalPadding) / heightMm);
+            if (pixelsPerMm <= 0) return RectangleF.Empty;
+
+            float width = (float)(widthMm * pixelsPerMm);
+            float height = (float)(heightMm * pixelsPerMm);
+            return new RectangleF(client.Left + (client.Width - width) / 2,
+                client.Top + (client.Height - height) / 2, width, height);
         }
 
         private static string SourceName(KadaiPanelSource face) =>

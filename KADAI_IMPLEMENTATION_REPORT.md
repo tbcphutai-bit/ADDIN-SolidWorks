@@ -233,3 +233,21 @@ Với template công ty, một lượt thử cho thấy Part mất kết nối C
 Các bước mở và hủy hộp thoại **New SOLIDWORKS Document** và **Material** đã được kiểm tra riêng trong tiến trình thử. Lượt kiểm tra gói đầy đủ truyền các lựa chọn vào điểm bắt đầu ghi của form bằng API. Vị trí tab ban đầu do hộp thoại SolidWorks quản lý. Build Debug/Release x64 đạt. SHA256 của 17 file CAD nguồn 6866 giữ nguyên. So DLL ứng viên với DLL TAI TOOL đang dùng có 0 sai khác tại 47.645 mục IL, metadata và tài nguyên ngoài Kadai. MVID ứng viên `77c145df-3065-4952-92b6-b45067430f89`, SHA256 `24BA4B24B9D98F87EE5F5AE65E570791CF30F77BC5962DB912F8F93F4A42DCF7`.
 
 Các file code sửa gồm `Commands/Kadai/KadaiCadContracts.cs`, `Commands/Kadai/KadaiNativePrototype.cs`, `Commands/Kadai/KadaiPreviewBackend.cs` và `UI/KadaiForm.cs`.
+
+## 14. Apply dừng trước khi tạo gói, 23/11/2026
+
+Log Debug ghi nhiều `InvalidOperationException` trong `ADDIN.dll` nhưng thiếu thông báo và stack trace. Phiên ghi log thoát với mã 0. Chưa tìm được gói mới trong các thư mục đã rà soát để lấy bước cuối từ `INCOMPLETE.txt`. Chưa xác định được ngoại lệ cụ thể của lần chạy đó.
+
+Phát hiện một lỗi trong luồng chọn mẫu của `UI/KadaiForm.cs`. `FileNewPreNotify` có thể trả đuôi file thay vì đường dẫn. Bản trước luôn hủy thao tác tạo ngay ở sự kiện này. Bản sửa tiếp tục khi nhận dữ liệu sơ bộ và lấy đường dẫn từ sự kiện trước hoặc sau tạo tài liệu. Nếu xác nhận rồi mà API thiếu đường dẫn, Kadai mở bộ chọn file theo cấu hình Document Templates. Bước hủy vẫn trả người dùng về Preview. Khi Apply lỗi, form hiện bước lỗi và ghi stack trace vào Output Debug. [SOLIDWORKS FileNewPreNotify](https://help.solidworks.com/2025/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.DSldWorksEvents_FileNewPreNotifyEventHandler.html)
+
+Sáu trường hợp xử lý lựa chọn đều đạt với DLL Debug đã build, gồm thông báo đuôi file rồi hủy, đường dẫn đầy đủ, đường dẫn UNC nhận sau khi tạo tài liệu và yêu cầu chọn lại khi thiếu đường dẫn. Debug/Release x64 đạt. So sánh 47.645 mục IL, metadata và tài nguyên ngoài Kadai cho 0 sai khác. SHA256 của 17 CAD nguồn 6866 giữ nguyên. Lượt chạy SolidWorks 2024 sau khi phiên làm việc đóng được ghi ở mục 15.
+
+Apply có hai lượt chọn mẫu cho cả gói. Trước khi mở hộp thoại gốc, Kadai hiện thông báo riêng cho **1/5 · Template Part** với tab **Part** và mẫu `.prtdot`, hoặc **4/5 · Template bản vẽ** với tab **Draw** và mẫu `.drwdot`. Người dùng có thể hủy từ thông báo để trở về Preview. Nếu chọn nhầm loại file, hộp thoại chọn lại nhắc đúng tab cần dùng.
+
+## 15. Giữ tỷ lệ sơ đồ 2D khi đổi kích thước Preview
+
+`UI/KadaiForm.cs` vẽ lại sơ đồ khi vùng Preview đổi kích thước. Hai trục dùng cùng tỷ lệ mm sang pixel. Khung tấm và các thanh cùng căn giữa theo kích thước khả dụng. Lượt thử render từ bản sao 6866 giữ đúng tỷ lệ tấm 2.250 × 1.450 mm ở bốn khung 910 × 453, 475 × 64, 445 × 393 và 1.050 × 188 pixel, và Apply vẫn mở sau mỗi lần đổi kích thước.
+
+Kiểm thử API trên SolidWorks 2024 SP5.0 xác nhận nhận được đường dẫn hai template công ty khi SolidWorks phát sự kiện tạo tài liệu. Apply trên 6866 tạo 11 Part Sheet Metal, 11 Drawing, 11 DXF và mở lại được Assembly. Drawing kiểm tra có hình chiếu Flat Pattern và giữ khung A4 đã chọn. Phép thử dùng API để truyền các lựa chọn vào form. Log local tại `kadai-assembly-6866/preview-resize-cad-01/run.log`. Build Debug/Release x64 đạt. MVID DLL kiểm thử `e8ef3b4a-4e55-44a4-8ce3-3e624877a367`, SHA256 `469FAD7BD9E7A8E52AC3799AAE94D95CC31D6EB5FE1C28A7D3F70CCC78103F5D`.
+
+Đối chiếu 11 DXF với bộ native tham chiếu cho kết quả trùng biên dạng 1:1 và đủ 56 rãnh. 17 file CAD nguồn 6866 giữ nguyên mã băm. Bản đã thử được cài vào TAI TOOL khi SolidWorks đóng. File phần mềm cập nhật là `UI/KadaiForm.cs`, DLL và PDB. Đối chiếu DLL đã cài cho 0 sai khác tại 47.645 mục ngoài Kadai.
