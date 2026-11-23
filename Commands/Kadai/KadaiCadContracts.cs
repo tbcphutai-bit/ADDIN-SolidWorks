@@ -131,6 +131,7 @@ namespace ADDIN.Commands.Kadai
         public double[] ExtrusionDirection;
         public double[] AlongDirection;
         public double[] HeightDirection;
+        internal bool HasPanelContact;
     }
 
     internal sealed class KadaiPartResult

@@ -104,6 +104,7 @@
     <Compile Include="Commands\Kadai\KadaiCadContracts.cs" />
     <Compile Include="Commands\Kadai\KadaiPreviewBackend.cs" />
     <Compile Include="Commands\Kadai\KadaiNativePrototype.cs" />
+    <Compile Include="Commands\Kadai\KadaiNativePrototype.References.cs" />
     <Compile Include="Commands\Kadai\KadaiJointGeometry.cs" />
     <Compile Include="UI\MakeHolePageValues.cs" />
     <Compile Include="UI\MakeHolePropertyManagerPage.cs" />

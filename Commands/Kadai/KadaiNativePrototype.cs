@@ -10,7 +10,7 @@ using SolidWorks.Interop.swconst;
 namespace ADDIN.Commands.Kadai
 {
     // Writes new native documents into a separate package.
-    internal sealed class KadaiNativePrototype
+    internal sealed partial class KadaiNativePrototype
     {
         readonly ISldWorks app;
         private readonly string materialDatabasePath;
@@ -45,7 +45,7 @@ namespace ADDIN.Commands.Kadai
             throw new InvalidOperationException("Cannot resolve the new sketch by COM identity.");
         }
         private ModelDoc2 WritePart(KadaiProfile3D profile, double bottomMm, string path, List<KadaiJointCut> cuts,
-            bool prototype, int uraNormal)
+            bool prototype, int uraNormal, bool opensAtBottom, Func<ModelDoc2, Dictionary<string, Feature>> addReferences)
         {
             Require(!File.Exists(path), "Refusing to overwrite " + path);
             var local = KadaiJointGeometry.LocalPoints(profile, bottomMm);
@@ -55,6 +55,7 @@ namespace ADDIN.Commands.Kadai
             Require(doc != null, "Cannot create native Part.");
             try {
             doc.SetUserPreferenceIntegerValue((int)swUserPreferenceIntegerValue_e.swUnitsLinear, (int)swLengthUnit_e.swMM);
+            var surfaces = addReferences?.Invoke(doc);
             Feature plane = null;
             for (Feature f = doc.FirstFeature() as Feature; f != null; f = f.GetNextFeature() as Feature)
                 if (f.GetTypeName2() == "RefPlane") { plane = f; break; }
@@ -62,12 +63,12 @@ namespace ADDIN.Commands.Kadai
             var sketch = doc.SketchManager;
             sketch.InsertSketch(true);
             var profileSketchObject = sketch.ActiveSketch;
+            double[] endTrim = null;
             try {
-                sketch.AddToDB = true;
-                for (int i = 0; i < local.Length; i++) {
-                    var a = local[i]; var b = local[(i + 1) % local.Length];
-                    Require(sketch.CreateLine(a[0], a[1], 0, b[0], b[1], 0) != null, "Profile edge failed.");
-                }
+                if (surfaces != null && surfaces.TryGetValue(PanelSurfaceKey, out Feature panelSurface))
+                    endTrim = DrawLinkedPanelProfile(doc, profileSketchObject, panelSurface, local);
+                else
+                    DrawPolygon(doc, local);
             } finally { sketch.AddToDB = false; sketch.InsertSketch(true); }
             var baseSketch = SketchFeature(doc, profileSketchObject);
             Require(baseSketch != null && baseSketch.Select2(false, 0), "Profile sketch missing.");
@@ -79,6 +80,8 @@ namespace ADDIN.Commands.Kadai
                 .0001, 0, 0, false, 0, 0, 0, allowance, true, 0, 0, 0, .5, true, false, true, true);
             Require(flange != null, "Native Sheet Metal Base Flange failed.");
             flange.Name = "Kadai_BaseFlange_" + profile.RibId;
+            if (endTrim != null)
+                TrimLinkedProfile(doc, plane, profile.RibId, local, endTrim);
             if (materialDatabasePath != null) {
                 doc.ClearSelection2(true);
                 SetBodyBendTable(doc);
@@ -92,29 +95,29 @@ namespace ADDIN.Commands.Kadai
             sketch.InsertSketch(true);
             var slotSketchObject = sketch.ActiveSketch;
             try {
-                sketch.AddToDB = true;
-                foreach (var slot in cuts) {
-                    var corners = new[] { new[] { slot.Left, slot.Bottom }, new[] { slot.Right, slot.Bottom },
-                        new[] { slot.Right, slot.Top }, new[] { slot.Left, slot.Top } };
-                    for (int i = 0; i < 4; i++) {
-                        var a = corners[i]; var b = corners[(i + 1) % 4];
-                        Require(sketch.CreateLine(a[0], a[1], 0, b[0], b[1], 0) != null, "Slot sketch edge failed.");
-                    }
-                }
+                if (surfaces != null)
+                    DrawLinkedSlots(doc, slotSketchObject, cuts, opensAtBottom, surfaces);
+                else
+                    foreach (var slot in cuts) DrawPolygon(doc, Rectangle(slot.Left, slot.Bottom, slot.Right, slot.Top));
             } finally { sketch.AddToDB = false; sketch.InsertSketch(true); }
             var slotSketch = SketchFeature(doc, slotSketchObject);
             Require(slotSketch != null && slotSketch.Select2(false, 0), "Slot sketch missing.");
             slotSketch.Name = "Kadai_Slots_" + profile.RibId;
             // Through-all both directions, NormalCut=true, single native Part body.
-            cut = doc.FeatureManager.FeatureCut4(false, false, false, 1, 1, 0, 0,
-                false, false, false, false, 0, 0, false, false, false, false,
-                true, true, true, false, false, false, 0, 0, false, true);
-            Require(cut != null, "Part-level Cut-Extrude failed."); cut.Name = "Kadai_JointCut_" + profile.RibId;
+            cut = CutThroughSheet(doc, "Kadai_JointCut_" + profile.RibId);
             }
             doc.EditRebuild3();
             Require(doc.Extension.NeedsRebuild2 == 0, "Part requires a rebuild.");
             var bodies = Items(((PartDoc)doc).GetBodies2(0, false)).OfType<Body2>().ToList();
             Require(bodies.Count == 1 && bodies[0].IsSheetMetal(), "Expected one native Sheet Metal body.");
+            if (surfaces != null)
+            {
+                var box = (double[])bodies[0].GetBodyBox();
+                Require(Math.Abs(box[2] + box[5] + profile.ThicknessMeters) < .00002,
+                    "Độ dày Sheet Metal lệch khỏi mặt phẳng đã đặt thanh.");
+                foreach (var surface in surfaces.Values)
+                    ((Body2)((Face2)Items(surface.GetFaces()).Single()).GetBody()).HideBody(true);
+            }
             bool warning;
             if (cut != null) Require(cut.GetErrorCode2(out warning) == 0 && !warning, "Cut rebuild error/warning.");
             var flat = FindFlatPattern(doc);
@@ -127,7 +130,10 @@ namespace ADDIN.Commands.Kadai
             if (prototype) doc.Extension.CustomPropertyManager[""].Add3("Kadai_Status", 30, "PROTOTYPE - NOT FOR MANUFACTURE", 2);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             int error = 0, saveWarning = 0;
-            Require(doc.Extension.SaveAs(path, 0, 1, null, ref error, ref saveWarning) && error == 0 && saveWarning == 0,
+            bool saved = surfaces == null
+                ? doc.Extension.SaveAs(path, 0, 1, null, ref error, ref saveWarning)
+                : doc.Save3(1, ref error, ref saveWarning);
+            Require(saved && error == 0 && saveWarning == 0,
                 "Saving prototype failed: " + error + "/" + saveWarning);
             return doc;
             } catch { try { app.CloseDoc(doc.GetTitle()); } catch { } throw; }
@@ -201,11 +207,11 @@ namespace ADDIN.Commands.Kadai
         }
 
         internal void InsertLayout(KadaiPreviewBackend.SlottedLayout layout, ModelDoc2 targetAssembly,
-            string directory, double[] placement, Action<string> progress, KadaiApplyOptions options, Action<ModelDoc2, View> dimensionView)
+            string directory, KadaiPanelSource panel, Action<string> progress, KadaiApplyOptions options, Action<ModelDoc2, View> dimensionView)
         {
             Require(targetAssembly is AssemblyDoc, "Chọn Assembly đích để chèn thanh Kadai.");
             WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, null, progress,
-                targetAssembly, placement, options, dimensionView);
+                targetAssembly, panel, options, dimensionView);
         }
 
         private static string PartName(string ribId, string packageName)
@@ -215,13 +221,22 @@ namespace ADDIN.Commands.Kadai
 
         private void WritePackage(KadaiPlan plan, List<KadaiProfile3D> profiles,
             Dictionary<string, List<KadaiJointCut>> cuts, string directory, bool export, string assemblyTemplate,
-            Action<string> progress, ModelDoc2 targetAssembly = null, double[] placement = null,
+            Action<string> progress, ModelDoc2 targetAssembly = null, KadaiPanelSource panel = null,
             KadaiApplyOptions options = null, Action<ModelDoc2, View> dimensionView = null)
         {
             directory = Path.GetFullPath(directory);
             Require(!Directory.Exists(directory) && !File.Exists(directory), "A new output folder is required.");
             Directory.CreateDirectory(directory);
             bool prototype = targetAssembly == null;
+            if (!prototype)
+            {
+                Require(panel?.PanelComponent != null && !string.IsNullOrEmpty(targetAssembly.GetPathName()),
+                    "Lưu Assembly trước để SolidWorks giữ tham chiếu mặt panel.");
+                Require(!app.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swExternalReferencesDisable)
+                    && app.GetUserPreferenceToggle((int)swUserPreferenceToggle_e.swAllowCreationOfReferencesExternalToModel),
+                    "Bật tạo External References trong System Options của SolidWorks để tạo thanh Kadai liên kết.");
+                profiles = profiles.OrderByDescending(profile => plan.Settings.OpensAtBottom(profile.Direction)).ToList();
+            }
             string incomplete = Path.Combine(directory, "INCOMPLETE.txt");
             File.WriteAllText(incomplete, "Kadai generation has not completed.");
             var culture = System.Globalization.CultureInfo.InvariantCulture;
@@ -237,6 +252,7 @@ namespace ADDIN.Commands.Kadai
                     .Select(rib => rib.Id + "," + rib.StationKey)));
             ModelDoc2 assemblyDoc = targetAssembly;
             var added = new List<Component2>(profiles.Count);
+            var componentsById = new Dictionary<string, Component2>();
             var bom = new List<string> { "RibId,Part,Quantity,Status" };
             string complete = Path.Combine(directory, "PASS.txt");
             string step = prototype ? "Tạo Assembly" : "Kích hoạt Assembly đích";
@@ -258,7 +274,23 @@ namespace ADDIN.Commands.Kadai
                     string partPath = Path.Combine(directory, name + ".SLDPRT");
                     markStep("Tạo Part " + name);
                     progress?.Invoke(step);
-                    var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype, uraNormal);
+                    bool opensAtBottom = plan.Settings.OpensAtBottom(profile.Direction);
+                    Func<ModelDoc2, Dictionary<string, Feature>> addReferences = null;
+                    if (!prototype)
+                    {
+                        addReferences = partDoc =>
+                        {
+                            SaveBlankPart(partDoc, partPath);
+                            var component = InsertPartAtTransform(assemblyDoc, partPath, profile, plan.Settings.BottomMm,
+                                panel.ComponentPlacement, -profile.ThicknessMeters * .5, added);
+                            componentsById.Add(profile.RibId, component);
+                            markStep("Gắn tham chiếu " + name);
+                            return AddLinkedFaces(assemblyDoc, partDoc, component, profile, cuts[profile.RibId],
+                                panel, opensAtBottom, componentsById, cuts);
+                        };
+                    }
+                    var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype, uraNormal,
+                        opensAtBottom, addReferences);
                     try
                     {
                         if (prototype && export)
@@ -269,8 +301,11 @@ namespace ADDIN.Commands.Kadai
                         // Insert before the Drawing can close or replace the Part's open document.
                         // AddComponent5 requires the Part to remain loaded.
                         markStep("Chèn vào Assembly " + name);
-                        bom.Add(InsertOpenPart(assemblyDoc, part, partPath, profile, plan.Settings.BottomMm,
-                            placement, prototype, added));
+                        if (prototype)
+                            bom.Add(InsertOpenPart(assemblyDoc, part, partPath, profile, plan.Settings.BottomMm,
+                                null, true, added));
+                        else
+                            bom.Add(BomRow(profile.RibId, partPath, false));
                         if (export)
                         {
                             string drawingPath = Path.Combine(directory, name + ".SLDDRW");
@@ -380,11 +415,18 @@ namespace ADDIN.Commands.Kadai
             VerifyManufacturingSettings(part, profile.ThicknessMeters);
             var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
             var box = (double[])body.GetBodyBox();
+            InsertPartAtTransform(doc, partPath, profile, bottomMm, placement, (box[2] + box[5]) / 2, added);
+            return BomRow(profile.RibId, partPath, prototype);
+        }
+
+        private Component2 InsertPartAtTransform(ModelDoc2 doc, string partPath, KadaiProfile3D profile,
+            double bottomMm, double[] placement, double centerZ, List<Component2> added)
+        {
             double[] a = profile.AlongDirection, h = profile.HeightDirection;
             var n = PartNormal(profile);
             var origin = (double[])profile.PointsWorldMeters[0].Clone();
             double localHeight = Dot(origin, h) - bottomMm * .001;
-            for (int k = 0; k < 3; k++) origin[k] -= h[k] * localHeight + n[k] * (box[2] + box[5]) / 2;
+            for (int k = 0; k < 3; k++) origin[k] -= h[k] * localHeight + n[k] * centerZ;
             if (placement != null)
             {
                 a = KadaiPreviewBackend.IntoPanelFrame(a, placement, null, false);
@@ -406,9 +448,14 @@ namespace ADDIN.Commands.Kadai
             assembly.FixComponent();
             doc.ClearSelection2(true);
             Require(component.IsFixed(), "Cannot fix rib component: " + profile.RibId);
+            return component;
+        }
+
+        private static string BomRow(string ribId, string partPath, bool prototype)
+        {
             string partFile = Path.GetFileName(partPath);
             if (partFile.Contains(",")) partFile = "\"" + partFile + "\"";
-            return profile.RibId + "," + partFile + ",1," + (prototype ? "PROTOTYPE" : "KADAI");
+            return ribId + "," + partFile + ",1," + (prototype ? "PROTOTYPE" : "KADAI");
         }
 
         private void ActivateAssembly(ModelDoc2 doc)

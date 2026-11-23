@@ -29,6 +29,7 @@ namespace ADDIN.UI
         private readonly NumericUpDown startClearance = Number(0, 99999, 50, 1);
         private readonly NumericUpDown endClearance = Number(0, 99999, 50, 1);
         private readonly NumericUpDown fixedHeight = Number(.1m, 99999, 170, 1);
+        private readonly NumericUpDown jointHeight = Number(.1m, 99999, 100, 1);
         private readonly ComboBox panelDirection = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
         private readonly Label panelName = FaceLabel();
         private readonly Label baseName = FaceLabel();
@@ -51,7 +52,7 @@ namespace ADDIN.UI
             backend = new KadaiPreviewBackend(app);
             Text = "Kadai";
             ClientSize = new Size(505, 416);
-            MinimumSize = new Size(465, 422);
+            MinimumSize = new Size(465, 455);
             StartPosition = FormStartPosition.Manual;
             var workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
             Location = new Point(Math.Max(workArea.Left, workArea.Right - Width), workArea.Top + 48);
@@ -74,6 +75,7 @@ namespace ADDIN.UI
             AddRow(form, Caption("Khoảng chừa đầu base (mm)"), startClearance);
             AddRow(form, Caption("Khoảng chừa cuối base (mm)"), endClearance);
             AddRow(form, Caption("Chiều cao thanh cố định (mm)"), fixedHeight);
+            AddRow(form, Caption("Chiều cao rãnh từ mặt đế (mm)"), jointHeight);
             AddFullRow(form, map, new RowStyle(SizeType.Percent, 100));
             AddFullRow(form, status, new RowStyle(SizeType.Absolute, 42));
 
@@ -95,7 +97,7 @@ namespace ADDIN.UI
             };
             map.Paint += DrawLayout;
             map.Resize += (s, e) => map.Invalidate();
-            foreach (var input in new[] { countL, countC, startClearance, endClearance, fixedHeight })
+            foreach (var input in new[] { countL, countC, startClearance, endClearance, fixedHeight, jointHeight })
                 input.ValueChanged += (s, e) => ResetPreview();
             panelDirection.SelectedIndexChanged += (s, e) => ResetPreview();
             UpdateSelectionStatus();
@@ -173,6 +175,7 @@ namespace ADDIN.UI
                     LongRibCount = (int)countL.Value, CrossRibCount = (int)countC.Value,
                     StartClearanceMm = (double)startClearance.Value, EndClearanceMm = (double)endClearance.Value,
                     FixedHeightMm = (double)fixedHeight.Value,
+                    JointHeightMm = (double)jointHeight.Value,
                     PanelRibDirection = panelDirection.SelectedIndex == 0 ? KadaiRibDirection.Longitudinal : KadaiRibDirection.Transverse,
                     LongThicknessMm = ribThicknessMm, CrossThicknessMm = ribThicknessMm,
                     LongSlotExtraMm = slotClearanceMm, CrossSlotExtraMm = slotClearanceMm

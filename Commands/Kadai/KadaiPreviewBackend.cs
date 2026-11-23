@@ -231,6 +231,7 @@ namespace ADDIN.Commands.Kadai
                 Func<double, double[]> panelAt = coordinate => Intersect(face, surface, modeler, h, along, across,
                     coordinate, fixedCoordinate, box[h] - 1, box[h + 3] + 1, sign * settings.GapToPanelMm * .001);
                 List<double[]> samples;
+                bool hasPanelContact = false;
                 if (baseFace == null)
                 {
                     samples = TraceSection(panelAt, start, start + span, along, h, settings.PreviewChordToleranceMm * .001);
@@ -260,6 +261,7 @@ namespace ADDIN.Commands.Kadai
                             along, h, settings.PreviewChordToleranceMm * .001);
                         if (contact.Count > 0)
                         {
+                            hasPanelContact = true;
                             // Carry the nearest contact height horizontally to each edge of the base.
                             ExtendToBaseEdge(contact, baseSection[0][along], along, true);
                             ExtendToBaseEdge(contact, baseSection[1][along], along, false);
@@ -272,6 +274,7 @@ namespace ADDIN.Commands.Kadai
                     throw new InvalidOperationException(rib.Id + ": mặt đế ở sai phía panel hoặc quá sát. Kiểm tra hướng cao và mặt đế.");
                 var heightDirection = Unit(h); heightDirection[h] = sign;
                 var profile = new KadaiProfile3D { RibId = rib.Id, Direction = rib.Direction,
+                    HasPanelContact = hasPanelContact,
                     ThicknessMeters = (longitudinal ? settings.LongThicknessMm : settings.CrossThicknessMm) * .001,
                     ExtrusionDirection = Unit(across), AlongDirection = Unit(along), HeightDirection = heightDirection,
                     Closed = true, ValidationMessage = "Panel section midpoint tolerance " + settings.PreviewChordToleranceMm + " mm." };
@@ -307,7 +310,10 @@ namespace ADDIN.Commands.Kadai
                 throw new InvalidOperationException("Chiều cao thanh cố định quá thấp để tạo rãnh ghép.");
             if (straightHeight >= datum.MinPanelHeightMm - .05)
                 throw new InvalidOperationException("Chiều cao thanh cố định chạm hoặc quá sát panel. Giảm chiều cao.");
-            double seamMm = straightHeight >= 100 + thickness ? 100 : (straightHeight + depthClearanceMm) / 2;
+            double seamMm = request.JointHeightMm ?? (straightHeight >= 100 + thickness ? 100 : (straightHeight + depthClearanceMm) / 2);
+            if (double.IsNaN(seamMm) || double.IsInfinity(seamMm) ||
+                seamMm < thickness + depthClearanceMm || seamMm > straightHeight - thickness)
+                throw new InvalidOperationException("Chiều cao rãnh từ mặt đế phải chừa đủ vật liệu ở cả hai phía của thanh đỡ.");
             var plan = KadaiPlanner.Build(request);
             var blanks = CalculateProfiles(plan, panel, datum, straightHeight);
             var cuts = KadaiJointGeometry.Build(plan, blanks, seamMm, depthClearanceMm);
@@ -357,7 +363,7 @@ namespace ADDIN.Commands.Kadai
             {
                 var writer = new KadaiNativePrototype(app, options.MaterialDatabase, options.MaterialName, bendTable,
                     options.PartTemplate, options.DrawingTemplate);
-                writer.InsertLayout(layout, targetAssembly, target, panel.ComponentPlacement, progress, options, dimensionView);
+                writer.InsertLayout(layout, targetAssembly, target, panel, progress, options, dimensionView);
                 return target;
             }
             catch (Exception ex)

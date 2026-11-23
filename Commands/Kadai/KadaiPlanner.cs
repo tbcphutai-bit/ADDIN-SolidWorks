@@ -22,6 +22,7 @@ namespace ADDIN.Commands.Kadai
         public double? EndClearanceMm;
         public KadaiRibDirection? PanelRibDirection;
         public double FixedHeightMm = 170;
+        public double? JointHeightMm;
         public bool OpensAtBottom(KadaiRibDirection direction)
         {
             return direction == (PanelRibDirection ?? KadaiRibDirection.Longitudinal);
