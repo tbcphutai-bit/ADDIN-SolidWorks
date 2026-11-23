@@ -1,6 +1,6 @@
 # KADAI_IMPLEMENTATION_REPORT
 
-Ngày thực hiện: 17–18/11/2026, Asia/Bangkok. **Chưa nghiệm thu sản xuất; Apply/Export trong UI vẫn khóa.**
+Khảo sát ban đầu thực hiện ngày 17–18/11/2026, giờ Bangkok. Apply và Export được khóa trong đợt khảo sát. Các mục cuối ghi kết quả kiểm tra hiện tại trên bản sao.
 
 Repository: https://github.com/tbcphutai-bit/ADDIN-SolidWorks  
 Branch: `feature/kadai-parametric-panel-ribs-20261117`  
@@ -325,3 +325,21 @@ Build Debug/Release x64 đạt. So sánh với bản kiểm thử mục 19 cho 0
 Mặt ghép dùng mốc cao độ chung đo từ mặt đế. Người dùng nhập chiều cao thanh đỡ `H` và chiều cao rãnh mở từ đáy `h`. Sketch 2D của nhóm mở từ đáy mang DIM điều khiển `h`. Sketch đối ứng lấy giao tuyến từ mốc đó và dùng độ lệch **0,1 mm** để tạo Cut-Extrude tại cấp Part. Với rãnh đối ứng mở từ đỉnh thanh cao `H`, chiều sâu là `H - h + 0,1 mm`. Mẫu KDA1 ghi 100 mm và 70,1 mm với `H = 170 mm`. Khoảng hở theo chiều cao độc lập với khoảng hở bề rộng.
 
 Phương án giữ tham chiếu một chiều từ hình học định vị có trước Cut vào các sketch rãnh và tránh hai Part tham chiếu Cut của nhau. Thử nghiệm cần kiểm tra rebuild khi đổi `h`, thay mặt panel và dịch vị trí giao. Việc thêm hay bớt số thanh cần xử lý tập component và sketch thay đổi. Mục này mô tả thiết kế đang trao đổi. [SolidWorks API IntersectCurves](https://help.solidworks.com/2024/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISketchManager~IntersectCurves.html)
+
+## 21. Giao tuyến panel và rãnh liên kết trong Assembly
+
+Kadai có thêm ô **Chiều cao rãnh từ mặt đế (mm)**, mặc định 100 mm. Giá trị này độc lập với chiều cao thanh đỡ. Preview kiểm tra phần vật liệu còn lại quanh rãnh và được tạo lại khi người dùng đổi giá trị. Chọn Dọc hoặc Ngang quyết định nhóm bám panel và mở rãnh từ đáy.
+
+Apply tạo Part và đặt vào đúng Assembly trước khi ghi tham chiếu. Trong Edit Part, add-in tạo Offset Surface 0 mm từ chính mặt panel đã chọn. Trên mặt phẳng thanh, lệnh **交線カーブ** tạo đường trên của sketch Base Flange. Hai đoạn nối và một Normal Cut giới hạn thanh theo mép base. Cách này giữ được đường giao native khi mép panel và mép base lệch nhau. Nhóm mở rãnh từ đáy có DIM điều khiển đo từ mặt đế trên sketch Cut. Mỗi rãnh đối ứng lấy mặt đáy rãnh tương ứng qua Offset Surface 0,1 mm về phía đế. Giao tuyến của mặt này đi thẳng vào sketch Normal Cut của thanh đối ứng. Tham chiếu đi theo một chiều để tránh vòng giữa hai Part. [SolidWorks Intersection Curve](https://help.solidworks.com/2024/english/solidworks/sldworks/c_Intersection_Curves.htm) · [SolidWorks Offset Surface](https://help.solidworks.com/2024/english/SolidWorks/sldworks/t_offset_surface.htm)
+
+Trên SolidWorks 2024 SP5.0, gọi trực tiếp `ISketchManager.IntersectCurves` khi chọn mặt panel của component khác trong Edit Part không sinh giao tuyến. Gọi lệnh native trên mặt Offset Surface đã liên kết bên trong Part sinh spline với quan hệ giao tuyến và tham chiếu in-context về đúng mặt panel. Bản sao thử nghiệm được gỡ ràng buộc vị trí panel để đo rebuild. Khi panel dịch 5 mm, biên trên Base Flange dịch 5 mm và đáy giữ cao độ. Đổi DIM rãnh A từ 110 lên 120 mm làm mặt đáy rãnh B đổi từ 109,9 lên 119,9 mm sau rebuild. Log thử nghiệm ở `kadai-assembly-6866/assoc-intersection-probe-11/run.log`.
+
+Mã thuộc `Commands/Kadai/KadaiNativePrototype.References.cs`, `KadaiNativePrototype.cs`, `KadaiPreviewBackend.cs`, `KadaiPlanner.cs`, `KadaiCadContracts.cs`, `UI/KadaiForm.cs` và một mục compile trong `ADDIN.csproj`. Build Debug/Release x64 với PIA SolidWorks 2024. So sánh 47.738 mục IL và metadata ngoài Kadai với bản đã triển khai cho 0 khác biệt. Thay đổi số lượng thanh vẫn dùng lại Preview và tạo bộ mới. Nếu thay topology làm mặt panel biến mất, phải chọn lại tham chiếu.
+
+Mở lại Assembly 6866 đã lưu sau Apply và kiểm tra Feature Data của thanh xác nhận tham chiếu in-context về đúng Part panel. Khi dịch panel 5 mm trong phiên kiểm thử tiếp theo, thân Sheet Metal đã tạo bằng Apply tăng cao 5 mm, giữ nguyên đáy. Phép thử chuyển vị trí chỉ thực hiện trong bộ nhớ của bản sao. Log ở `kadai-assembly-6866/assoc-linked-reopen-01/run.log`.
+
+Hai lượt kiểm thử 6866 ở phương Dọc và Ngang đều chạy Apply với 7 thanh dọc, 4 thanh ngang, chiều cao thanh đỡ 170 mm và cao độ rãnh A 110 mm. Mỗi lượt đo đủ 56 đáy rãnh trên 11 Part thật, xác nhận cao độ A 110 mm và B 109,9 mm. Sửa DIM A lên 120 mm, rebuild Assembly và đo lại B 119,9 mm. Thử nghiệm hoàn tác khi lỗi sau lần chèn đầu và phép lưu rồi mở lại Assembly bản sao đều đạt. Mỗi lượt tạo 11 bản vẽ 展開 hướng 表 có Bounding Box và đủ W/L qua DIM Kegaki. Vật liệu custom StSA- được đọc lại ở Part, configuration triển khai và khung tên Drawing. Lượt Apply kiểm tra Assembly trên đĩa giữ nguyên cho tới khi gọi lưu riêng. Thư mục kết quả có Part và Drawing, số DXF bằng 0.
+
+Log đầy đủ ở `kadai-assembly-6866/assoc-linked-package-03/run.log` và `kadai-assembly-6866/assoc-linked-transverse-01/run.log`. Bản Debug kiểm thử có MVID `61cf2631-7881-4e3d-a22f-8a2ef8c61e98` và SHA256 `9F013DD0D2A84697312BB414F86622688951E2BE3087D5B21F570F1927FC1979`.
+
+Mã đã kiểm thử được đồng bộ vào project TAI TOOL để tự rebuild. SHA256 của DLL đang cài giữ nguyên. Đợt xác minh cuối kiểm tra lại 109 mã băm CAD đầu vào. Lượt chạy Apply đầy đủ cho đường tham chiếu mới dùng Assembly 6866; phần phân tích Feature Tree của 4315 và KF3 nằm ở các mục đầu. [Commit triển khai](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/commit/544005375ec4d21db191fb4407906c615ff89dcb)
