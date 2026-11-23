@@ -171,13 +171,7 @@ namespace ADDIN.Commands.Kadai
         private void VerifyManufacturingSettings(ModelDoc2 doc, double expectedThickness)
         {
             if (materialDatabasePath == null) return;
-            string configuration = doc.ConfigurationManager.ActiveConfiguration.Name;
-            string database;
-            string material = ((PartDoc)doc).GetMaterialPropertyName2(configuration, out database);
-            Require(string.Equals(materialName, material, StringComparison.Ordinal)
-                && string.Equals(Path.GetFileNameWithoutExtension(materialDatabasePath),
-                    Path.GetFileNameWithoutExtension(database), StringComparison.OrdinalIgnoreCase),
-                "SolidWorks did not retain the selected custom material. Read " + database + " / " + material);
+            VerifyMaterial((PartDoc)doc, doc.ConfigurationManager.ActiveConfiguration.Name);
 
             var settings = FindSheetMetalFeature(doc).GetDefinition() as SheetMetalFeatureData;
             Require(settings != null && Math.Abs(settings.Thickness - expectedThickness) <= 1e-8,
@@ -186,6 +180,16 @@ namespace ADDIN.Commands.Kadai
             Require(allowance != null && allowance.Type == (int)swBendAllowanceTypes_e.swBendAllowanceBendTable
                 && string.Equals(allowance.BendTableFile, bendTablePath, StringComparison.OrdinalIgnoreCase),
                 "SolidWorks did not retain the selected bend table. Read " + allowance?.Type + " / " + allowance?.BendTableFile);
+        }
+
+        private void VerifyMaterial(PartDoc part, string configuration)
+        {
+            if (materialDatabasePath == null) return;
+            string material = part.GetMaterialPropertyName2(configuration, out string database);
+            Require(string.Equals(materialName, material, StringComparison.Ordinal)
+                && string.Equals(Path.GetFileNameWithoutExtension(materialDatabasePath),
+                    Path.GetFileNameWithoutExtension(database), StringComparison.OrdinalIgnoreCase),
+                "SolidWorks không giữ vật liệu đã chọn trong cấu hình " + configuration + ". Đọc được " + database + " / " + material + ".");
         }
 
         internal void WriteNewPackage(KadaiPlan plan, List<KadaiProfile3D> profiles, string directory,
@@ -558,8 +562,8 @@ namespace ADDIN.Commands.Kadai
             Require(view != null, "Flat drawing view failed.");
             if (uraNormal != 0)
             {
-                markStep?.Invoke("Tô mặt ウラ trong cấu hình 展開");
-                PaintFlatConfiguration(part, view.ReferencedConfiguration, uraNormal);
+                markStep?.Invoke("Gán vật liệu và tô mặt ウラ trong cấu hình 展開");
+                PrepareFlatConfiguration(part, view.ReferencedConfiguration, uraNormal);
                 int activationError = 0;
                 app.ActivateDoc3(drawing.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activationError);
                 markStep?.Invoke("Định hướng mặt 表");
@@ -680,8 +684,9 @@ namespace ADDIN.Commands.Kadai
                 && string.IsNullOrEmpty(view.GetReferencedModelName());
         }
 
-        private static void PaintFlatConfiguration(ModelDoc2 part, string flatConfiguration, int uraNormal)
+        private void PrepareFlatConfiguration(ModelDoc2 part, string flatConfiguration, int uraNormal)
         {
+            var partDoc = (PartDoc)part;
             string folded = part.ConfigurationManager.ActiveConfiguration.Name;
             Require(!string.IsNullOrEmpty(flatConfiguration) && folded != flatConfiguration,
                 "Drawing không tham chiếu cấu hình Flat Pattern riêng.");
@@ -699,14 +704,20 @@ namespace ADDIN.Commands.Kadai
                 part.EditRebuild3();
                 Require(!IsFlatSuppressed(flat, thisConfiguration) && flat.GetErrorCode2(out bool featureWarning) == 0 && !featureWarning,
                     "Cấu hình 展開 vẫn chưa mở phẳng được tấm.");
+                // SolidWorks may copy the material override from the Part template into the flat configuration.
+                if (materialDatabasePath != null)
+                    partDoc.SetMaterialPropertyName2(flatConfiguration, materialDatabasePath, materialName);
+                VerifyMaterial(partDoc, flatConfiguration);
                 PaintUra(part, uraNormal);
             }
             finally { Require(part.ShowConfiguration2(folded), "Không khôi phục được cấu hình ban đầu của Part."); }
             // Creating or rebuilding the derived configuration can replace the folded face.
             PaintUra(part, uraNormal);
+            VerifyMaterial(partDoc, folded);
+            VerifyMaterial(partDoc, flatConfiguration);
             int error = 0, warning = 0;
             Require(part.Save3((int)swSaveAsOptions_e.swSaveAsOptions_Silent, ref error, ref warning) && error == 0,
-                "Không lưu được màu mặt của Part: " + error + "/" + warning);
+                "Không lưu được vật liệu và màu mặt của Part: " + error + "/" + warning);
         }
 
         private static bool IsFlatSuppressed(Feature flat, int option)

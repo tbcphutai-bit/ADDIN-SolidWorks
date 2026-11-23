@@ -492,7 +492,7 @@ namespace ADDIN.UI
             {
                 Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
                 AllowUserToResizeRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.CellSelect
+                RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = true
             };
             private readonly Label validation = new Label { AutoSize = true, ForeColor = Color.Firebrick };
             private readonly Action refreshInspection;
@@ -519,6 +519,8 @@ namespace ADDIN.UI
 
                 var hint = Caption("Chọn thanh trong bảng. Xoay và zoom Assembly để xem hai mặt.");
                 AddFullRow(content, hint, new RowStyle(SizeType.AutoSize));
+                AddFullRow(content, Caption("Shift + nhấp để chọn một dải. Ctrl + nhấp để chọn từng thanh."),
+                    new RowStyle(SizeType.AutoSize));
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Thanh", ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.NotSortable, FillWeight = 38 });
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Tên Part", SortMode = DataGridViewColumnSortMode.NotSortable });
@@ -566,10 +568,15 @@ namespace ADDIN.UI
                 CancelButton = cancel;
 
                 var viewing = KadaiUraSide.Unset;
+                var visibleSides = new Dictionary<KadaiRibDirection, KadaiUraSide>();
+                bool settingSides = false;
+                DataGridViewRow[] SelectedRibs() => grid.SelectedRows.Cast<DataGridViewRow>().ToArray();
+
                 void RefreshInspection(bool draw)
                 {
                     if (!(grid.CurrentRow?.Tag is KadaiProfile3D rib)) return;
                     var side = (KadaiUraSide)grid.CurrentRow.Cells[2].Value;
+                    var selection = SelectedRibs();
                     try
                     {
                         bool available = sourceIsCurrent();
@@ -579,27 +586,56 @@ namespace ADDIN.UI
                             highlight(rib.RibId, side);
                         }
                         viewing = available ? visibleSide(rib) : KadaiUraSide.Unset;
+                        visibleSides.Clear();
+                        if (available)
+                        {
+                            visibleSides[rib.Direction] = viewing;
+                            foreach (var row in selection)
+                            {
+                                var target = (KadaiProfile3D)row.Tag;
+                                if (!visibleSides.ContainsKey(target.Direction))
+                                    visibleSides[target.Direction] = visibleSide(target);
+                            }
+                        }
                         look.Enabled = isolation.Enabled = next.Enabled = available;
-                        choose.Enabled = opposite.Enabled = available && viewing != KadaiUraSide.Unset;
-                        reverse.Enabled = group.Enabled = available && side != KadaiUraSide.Unset;
+                        opposite.Enabled = available && viewing != KadaiUraSide.Unset;
+                        choose.Enabled = available && selection.Length != 0 &&
+                            selection.All(row => visibleSides[((KadaiProfile3D)row.Tag).Direction] != KadaiUraSide.Unset);
+                        reverse.Enabled = available && selection.Length != 0 &&
+                            selection.All(row => (KadaiUraSide)row.Cells[2].Value != KadaiUraSide.Unset);
+                        group.Enabled = available && selection.Length == 1 && grid.CurrentRow.Selected && side != KadaiUraSide.Unset;
                         if (!available) hint.Text = "Quay lại Assembly đã Preview. Nếu nó đã thay đổi, tạo lại Preview.";
                         else if (viewing == KadaiUraSide.Unset) hint.Text = rib.RibId + " · Hãy xoay để thấy mặt rộng, hoặc bấm Xem rõ thanh.";
+                        else if (selection.Length > 1 && !choose.Enabled) hint.Text = "Xoay Assembly để thấy mặt rộng của mọi thanh đã chọn.";
                         else
                         {
                             string face = viewing == KadaiUraSide.First ? "Mặt 1" : "Mặt 2";
                             string role = side == KadaiUraSide.Unset ? "chưa chọn ウラ" : side == viewing ? "ウラ · màu hồng" : "表 · mặt lên bản vẽ";
                             hint.Text = rib.RibId + " · Đang xem " + face + " · " + role;
                         }
-                        progress.Text = grid.Rows.Cast<DataGridViewRow>().Count(row => (KadaiUraSide)row.Cells[2].Value != KadaiUraSide.Unset)
+                        progress.Text = (selection.Length > 1 ? "Đang chọn " + selection.Length + " thanh · " : "") +
+                            grid.Rows.Cast<DataGridViewRow>().Count(row => (KadaiUraSide)row.Cells[2].Value != KadaiUraSide.Unset)
                             + "/" + ribs.Count + " thanh đã chọn mặt ウラ";
                     }
                     catch (Exception ex) when (ex is COMException || ex is InvalidOperationException)
                     {
-                        choose.Enabled = opposite.Enabled = next.Enabled = false;
+                        choose.Enabled = opposite.Enabled = reverse.Enabled = group.Enabled = next.Enabled = false;
                         hint.Text = "Không thể xem thanh " + rib.RibId + " trong Assembly.";
                         Trace.WriteLine("[KADAI] Naming highlight: " + ex);
                     }
                 }
+
+                void SetSides(IEnumerable<DataGridViewRow> rows, Func<DataGridViewRow, KadaiUraSide> getSide)
+                {
+                    settingSides = true;
+                    try
+                    {
+                        foreach (var row in rows) row.Cells[2].Value = getSide(row);
+                    }
+                    finally { settingSides = false; }
+                    RefreshInspection(true);
+                }
+
                 refreshInspection = () => RefreshInspection(false);
                 void FocusFace(bool flip)
                 {
@@ -618,9 +654,11 @@ namespace ADDIN.UI
                 choose.Click += (s, e) =>
                 {
                     RefreshInspection(false);
-                    if (choose.Enabled) grid.CurrentRow.Cells[2].Value = viewing;
+                    if (choose.Enabled)
+                        SetSides(SelectedRibs(), row => visibleSides[((KadaiProfile3D)row.Tag).Direction]);
                 };
                 grid.CurrentCellChanged += (s, e) => RefreshInspection(true);
+                grid.SelectionChanged += (s, e) => RefreshInspection(false);
                 grid.CurrentCellDirtyStateChanged += (s, e) =>
                 {
                     if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewComboBoxCell)
@@ -628,20 +666,21 @@ namespace ADDIN.UI
                 };
                 grid.CellValueChanged += (s, e) =>
                 {
-                    if (e.ColumnIndex == sides.Index && e.RowIndex == grid.CurrentCell?.RowIndex) RefreshInspection(true);
+                    if (!settingSides && e.ColumnIndex == sides.Index) RefreshInspection(e.RowIndex == grid.CurrentCell?.RowIndex);
                 };
                 reverse.Click += (s, e) =>
                 {
-                    var cell = grid.CurrentRow.Cells[2];
-                    cell.Value = Opposite((KadaiUraSide)cell.Value);
+                    RefreshInspection(false);
+                    if (reverse.Enabled)
+                        SetSides(SelectedRibs(), row => Opposite((KadaiUraSide)row.Cells[2].Value));
                 };
                 group.Click += (s, e) =>
                 {
-                    var selected = (KadaiProfile3D)grid.CurrentRow.Tag;
-                    var side = grid.CurrentRow.Cells[2].Value;
-                    foreach (DataGridViewRow row in grid.Rows)
-                        if (((KadaiProfile3D)row.Tag).Direction == selected.Direction) row.Cells[2].Value = side;
                     RefreshInspection(false);
+                    if (!group.Enabled) return;
+                    var selected = (KadaiProfile3D)grid.CurrentRow.Tag;
+                    var side = (KadaiUraSide)grid.CurrentRow.Cells[2].Value;
+                    SetSides(grid.Rows.Cast<DataGridViewRow>().Where(row => ((KadaiProfile3D)row.Tag).Direction == selected.Direction), row => side);
                 };
                 Shown += (s, e) => RefreshInspection(true);
                 cancel.Click += (s, e) => Close();
