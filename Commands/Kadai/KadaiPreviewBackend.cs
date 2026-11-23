@@ -23,12 +23,15 @@ namespace ADDIN.Commands.Kadai
 
         private readonly ISldWorks app;
         private readonly int threadId = Thread.CurrentThread.ManagedThreadId;
-        private const int HighlightColor = 0xD000FF;
-        private readonly Dictionary<string, (Body2 Body, int Color)> visibleBodies =
-            new Dictionary<string, (Body2 Body, int Color)>(StringComparer.Ordinal);
+        private const int HighlightColor = 0xFFB060;
+        private const int UraColor = 0xB87CFF;
+        private readonly Dictionary<string, (Body2 Body, int Color, double[] Across)> visibleBodies =
+            new Dictionary<string, (Body2 Body, int Color, double[] Across)>(StringComparer.Ordinal);
         private ModelDoc2 previewDocument;
         private object previewContext;
         private string highlightedRibId;
+        private KadaiUraSide highlightedSide;
+        private Body2 uraPreview;
         internal int VisibleBodyCount { get { return visibleBodies.Count; } }
         internal KadaiPreviewBackend(ISldWorks app) { this.app = app; }
         private void CheckThread()
@@ -313,46 +316,38 @@ namespace ADDIN.Commands.Kadai
         }
 
         internal string ApplyBaseLayout(SlottedLayout layout, KadaiPanelSource panel, KadaiBaseDatum datum,
-            string parentDirectory, KadaiApplyOptions options, Action<string> progress)
+            string parentDirectory, KadaiApplyOptions options, Action<string> progress, Action<ModelDoc2, View> dimensionView)
         {
             CheckThread();
             if (layout == null || !IsSourceCurrent(panel) || datum == null || !IsSourceCurrent(datum.Source))
                 throw new InvalidOperationException("Mô hình đã thay đổi. Hãy tạo lại Preview trước khi Apply.");
+            var targetAssembly = panel.DocumentTransient;
+            var assembly = targetAssembly as AssemblyDoc;
+            if (assembly == null || !IsAssemblyEditingRoot(assembly))
+                throw new InvalidOperationException("Apply cần Assembly đang mở ở chế độ chỉnh sửa cấp trên cùng.");
+            if (targetAssembly.IsOpenedReadOnly() || targetAssembly.IsOpenedViewOnly())
+                throw new InvalidOperationException("Assembly đang mở ở chế độ chỉ đọc. Hãy mở lại với quyền chỉnh sửa để Apply.");
             if (!Directory.Exists(parentDirectory))
                 throw new InvalidOperationException("Chọn thư mục để lưu bộ chi tiết Kadai.");
 
             options.Validate(layout.Blanks);
-            var openParts = ((app.GetDocuments() as object[]) ?? new object[0]).OfType<ModelDoc2>()
+            var openPartPaths = ((app.GetDocuments() as object[]) ?? new object[0]).OfType<ModelDoc2>()
                 .Where(doc => doc.GetType() == (int)swDocumentTypes_e.swDocPART)
-                .Select(doc => Path.GetFileNameWithoutExtension(doc.GetPathName()))
+                .Select(doc => doc.GetPathName());
+            var componentPaths = ((assembly.GetComponents(false) as object[]) ?? new object[0]).OfType<Component2>()
+                .Select(component => component.GetPathName());
+            var occupiedPartNames = openPartPaths.Concat(componentPaths)
+                .Where(path => string.Equals(Path.GetExtension(path), ".sldprt", StringComparison.OrdinalIgnoreCase))
+                .Select(Path.GetFileNameWithoutExtension)
                 .Where(stem => !string.IsNullOrEmpty(stem));
-            var conflict = openParts.Intersect(layout.Blanks.Select(rib => options.PartName(rib.RibId)),
+            var conflict = occupiedPartNames.Intersect(layout.Blanks.Select(rib => options.PartName(rib.RibId)),
                 StringComparer.OrdinalIgnoreCase).FirstOrDefault();
             if (conflict != null)
-                throw new InvalidOperationException("Đang mở một Part có tên " + conflict + ". Hãy chọn tên khác.");
+                throw new InvalidOperationException("Tên Part " + conflict + " đã được dùng trong Assembly hoặc tài liệu đang mở.");
 
             const string bendTable = @"C:\sw共有ライブラリ\テーブル\菊川ベンドテーブル_170905\BD_Kiku_ST_2020.xlsx";
             if (!File.Exists(bendTable))
                 throw new InvalidOperationException("Không tìm thấy bảng uốn BD_Kiku_ST_2020.xlsx.");
-
-            string assemblyTemplate = app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateAssembly);
-            if (!File.Exists(assemblyTemplate))
-            {
-                var candidates = Directory.GetFiles(Path.GetDirectoryName(options.PartTemplate), "*.asmdot");
-                if (candidates.Length != 1)
-                {
-                    int revision;
-                    if (int.TryParse(app.RevisionNumber().Split('.')[0], out revision))
-                    {
-                        string installed = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.CommonApplicationData),
-                            "SOLIDWORKS", "SOLIDWORKS " + (1992 + revision), "templates");
-                        if (Directory.Exists(installed)) candidates = Directory.GetFiles(installed, "*.asmdot");
-                    }
-                }
-                if (candidates.Length != 1)
-                    throw new InvalidOperationException("Chọn template Assembly mặc định trong SolidWorks rồi Apply lại.");
-                assemblyTemplate = candidates[0];
-            }
 
             string name = "Kadai-" + DateTime.Now.ToString("yyyyMMdd-HHmmss")
                 + "-" + Guid.NewGuid().ToString("N").Substring(0, 6);
@@ -362,7 +357,7 @@ namespace ADDIN.Commands.Kadai
             {
                 var writer = new KadaiNativePrototype(app, options.MaterialDatabase, options.MaterialName, bendTable,
                     options.PartTemplate, options.DrawingTemplate);
-                writer.WriteLayoutPackage(layout, target, assemblyTemplate, panel.ComponentPlacement, progress, options);
+                writer.InsertLayout(layout, targetAssembly, target, panel.ComponentPlacement, progress, options, dimensionView);
                 return target;
             }
             catch (Exception ex)
@@ -550,7 +545,7 @@ namespace ADDIN.Commands.Kadai
                 foreach (var rib in ribs) {
                     int color = rib.Direction == KadaiRibDirection.Longitudinal ? 0x70C040 : 0x4090F0;
                     var body = CreatePreviewBody(rib);
-                    visibleBodies.Add(rib.RibId, (body, color));
+                    visibleBodies.Add(rib.RibId, (body, color, rib.ExtrusionDirection));
                     // Display3 with a Component2 applies its placement to Part-local geometry.
                     // swTempBodySelectOptionNone = 0. Bodies cannot steal source face selection.
                     DisplayPreviewBody(body, color);
@@ -560,10 +555,10 @@ namespace ADDIN.Commands.Kadai
             } catch { ClearTemporaryPreview(null); throw; }
         }
 
-        internal void SetHighlightedRib(string ribId)
+        internal void SetHighlightedRib(string ribId, KadaiUraSide side)
         {
             CheckThread();
-            if (ribId == highlightedRibId) return;
+            if (ribId == highlightedRibId && side == highlightedSide) return;
             var active = app.ActiveDoc as ModelDoc2;
             if (previewDocument == null || active == null || !SameDocument(previewDocument, active))
                 throw new InvalidOperationException("Kích hoạt lại tài liệu chứa Preview 3D.");
@@ -572,6 +567,7 @@ namespace ADDIN.Commands.Kadai
 
             try
             {
+                RemoveUraPreview();
                 if (highlightedRibId != null)
                 {
                     var previous = visibleBodies[highlightedRibId];
@@ -580,11 +576,27 @@ namespace ADDIN.Commands.Kadai
                 }
                 if (ribId != null)
                 {
-                    var current = visibleBodies[ribId].Body;
-                    current.Hide(previewContext);
-                    DisplayPreviewBody(current, HighlightColor);
+                    var current = visibleBodies[ribId];
+                    current.Body.Hide(previewContext);
+                    DisplayPreviewBody(current.Body, HighlightColor);
+                    if (side != KadaiUraSide.Unset)
+                    {
+                        var face = (current.Body.GetFaces() as object[] ?? new object[0]).OfType<Face2>().Single(candidate =>
+                            candidate.Normal is double[] normal &&
+                            normal.Zip(current.Across, (x, y) => x * y).Sum() * (int)side > .999999);
+                        uraPreview = face.CreateSheetBody() as Body2;
+                        if (uraPreview == null) throw new InvalidOperationException("Không dựng được Preview mặt ウラ.");
+                        var shift = new[] { 1d, 0, 0, 0, 1d, 0, 0, 0, 1d }
+                            .Concat(current.Across.Select(axis => axis * (int)side * .00005))
+                            .Concat(new[] { 1d, 0, 0, 0 }).ToArray();
+                        var transform = ((MathUtility)app.GetMathUtility()).CreateTransform(shift) as MathTransform;
+                        if (!uraPreview.ApplyTransform(transform))
+                            throw new InvalidOperationException("Không hiển thị được mặt ウラ đã chọn.");
+                        DisplayPreviewBody(uraPreview, UraColor);
+                    }
                 }
                 highlightedRibId = ribId;
+                highlightedSide = side;
                 previewDocument.GraphicsRedraw2();
             }
             catch { ClearTemporaryPreview(null); throw; }
@@ -599,6 +611,7 @@ namespace ADDIN.Commands.Kadai
         public void ClearTemporaryPreview(ModelDoc2 ignored)
         {
             CheckThread();
+            RemoveUraPreview();
             foreach (var preview in visibleBodies.Values) {
                 var body = preview.Body;
                 try { if (previewContext != null) body.Hide(previewContext); } catch (COMException) { }
@@ -606,9 +619,18 @@ namespace ADDIN.Commands.Kadai
             }
             visibleBodies.Clear();
             highlightedRibId = null;
+            highlightedSide = KadaiUraSide.Unset;
             try { if (previewDocument != null) previewDocument.GraphicsRedraw2(); } catch (COMException) { }
             previewDocument = null;
             previewContext = null;
+        }
+
+        private void RemoveUraPreview()
+        {
+            if (uraPreview == null) return;
+            try { if (previewContext != null) uraPreview.Hide(previewContext); }
+            catch (COMException) { }
+            finally { ReleaseOwned(uraPreview); uraPreview = null; }
         }
         private static void ReleaseOwned(object value)
         {

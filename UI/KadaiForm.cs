@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using ADDIN.Commands;
 using ADDIN.Commands.Kadai;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
@@ -40,6 +41,7 @@ namespace ADDIN.UI
         private PickTarget picking;
         private ModelDoc2 pickDocument;
         private bool applying;
+        private bool CanApply => layout != null && source?.DocumentTransient is AssemblyDoc && picking == PickTarget.None;
 
         internal KadaiForm(ISldWorks app)
         {
@@ -147,7 +149,7 @@ namespace ADDIN.UI
             panelName.Text = SourceName(source);
             baseName.Text = SourceName(baseDatum?.Source);
             preview.Enabled = baseDatum != null && picking == PickTarget.None;
-            apply.Enabled = layout != null && picking == PickTarget.None;
+            apply.Enabled = CanApply;
             if (picking != PickTarget.None)
                 status.Text = picking == PickTarget.Panel ? "Chọn một mặt panel trong vùng đồ họa." : "Chọn mặt phẳng tỳ của base.";
             else if (baseDatum != null)
@@ -176,17 +178,18 @@ namespace ADDIN.UI
                 var result = backend.BuildBaseLayout(request, source, baseDatum);
                 backend.ShowTemporaryPreview(source, result.Profiles);
                 layout = result;
-                apply.Enabled = true;
+                apply.Enabled = CanApply;
                 map.Invalidate();
                 int outside = layout.Plan.CrossingCount - layout.JoinedCrossings;
                 status.Text = outside == 0 ? "Đã tạo Preview." : "Đã tạo Preview. " + outside + " giao điểm nằm ngoài biên thanh.";
+                if (!CanApply) status.Text += " Apply cần Assembly.";
             }
             catch (Exception ex) { ClearPreview(); status.Text = ex.Message; }
         }
 
         private void RunApply()
         {
-            if (applying || layout == null) return;
+            if (applying || !CanApply) return;
             string previousStatus = status.Text;
             var ready = layout;
             var sourceDocument = source;
@@ -206,10 +209,11 @@ namespace ADDIN.UI
                 app.ActivateDoc3(sourceDocument.DocumentTransient.GetTitle(), false,
                     (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activateError);
 
-                step = "Đặt tên Part";
+                step = "Đặt tên Part và chọn mặt ウラ";
                 // Switching to the material Part may discard the displayed bodies.
                 backend.ShowTemporaryPreview(sourceDocument, ready.Profiles);
-                var names = ChoosePartNames(ready.Blanks, material);
+                Dictionary<string, KadaiUraSide> uraSides;
+                var names = ChoosePartNames(ready.Blanks, material, out uraSides);
                 if (names == null) return;
                 step = "Chọn Template Drawing";
                 string drawingTemplate = SelectTemplate(".drwdot", "Draw", "Kadai · 4/5 · Template bản vẽ");
@@ -223,9 +227,10 @@ namespace ADDIN.UI
                 })
                 {
                     if (folder.ShowDialog(this) != DialogResult.OK) return;
-                    var options = new KadaiApplyOptions(partTemplate, drawingTemplate, material, materialDatabase, names);
+                    var options = new KadaiApplyOptions(partTemplate, drawingTemplate, material, materialDatabase, names, uraSides);
                     step = "Tạo gói Kadai";
-                    previousStatus = "Đã lưu bộ Kadai tại " + ApplyToFolder(folder.SelectedPath, options);
+                    ApplyToFolder(folder.SelectedPath, options);
+                    previousStatus = "Đã chèn " + ready.Blanks.Count + " thanh vào Assembly. Bấm Ctrl+S để lưu Assembly.";
                 }
             }
             catch (Exception ex)
@@ -239,12 +244,14 @@ namespace ADDIN.UI
                 status.Text = previousStatus;
                 applying = false;
                 Enabled = true;
-                apply.Enabled = layout != null;
+                apply.Enabled = CanApply;
             }
         }
 
-        private Dictionary<string, string> ChoosePartNames(IReadOnlyList<KadaiProfile3D> ribs, string material)
+        private Dictionary<string, string> ChoosePartNames(IReadOnlyList<KadaiProfile3D> ribs, string material,
+            out Dictionary<string, KadaiUraSide> uraSides)
         {
+            uraSides = null;
             var workArea = Screen.FromControl(this).WorkingArea;
             bool wasVisible = Visible;
             using (var dialog = new PartNamesDialog(ribs, material, backend.SetHighlightedRib))
@@ -253,10 +260,15 @@ namespace ADDIN.UI
                 dialog.Location = new Point(Math.Max(workArea.Left, workArea.Right - dialog.Width - 16),
                     Math.Max(workArea.Top, workArea.Top + (workArea.Height - dialog.Height) / 2));
                 Hide();
-                try { return dialog.ShowDialog(this) == DialogResult.OK ? dialog.Names : null; }
+                try
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return null;
+                    uraSides = dialog.UraSides;
+                    return dialog.Names;
+                }
                 finally
                 {
-                    try { backend.SetHighlightedRib(null); }
+                    try { backend.SetHighlightedRib(null, KadaiUraSide.Unset); }
                     catch (COMException ex) { Trace.WriteLine("[KADAI] Reset naming highlight: " + ex); }
                     catch (InvalidOperationException ex) { Trace.WriteLine("[KADAI] Reset naming highlight: " + ex); }
                     if (wasVisible && !IsDisposed) Show();
@@ -266,8 +278,25 @@ namespace ADDIN.UI
 
         private string ApplyToFolder(string parentDirectory, KadaiApplyOptions options)
         {
-            try { return backend.ApplyBaseLayout(layout, source, baseDatum, parentDirectory, options, SetApplyStatus); }
+            try
+            {
+                string directory = backend.ApplyBaseLayout(layout, source, baseDatum, parentDirectory, options, SetApplyStatus, DimensionFlatView);
+                source = null;
+                baseDatum = null;
+                UpdateSelectionStatus();
+                return directory;
+            }
             finally { ClearPreview(); }
+        }
+
+        private void DimensionFlatView(ModelDoc2 drawing, SolidWorks.Interop.sldworks.View view)
+        {
+            if (app.IsSame(app.ActiveDoc, drawing) != (int)swObjectEquality.swObjectSame)
+                throw new InvalidOperationException("Hãy kích hoạt Drawing vừa tạo để chạy DIM Kegaki.");
+            drawing.ClearSelection2(true);
+            if (!drawing.Extension.SelectByID2(view.GetName2(), "DRAWINGVIEW", 0, 0, 0, false, 0, null, 0))
+                throw new InvalidOperationException("Không chọn được hình chiếu 展開 để chạy DIM Kegaki.");
+            new TaoDimKegaki(app).RunNative(10, false);
         }
 
         private void SetApplyStatus(string message)
@@ -420,6 +449,18 @@ namespace ADDIN.UI
 
         private sealed class PartNamesDialog : Form
         {
+            private sealed class UraChoice
+            {
+                public string Text { get; }
+                public KadaiUraSide Side { get; }
+
+                internal UraChoice(string text, KadaiUraSide side)
+                {
+                    Text = text;
+                    Side = side;
+                }
+            }
+
             private readonly DataGridView grid = new DataGridView
             {
                 Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
@@ -428,12 +469,13 @@ namespace ADDIN.UI
             };
             private readonly Label validation = new Label { AutoSize = true, ForeColor = Color.Firebrick };
             internal Dictionary<string, string> Names { get; private set; }
+            internal Dictionary<string, KadaiUraSide> UraSides { get; private set; }
 
-            internal PartNamesDialog(IReadOnlyList<KadaiProfile3D> ribs, string material, Action<string> highlight)
+            internal PartNamesDialog(IReadOnlyList<KadaiProfile3D> ribs, string material, Action<string, KadaiUraSide> highlight)
             {
-                Text = "Kadai · Tên Part";
-                ClientSize = new Size(475, 408);
-                MinimumSize = new Size(430, 330);
+                Text = "Kadai · 3/5 · Tên Part và mặt ウラ";
+                ClientSize = new Size(555, 445);
+                MinimumSize = new Size(495, 360);
                 ShowInTaskbar = false;
 
                 var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(12) };
@@ -445,20 +487,37 @@ namespace ADDIN.UI
                 AddRow(content, Caption("Tên bắt đầu · Dọc"), longSeed);
                 AddRow(content, Caption("Tên bắt đầu · Ngang"), crossSeed);
 
-                var hint = Caption("Chọn một dòng để làm nổi bật thanh trong Preview 3D.");
+                var hint = Caption("Chọn thanh và mặt ウラ. Màu hồng chỉ mặt ウラ trong Preview 3D.");
                 AddFullRow(content, hint, new RowStyle(SizeType.AutoSize));
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Thanh", ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.NotSortable, FillWeight = 38 });
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Tên Part", SortMode = DataGridViewColumnSortMode.NotSortable });
+                var sides = new DataGridViewComboBoxColumn
+                {
+                    HeaderText = "Mặt ウラ",
+                    SortMode = DataGridViewColumnSortMode.NotSortable,
+                    DataSource = new[]
+                    {
+                        new UraChoice("Chưa chọn", KadaiUraSide.Unset),
+                        new UraChoice("Mặt 1", KadaiUraSide.First),
+                        new UraChoice("Mặt 2", KadaiUraSide.Second)
+                    },
+                    DisplayMember = "Text",
+                    ValueMember = "Side",
+                    FillWeight = 54
+                };
+                grid.Columns.Add(sides);
                 foreach (var rib in ribs)
-                    grid.Rows[grid.Rows.Add(rib.RibId, rib.RibId)].Tag = rib;
+                    grid.Rows[grid.Rows.Add(rib.RibId, rib.RibId, KadaiUraSide.Unset)].Tag = rib;
                 AddFullRow(content, grid, new RowStyle(SizeType.Percent, 100));
                 AddFullRow(content, validation, new RowStyle(SizeType.AutoSize));
                 var next = new Button { Text = "Tiếp tục", AutoSize = true };
                 var cancel = new Button { Text = "Hủy", AutoSize = true, DialogResult = DialogResult.Cancel };
+                var reverse = new Button { Text = "Đảo mặt", AutoSize = true, Enabled = false };
+                var group = new Button { Text = "Áp dụng cùng phương", AutoSize = true, Enabled = false };
                 var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill,
                     FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
-                actions.Controls.AddRange(new Control[] { next, cancel });
+                actions.Controls.AddRange(new Control[] { next, cancel, group, reverse });
                 AddFullRow(content, actions, new RowStyle(SizeType.AutoSize));
                 Controls.Add(content);
                 AcceptButton = next;
@@ -467,10 +526,13 @@ namespace ADDIN.UI
                 void UpdateHighlight()
                 {
                     if (!(grid.CurrentRow?.Tag is KadaiProfile3D rib)) return;
+                    var side = (KadaiUraSide)grid.CurrentRow.Cells[2].Value;
+                    reverse.Enabled = group.Enabled = side != KadaiUraSide.Unset;
                     try
                     {
-                        highlight(rib.RibId);
-                        hint.Text = "Thanh " + rib.RibId + " đang được tô hồng trong Preview 3D.";
+                        highlight(rib.RibId, side);
+                        hint.Text = side == KadaiUraSide.Unset ? "Chọn mặt ウラ cho thanh " + rib.RibId + "." :
+                            "Mặt màu hồng của " + rib.RibId + " là ウラ. Mặt đối diện là 表.";
                     }
                     catch (Exception ex) when (ex is COMException || ex is InvalidOperationException)
                     {
@@ -479,6 +541,27 @@ namespace ADDIN.UI
                     }
                 }
                 grid.CurrentCellChanged += (s, e) => UpdateHighlight();
+                grid.CurrentCellDirtyStateChanged += (s, e) =>
+                {
+                    if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewComboBoxCell)
+                        grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+                };
+                grid.CellValueChanged += (s, e) =>
+                {
+                    if (e.ColumnIndex == sides.Index && e.RowIndex == grid.CurrentCell?.RowIndex) UpdateHighlight();
+                };
+                reverse.Click += (s, e) =>
+                {
+                    var cell = grid.CurrentRow.Cells[2];
+                    cell.Value = (KadaiUraSide)cell.Value == KadaiUraSide.First ? KadaiUraSide.Second : KadaiUraSide.First;
+                };
+                group.Click += (s, e) =>
+                {
+                    var selected = (KadaiProfile3D)grid.CurrentRow.Tag;
+                    var side = grid.CurrentRow.Cells[2].Value;
+                    foreach (DataGridViewRow row in grid.Rows)
+                        if (((KadaiProfile3D)row.Tag).Direction == selected.Direction) row.Cells[2].Value = side;
+                };
                 Shown += (s, e) => UpdateHighlight();
                 longSeed.TextChanged += (s, e) => SetSeries(longSeed.Text, KadaiRibDirection.Longitudinal);
                 crossSeed.TextChanged += (s, e) => SetSeries(crossSeed.Text, KadaiRibDirection.Transverse);
@@ -492,7 +575,13 @@ namespace ADDIN.UI
                         var names = grid.Rows.Cast<DataGridViewRow>().ToDictionary(row => ((KadaiProfile3D)row.Tag).RibId,
                             row => (Convert.ToString(row.Cells[1].Value) ?? "").Trim(), StringComparer.Ordinal);
                         KadaiApplyOptions.ValidateNames(names.Values);
+                        var uraSides = grid.Rows.Cast<DataGridViewRow>().ToDictionary(row => ((KadaiProfile3D)row.Tag).RibId,
+                            row => (KadaiUraSide)row.Cells[2].Value, StringComparer.Ordinal);
+                        var missing = uraSides.FirstOrDefault(entry => entry.Value == KadaiUraSide.Unset).Key;
+                        if (missing != null)
+                            throw new InvalidOperationException("Chọn mặt ウラ cho thanh " + missing + ".");
                         Names = names;
+                        UraSides = uraSides;
                         DialogResult = DialogResult.OK;
                     }
                     catch (InvalidOperationException ex) { validation.Text = ex.Message; }

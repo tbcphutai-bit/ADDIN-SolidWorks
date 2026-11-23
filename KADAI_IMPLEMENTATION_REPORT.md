@@ -261,3 +261,29 @@ Log Debug thực tế ngày 23/11 xác nhận SolidWorks trả đúng đường 
 Trên bản sao 6866 trong SolidWorks 2024 SP5.0, phép thử đổi dòng `L-001` sang `C-004` và sửa tên trong bảng thực. Hai ảnh đồ họa xác nhận vùng màu hồng chuyển sang vị trí khác. Hủy bảng khôi phục Preview, bật lại cửa sổ Kadai chính và giữ nguyên cờ lưu cùng update stamp của Assembly. Ảnh và log ở `kadai-assembly-6866/naming-highlight-cad-01`.
 
 Apply sau lượt thử tô sáng xuất đủ 11 Part, 11 Drawing và 11 DXF. Assembly mở lại được. 11 DXF trùng biên dạng 1:1 với mẫu native, đủ 56 rãnh. 17 file CAD nguồn giữ nguyên mã băm. Build Debug/Release x64 đạt. Bản thử được cài sau khi SolidWorks đóng và đối chiếu cho 0 sai khác tại 47.742 mục ngoài Kadai. MVID `b71a9f43-f2bb-42e9-b190-add2b0ec65b5`, SHA256 `B57A76D4F74BCAFCC84F4D1E5CC1D1B8382310C973E749AACB421ED90C4C62AE`.
+
+## 17. Chèn thanh Kadai trực tiếp vào Assembly đang mở
+
+Apply dùng chính tài liệu Assembly đã chọn mặt panel và mặt đế, tại cấp trên cùng. Mỗi thanh được lưu thành Part Sheet Metal, chèn vào Assembly khi Part còn được nạp, đặt theo hệ tọa độ của panel và cố định. Kadai tiếp tục tạo Drawing Flat Pattern theo template đã chọn. Apply bỏ bước xuất DXF và tạo Assembly riêng. Assembly đang mở có thay đổi chờ lưu sau Apply. Người dùng bấm **Ctrl+S** khi muốn lưu.
+
+Kadai kiểm tra giao thể tích giữa hai nhóm thanh dọc và ngang vừa chèn. Bộ kiểm tra sao chép các body Sheet Metal thực, đặt bản sao theo transform của từng component trong hệ tọa độ Assembly rồi dùng Modeler kiểm tra giao thể tích. Nếu một bước lỗi sau khi đã chèn, Kadai thử gỡ những component do lần chạy đó thêm và giữ các file đã tạo trong thư mục có dấu `INCOMPLETE.txt`. Phạm vi sửa gồm `Commands/Kadai/KadaiNativePrototype.cs`, `Commands/Kadai/KadaiPreviewBackend.cs` và `UI/KadaiForm.cs`. [SOLIDWORKS API IModeler](https://help.solidworks.com/2024/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModeler_members.html)
+
+Build TAI TOOL Debug/Release x64, 36 kiểm tra bộ bố trí và kiểm tra hình học rãnh đạt. So DLL Debug với bản đang cài cho 0 sai khác ở 47.742 mục ngoài Kadai. SHA256 của 17 file CAD nguồn 6866 giữ nguyên. Bản đầu của ba class đã được đồng bộ vào project đang dùng để người dùng tự rebuild. Phiên kiểm thử ở mục 18 xác nhận Apply chèn trực tiếp vào Assembly trong bộ mã mới.
+
+## 18. Chọn mặt ウラ và ghi W/L trên bản vẽ 展開
+
+Bảng đặt tên Part cho phép chọn một trong hai mặt rộng làm **ウラ**, đảo mặt từng thanh hoặc áp dụng cho các thanh cùng phương. Lựa chọn bám theo mã thanh khi người dùng sửa tên Part. Preview dùng một mặt tạm màu hồng để chỉ phía ウラ của dòng đang chọn. Kadai yêu cầu xác nhận đủ các thanh trước khi tiếp tục.
+
+Khi tạo Part, Kadai đổi lựa chọn từ hệ tọa độ Preview sang pháp tuyến theo hệ tọa độ Part. Mã tạo Part gán màu hồng cấp mặt trong cấu hình thường và Flat Pattern. Kadai kiểm tra pháp tuyến theo hướng nhìn của hình chiếu và lật view nếu cần để hiển thị **表**. Drawing giữ khổ và khung tên của template, dùng tên dạng `図面ビュー<n>` và thêm ký hiệu **表** khoanh tròn. [SOLIDWORKS API tạo và lật Flat Pattern view](https://help.solidworks.com/2024/english/api/sldworksapi/Create_and_Flip_Flat-Pattern_View_of_Sheet_Metal_Part_Example_VB.htm)
+
+Kadai chọn đúng Drawing View và chạy điểm gọi `RunNative` của **DIM Kegaki** với khoảng dời 10 mm. Lệnh sẵn có hiện sketch Bounding Box và tạo kích thước. Kadai kiểm tra dữ liệu hiển thị của biên và đủ hai kích thước trước khi lưu Drawing. [SOLIDWORKS API đọc Bounding Box của Flat Pattern view](https://help.solidworks.com/2022/english/api/sldworksapi/Get_Number_of_Lines_Flat-pattern_Drawing_View_Boundary-box_Sketch_Example_CSharp.htm)
+
+Build TAI TOOL Debug/Release x64 đạt. Kiểm thử control WinForms thực xác nhận từ chối mặt chưa chọn, đảo mặt, áp dụng theo nhóm, sửa riêng từng thanh và giữ tên đã sửa. Đối chiếu DLL Debug cho 0 sai khác tại 47.742 mục ngoài Kadai. MVID DLL kiểm thử `0872a226-d0a0-4cd0-b20f-09c29c44eaff`, SHA256 `F1C47BEF8534023C3713C4153ED4B6CCE92295CB1AB013476DC073AFEF9B0A01`.
+
+Các file code cập nhật gồm `Commands/Kadai/KadaiCadContracts.cs`, `Commands/Kadai/KadaiNativePrototype.cs`, `Commands/Kadai/KadaiPreviewBackend.cs` và `UI/KadaiForm.cs`.
+
+Lượt thử đầu tiên nạp đúng DLL trong một PID riêng của SolidWorks 2024 SP5.0 và tạo đủ 11 Part cùng 11 Drawing. Tiến trình thử thoát ở bước kiểm tra Assembly với lỗi native `0xc0000374`. Mã ghi nhận bước cuối đang gọi kiểm tra giao thể tích. Phiên SolidWorks người dùng vẫn chạy. Sau khi đổi sang kiểm tra bản sao body qua Modeler, Apply hoàn tất, xác nhận đủ 11 component được chèn và ghi dấu hoàn tất trong gói.
+
+Lượt thử cuối qua COM mở bản sao 6866 trong một PID riêng và tạo **11 Part Sheet Metal cùng 11 Drawing**. Thử với cả hai lựa chọn mặt ウラ xen kẽ. Mở lại các Part kiểm tra màu ở cấu hình thường và Flat Pattern. Mở lại toàn bộ 11 Drawing xác nhận view `図面ビュー1` nhìn mặt **表**, có ký hiệu **表** khoanh tròn, giữ khổ và khung A4 đã chọn, Bounding Box có bốn cạnh và hai giá trị DIM khớp với hình học của biên trong sai số kiểm thử 0,05 mm. Thanh thử có cặp kích thước đại diện 1.450 × 302,735 mm và 2.250 × 170 mm.
+
+Apply giữ nguyên component có sẵn và SHA256 của Assembly trên đĩa trước khi người kiểm thử chủ động lưu bản sao. Gói thành công có 0 DXF và 0 Assembly mới. Khi chèn giả lập một lỗi sau thanh đầu tiên của lượt thử riêng, chương trình gỡ đúng thanh đó. Lưu thủ công và mở lại bản sao xác nhận tên và đường dẫn tham chiếu đến toàn bộ component được giữ. SHA256 của 17 file CAD nguồn giữ nguyên. Phiên SolidWorks người dùng và DLL đang dùng giữ nguyên. Log kiểm thử local nằm ở `kadai-assembly-6866/ura-drawing-separate-06/run.log`.

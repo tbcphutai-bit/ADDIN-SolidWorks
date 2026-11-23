@@ -2,8 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
+using System.Runtime.InteropServices;
 using SolidWorks.Interop.sldworks;
 using SolidWorks.Interop.swconst;
 
@@ -44,7 +43,8 @@ namespace ADDIN.Commands.Kadai
                 if (f.GetTypeName2() == "ProfileFeature" && app.IsSame(f.GetSpecificFeature2(), sketch) == 1) return f;
             throw new InvalidOperationException("Cannot resolve the new sketch by COM identity.");
         }
-        private ModelDoc2 WritePart(KadaiProfile3D profile, double bottomMm, string path, List<KadaiJointCut> cuts, bool prototype)
+        private ModelDoc2 WritePart(KadaiProfile3D profile, double bottomMm, string path, List<KadaiJointCut> cuts,
+            bool prototype, int uraNormal)
         {
             Require(!File.Exists(path), "Refusing to overwrite " + path);
             var local = KadaiJointGeometry.LocalPoints(profile, bottomMm);
@@ -124,6 +124,7 @@ namespace ADDIN.Commands.Kadai
             Require(flat.GetErrorCode2(out warning) == 0 && !warning, "Flat Pattern failed.");
             Require(flat.SetSuppression2(0, 1, null), "Cannot restore folded Part."); doc.EditRebuild3();
             VerifyManufacturingSettings(doc, profile.ThicknessMeters);
+            if (uraNormal != 0) PaintUra(doc, uraNormal);
             doc.Extension.CustomPropertyManager[""].Add3("Kadai_RibId", 30, profile.RibId, 2);
             if (prototype) doc.Extension.CustomPropertyManager[""].Add3("Kadai_Status", 30, "PROTOTYPE - NOT FOR MANUFACTURE", 2);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
@@ -187,14 +188,15 @@ namespace ADDIN.Commands.Kadai
         {
             // Validate the entire grid before opening or writing any output document.
             var cuts = KadaiJointGeometry.Build(plan, profiles, jointHeightMm, jointDepthClearanceMm);
-            WritePackage(plan, profiles, cuts, directory, export, assemblyTemplate, progress, null, null);
+            WritePackage(plan, profiles, cuts, directory, export, assemblyTemplate, progress);
         }
 
-        internal void WriteLayoutPackage(KadaiPreviewBackend.SlottedLayout layout, string directory,
-            string assemblyTemplate, double[] placement, Action<string> progress, KadaiApplyOptions options)
+        internal void InsertLayout(KadaiPreviewBackend.SlottedLayout layout, ModelDoc2 targetAssembly,
+            string directory, double[] placement, Action<string> progress, KadaiApplyOptions options, Action<ModelDoc2, View> dimensionView)
         {
-            string name = Path.GetFileName(Path.GetFullPath(directory));
-            WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, assemblyTemplate, progress, name, placement, options);
+            Require(targetAssembly is AssemblyDoc, "Chọn Assembly đích để chèn thanh Kadai.");
+            WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, null, progress,
+                targetAssembly, placement, options, dimensionView);
         }
 
         private static string PartName(string ribId, string packageName)
@@ -204,12 +206,13 @@ namespace ADDIN.Commands.Kadai
 
         private void WritePackage(KadaiPlan plan, List<KadaiProfile3D> profiles,
             Dictionary<string, List<KadaiJointCut>> cuts, string directory, bool export, string assemblyTemplate,
-            Action<string> progress, string packageName, double[] placement, KadaiApplyOptions options = null)
+            Action<string> progress, ModelDoc2 targetAssembly = null, double[] placement = null,
+            KadaiApplyOptions options = null, Action<ModelDoc2, View> dimensionView = null)
         {
             directory = Path.GetFullPath(directory);
             Require(!Directory.Exists(directory) && !File.Exists(directory), "A new output folder is required.");
             Directory.CreateDirectory(directory);
-            bool prototype = packageName == null;
+            bool prototype = targetAssembly == null;
             string incomplete = Path.Combine(directory, "INCOMPLETE.txt");
             File.WriteAllText(incomplete, "Kadai generation has not completed.");
             var culture = System.Globalization.CultureInfo.InvariantCulture;
@@ -223,10 +226,11 @@ namespace ADDIN.Commands.Kadai
             File.WriteAllLines(Path.Combine(directory, "Stations.csv"),
                 new[] { "RibId,StationKey" }.Concat(plan.LongRibs.Concat(plan.CrossRibs)
                     .Select(rib => rib.Id + "," + rib.StationKey)));
-            string assemblyPath = AssemblyPath(directory, packageName);
-            ModelDoc2 assemblyDoc = null;
+            ModelDoc2 assemblyDoc = targetAssembly;
+            var added = new List<Component2>(profiles.Count);
             var bom = new List<string> { "RibId,Part,Quantity,Status" };
-            string step = "Tạo Assembly";
+            string complete = Path.Combine(directory, "PASS.txt");
+            string step = prototype ? "Tạo Assembly" : "Kích hoạt Assembly đích";
             Action<string> markStep = message =>
             {
                 step = message;
@@ -235,54 +239,74 @@ namespace ADDIN.Commands.Kadai
             try
             {
                 markStep(step);
-                assemblyDoc = StartAssembly(assemblyPath, assemblyTemplate);
+                if (prototype) assemblyDoc = StartAssembly(AssemblyPath(directory, null), assemblyTemplate);
+                else ActivateAssembly(assemblyDoc);
                 foreach (var profile in profiles)
                 {
-                    string name = options == null ? PartName(profile.RibId, packageName) : options.PartName(profile.RibId);
+                    string name = options == null ? profile.RibId : options.PartName(profile.RibId);
+                    int uraNormal = options == null ? 0 :
+                        (int)options.UraSide(profile.RibId) * Math.Sign(Dot(PartNormal(profile), profile.ExtrusionDirection));
                     string partPath = Path.Combine(directory, name + ".SLDPRT");
                     markStep("Tạo Part " + name);
                     progress?.Invoke(step);
-                    var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype);
+                    var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype, uraNormal);
                     try
                     {
-                        if (export)
+                        if (prototype && export)
                         {
                             markStep("Xuất DXF " + name);
-                            string dxfPath = Path.Combine(directory, name + ".dxf");
-                            if (options == null) ExportFlatDxf(part, dxfPath);
-                            else WriteRibDxf(part, dxfPath, profile.ThicknessMeters);
+                            ExportFlatDxf(part, Path.Combine(directory, name + ".dxf"));
                         }
                         // Insert before the Drawing can close or replace the Part's open document.
                         // AddComponent5 requires the Part to remain loaded.
                         markStep("Chèn vào Assembly " + name);
                         bom.Add(InsertOpenPart(assemblyDoc, part, partPath, profile, plan.Settings.BottomMm,
-                            placement, prototype));
+                            placement, prototype, added));
                         if (export)
                         {
                             string drawingPath = Path.Combine(directory, name + ".SLDDRW");
-                            CreateFlatDrawing(partPath, drawingPath, prototype, detail => markStep(detail + " " + name));
+                            CreateFlatDrawing(partPath, drawingPath, prototype,
+                                detail => markStep(detail + " " + name), part, uraNormal, dimensionView);
                             markStep("Đóng Drawing " + name);
                             app.CloseDoc(drawingPath);
                         }
                     }
                     finally { app.CloseDoc(partPath); }
                 }
-                markStep("Kiểm tra và lưu Assembly");
+                markStep(prototype ? "Kiểm tra và lưu Assembly" : "Kiểm tra các thanh vừa chèn");
                 progress?.Invoke(step);
-                SaveAssembly(assemblyDoc, assemblyPath, profiles.Count, bom);
+                if (prototype) SaveAssembly(assemblyDoc, AssemblyPath(directory, null), profiles.Count, bom);
+                else
+                {
+                    VerifyInsertedRibs(assemblyDoc, added, profiles, markStep);
+                    File.WriteAllLines(Path.Combine(directory, "BOM.csv"), bom);
+                }
+                File.WriteAllText(complete, prototype ? "Native prototype only; production gate closed." : "Kadai components inserted.");
+                File.Delete(incomplete);
             }
             catch (Exception ex)
             {
                 var failure = new InvalidOperationException(step + " — " + ex.Message, ex);
-                try { File.WriteAllText(incomplete, failure.ToString()); }
+                if (!prototype && added.Count > 0)
+                {
+                    try { RemoveInsertedRibs(assemblyDoc, added); }
+                    catch (Exception rollback)
+                    {
+                        failure = new InvalidOperationException(failure.Message +
+                            "\nKhông thể gỡ hết các thanh Kadai vừa chèn. Hãy kiểm tra Assembly trước khi lưu.",
+                            new AggregateException(failure, rollback));
+                    }
+                }
+                try
+                {
+                    File.WriteAllText(incomplete, failure.ToString());
+                    File.Delete(complete);
+                }
                 catch (IOException) { }
                 catch (UnauthorizedAccessException) { }
                 throw failure;
             }
-            finally { if (assemblyDoc != null) CloseAssembly(assemblyDoc); }
-            File.WriteAllText(Path.Combine(directory, "PASS.txt"), prototype
-                ? "Native prototype only; production gate closed." : "Kadai package completed.");
-            File.Delete(incomplete);
+            finally { if (prototype && assemblyDoc != null) CloseAssembly(assemblyDoc); }
         }
         internal void ExportFlatDxf(ModelDoc2 doc, string path)
         {
@@ -293,58 +317,6 @@ namespace ADDIN.Commands.Kadai
             Require(File.Exists(path) && new FileInfo(path).Length > 0, "Missing DXF output.");
         }
 
-        private static void WriteRibDxf(ModelDoc2 doc, string path, double thickness)
-        {
-            // Kadai ribs are unbent single sheets. The two broad faces of the generated
-            // Part have the same perimeter, including the actual Part-level slots.
-            var body = Items(((PartDoc)doc).GetBodies2(0, false)).OfType<Body2>().Single();
-            var face = Items(body.GetFaces()).OfType<Face2>()
-                .Where(f => f.Normal is double[] normal && Math.Abs(normal[2]) > .999999)
-                .OrderByDescending(f => f.GetArea()).FirstOrDefault();
-            Require(face != null, "Không tìm được mặt phẳng của thanh tấm để xuất DXF.");
-            var edges = Items(face.GetEdges()).OfType<Edge>().ToArray();
-            var segments = new List<double[][]>(edges.Length);
-            foreach (var edge in edges)
-            {
-                var curve = edge.GetCurve() as Curve;
-                var start = edge.GetStartVertex() as Vertex;
-                var end = edge.GetEndVertex() as Vertex;
-                Require(curve != null && curve.IsLine() && start != null && end != null,
-                    "Biên thanh có đoạn không phải đường thẳng.");
-                segments.Add(new[] { (double[])start.GetPoint(), (double[])end.GetPoint() });
-            }
-            Require(segments.Count >= 3, "Biên DXF của thanh không đủ cạnh.");
-            var points = segments.SelectMany(pair => pair).ToArray();
-            double z = points[0][2];
-            Require(Items(body.GetVertices()).OfType<Vertex>().Select(v => (double[])v.GetPoint()).All(p =>
-            {
-                double distance = Math.Abs(p[2] - z);
-                return distance < 1e-8 || Math.Abs(distance - thickness) < 1e-8;
-            }), "DXF Kadai yêu cầu thanh tấm phẳng có một chiều dày.");
-
-            double minX = points.Min(p => p[0]);
-            double maxY = points.Max(p => p[1]);
-            using (var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write), Encoding.ASCII))
-            {
-                writer.WriteLine("0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n9\r\n$INSUNITS\r\n70\r\n4\r\n0\r\nENDSEC");
-                writer.WriteLine("0\r\nSECTION\r\n2\r\nENTITIES");
-                foreach (var segment in segments)
-                {
-                    writer.WriteLine("0\r\nLINE\r\n8\r\n0");
-                    for (int i = 0; i < segment.Length; i++)
-                    {
-                        var point = segment[i];
-                        writer.WriteLine(10 + i);
-                        writer.WriteLine(((point[0] - minX) * 1000).ToString("R", CultureInfo.InvariantCulture));
-                        writer.WriteLine(20 + i);
-                        writer.WriteLine(((maxY - point[1]) * 1000).ToString("R", CultureInfo.InvariantCulture));
-                        writer.WriteLine(30 + i);
-                        writer.WriteLine("0");
-                    }
-                }
-                writer.WriteLine("0\r\nENDSEC\r\n0\r\nEOF");
-            }
-        }
         internal void CreateAssembly(List<KadaiProfile3D> profiles, string directory, double bottomMm, string explicitTemplate = null,
             string packageName = null, double[] placement = null)
         {
@@ -393,14 +365,14 @@ namespace ADDIN.Commands.Kadai
         }
 
         private string InsertOpenPart(ModelDoc2 doc, ModelDoc2 part, string partPath, KadaiProfile3D profile,
-            double bottomMm, double[] placement, bool prototype)
+            double bottomMm, double[] placement, bool prototype, List<Component2> added = null)
         {
             Require(string.Equals(part.GetPathName(), partPath, StringComparison.OrdinalIgnoreCase), "Part filename conflict with another open document.");
             VerifyManufacturingSettings(part, profile.ThicknessMeters);
             var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
             var box = (double[])body.GetBodyBox();
             double[] a = profile.AlongDirection, h = profile.HeightDirection;
-            var n = new[] { a[1] * h[2] - a[2] * h[1], a[2] * h[0] - a[0] * h[2], a[0] * h[1] - a[1] * h[0] };
+            var n = PartNormal(profile);
             var origin = (double[])profile.PointsWorldMeters[0].Clone();
             double localHeight = Dot(origin, h) - bottomMm * .001;
             for (int k = 0; k < 3; k++) origin[k] -= h[k] * localHeight + n[k] * (box[2] + box[5]) / 2;
@@ -417,6 +389,7 @@ namespace ADDIN.Commands.Kadai
             var assembly = (AssemblyDoc)doc;
             var component = assembly.AddComponent5(partPath, 0, "", false, "", 0, 0, 0);
             Require(component != null, "Cannot insert rib component: " + profile.RibId);
+            added?.Add(component);
             component.Transform2 = transform;
             var actual = (double[])component.Transform2.ArrayData;
             Require(Enumerable.Range(0, 13).All(i => Math.Abs(actual[i] - data[i]) < 1e-8), "Assembly transform differs from source frame.");
@@ -433,7 +406,94 @@ namespace ADDIN.Commands.Kadai
         {
             int error = 0;
             var active = app.ActivateDoc3(doc.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref error) as ModelDoc2;
-            Require(active != null && app.IsSame(active, doc) == 1, "Cannot activate the generated Assembly: " + error);
+            Require(active != null && app.IsSame(active, doc) == 1, "Không kích hoạt được Assembly đích: " + error);
+        }
+
+        private static double[] PartNormal(KadaiProfile3D profile)
+        {
+            var a = profile.AlongDirection;
+            var h = profile.HeightDirection;
+            return new[] { a[1] * h[2] - a[2] * h[1], a[2] * h[0] - a[0] * h[2], a[0] * h[1] - a[1] * h[0] };
+        }
+
+        private static void PaintUra(ModelDoc2 part, int uraNormal)
+        {
+            var body = Items(((PartDoc)part).GetBodies2(0, false)).OfType<Body2>().Single();
+            var face = Items(body.GetFaces()).OfType<Face2>().Single(candidate =>
+                candidate.Normal is double[] normal && uraNormal * normal[2] > .999999);
+            var pink = new[] { 1d, .49, .72, .5, .8, .5, .25, 0, 0 };
+            int configuration = (int)swInConfigurationOpts_e.swThisConfiguration;
+            face.SetMaterialPropertyValues2(pink, configuration, null);
+            var actual = face.GetMaterialPropertyValues2(configuration, null) as double[];
+            Require(actual != null && actual.Take(3).Zip(pink, (a, b) => Math.Abs(a - b)).Max() < .005,
+                "SolidWorks không giữ màu hồng của mặt ウラ.");
+        }
+
+        private void VerifyInsertedRibs(ModelDoc2 doc, List<Component2> added, List<KadaiProfile3D> profiles,
+            Action<string> markStep)
+        {
+            ActivateAssembly(doc);
+            doc.EditRebuild3();
+            var assembly = (AssemblyDoc)doc;
+            var paths = new HashSet<string>(Items(assembly.GetComponents(true)).OfType<Component2>()
+                .Select(component => component.GetPathName()), StringComparer.OrdinalIgnoreCase);
+            Require(added.Count == profiles.Count && added.All(component =>
+                component.IsFixed() && paths.Contains(component.GetPathName())),
+                "Thiếu thanh mới hoặc có thanh chưa được cố định trong Assembly.");
+            markStep("Kiểm tra giao thể tích các thanh dọc và ngang");
+            var longitudinal = new List<Body2>();
+            var transverse = new List<Body2>();
+            try
+            {
+                for (int i = 0; i < added.Count; i++)
+                {
+                    var component = added[i];
+                    var part = component.GetModelDoc2() as PartDoc;
+                    Require(part != null, "Không đọc được Part vừa chèn để kiểm tra giao thể tích.");
+                    var modelBody = Items(part.GetBodies2((int)swBodyType_e.swSolidBody, false)).OfType<Body2>().Single();
+                    var copy = modelBody.Copy() as Body2;
+                    Require(copy != null, "Không sao chép được body để kiểm tra giao thể tích.");
+                    var group = profiles[i].Direction == KadaiRibDirection.Longitudinal ? longitudinal : transverse;
+                    group.Add(copy);
+                    Require(copy.ApplyTransform(component.Transform2), "Không đưa được body vào hệ tọa độ Assembly.");
+                }
+                if (longitudinal.Count > 0 && transverse.Count > 0)
+                {
+                    var modeler = (Modeler)app.GetModeler();
+                    object facesA = null, facesB = null, common = null;
+                    Require(!modeler.CheckInterference3(longitudinal.ToArray(), transverse.ToArray(), 0, ref facesA, ref facesB, ref common),
+                        "Các thanh Kadai vừa chèn bị giao thể tích.");
+                }
+            }
+            finally
+            {
+                foreach (var copy in longitudinal.Concat(transverse)) Marshal.ReleaseComObject(copy);
+            }
+            doc.GraphicsRedraw2();
+        }
+
+        private void RemoveInsertedRibs(ModelDoc2 doc, List<Component2> added)
+        {
+            ActivateAssembly(doc);
+            var assembly = (AssemblyDoc)doc;
+            var paths = new HashSet<string>(added.Select(component => component.GetPathName()),
+                StringComparer.OrdinalIgnoreCase);
+            doc.ClearSelection2(true);
+            try
+            {
+                foreach (var component in added)
+                    Require(component.Select4(true, null, false), "Không chọn được thanh vừa chèn để hoàn tác.");
+                Require(((SelectionMgr)doc.SelectionManager).GetSelectedObjectCount2(-1) == added.Count,
+                    "Lựa chọn hoàn tác không khớp số thanh vừa chèn.");
+                Require(assembly.DeleteSelections((int)swAssemblyDeleteOptions_e.swDelete_SelectedComponents),
+                    "SolidWorks không gỡ được các thanh vừa chèn.");
+                Require(!Items(assembly.GetComponents(true)).OfType<Component2>()
+                    .Any(component => paths.Contains(component.GetPathName())),
+                    "Assembly vẫn còn thanh Kadai chưa gỡ.");
+                doc.EditRebuild3();
+                doc.GraphicsRedraw2();
+            }
+            finally { doc.ClearSelection2(true); }
         }
 
         private void SaveAssembly(ModelDoc2 doc, string path, int componentCount, List<string> bom)
@@ -443,6 +503,15 @@ namespace ADDIN.Commands.Kadai
             doc.EditRebuild3(); doc.ShowNamedView2("*Isometric", 7); doc.ViewZoomtofit2();
             Require(Items(assembly.GetComponents(false)).Length == componentCount, "Unexpected Assembly component count.");
             Require(doc.Extension.NeedsRebuild2 == 0, "Assembly requires a rebuild.");
+            VerifyRibInterference(assembly);
+            int saveError = 0, saveWarning = 0;
+            Require(doc.Extension.SaveAs(path, 0, 1, null, ref saveError, ref saveWarning) && saveError == 0 && saveWarning == 0,
+                "Assembly save failed: " + saveError + "/" + saveWarning);
+            File.WriteAllLines(Path.Combine(Path.GetDirectoryName(path), "BOM.csv"), bom);
+        }
+
+        private static void VerifyRibInterference(AssemblyDoc assembly)
+        {
             var interference = assembly.InterferenceDetectionManager;
             Require(interference != null, "Cannot check native interference.");
             try {
@@ -450,12 +519,8 @@ namespace ADDIN.Commands.Kadai
                 interference.IncludeMultibodyPartInterferences = false;
                 var collisions = interference.GetInterferences();
                 Require(collisions == null || (collisions is Array && ((Array)collisions).Length == 0),
-                    "Native Assembly has overlapping rib volumes.");
+                    "Các thanh Kadai vừa chèn bị giao thể tích.");
             } finally { interference.Done(); }
-            int saveError = 0, saveWarning = 0;
-            Require(doc.Extension.SaveAs(path, 0, 1, null, ref saveError, ref saveWarning) && saveError == 0 && saveWarning == 0,
-                "Assembly save failed: " + saveError + "/" + saveWarning);
-            File.WriteAllLines(Path.Combine(Path.GetDirectoryName(path), "BOM.csv"), bom);
         }
 
         private void CloseAssembly(ModelDoc2 doc)
@@ -468,7 +533,8 @@ namespace ADDIN.Commands.Kadai
             return CreateFlatDrawing(part.GetPathName(), path, prototype, markStep);
         }
 
-        private ModelDoc2 CreateFlatDrawing(string partPath, string path, bool prototype, Action<string> markStep)
+        private ModelDoc2 CreateFlatDrawing(string partPath, string path, bool prototype, Action<string> markStep,
+            ModelDoc2 part = null, int uraNormal = 0, Action<ModelDoc2, View> dimensionView = null)
         {
             Require(!File.Exists(path), "Refusing to overwrite Drawing.");
             string template = drawingTemplate ?? app.GetUserPreferenceStringValue((int)swUserPreferenceStringValue_e.swDefaultTemplateDrawing);
@@ -481,6 +547,18 @@ namespace ADDIN.Commands.Kadai
             markStep?.Invoke("Tạo hình chiếu Flat Pattern");
             var view = ((DrawingDoc)drawing).CreateFlatPatternViewFromModelView3(partPath, "", .15, .15, 0, false, false);
             Require(view != null, "Flat drawing view failed.");
+            if (uraNormal != 0)
+            {
+                markStep?.Invoke("Tô mặt ウラ trong cấu hình 展開");
+                PaintFlatConfiguration(part, view.ReferencedConfiguration, uraNormal);
+                int activationError = 0;
+                app.ActivateDoc3(drawing.GetTitle(), false, (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activationError);
+                markStep?.Invoke("Định hướng mặt 表");
+                if (UraFacesViewer(view, uraNormal)) view.FlipView = !view.FlipView;
+                drawing.EditRebuild3();
+                Require(view.IsFlatPatternView() && !UraFacesViewer(view, uraNormal), "View 展開 chưa nhìn mặt 表.");
+                SetJapaneseViewName((DrawingDoc)drawing, view);
+            }
             if (drawingTemplate != null) FitFlatViewToTemplate(drawing, view, markStep);
             else
             {
@@ -505,6 +583,20 @@ namespace ADDIN.Commands.Kadai
                 : "KADAI - Flat view 1:1, mm.") as Note;
             if (note != null) ((Annotation)note.GetAnnotation()).SetPosition2(.05, .02, 0);
             }
+            if (uraNormal != 0)
+            {
+                markStep?.Invoke("Hiện Bounding Box và chạy DIM Kegaki");
+                drawing.SetUserPreferenceToggle((int)swUserPreferenceToggle_e.swDisplaySketches, true);
+                string viewName = view.GetName2();
+                Require(dimensionView != null, "Chưa kết nối lệnh DIM Kegaki.");
+                dimensionView(drawing, view);
+                view = Items(((DrawingDoc)drawing).GetViews()).SelectMany(Items).OfType<View>()
+                    .Single(candidate => candidate.GetName2() == viewName);
+                var boundingBox = view.GetSMBoundaryBoxDisplayData2() as DisplayData;
+                Require(boundingBox != null && boundingBox.GetLineCount() >= 4, "Bounding Box của view 展開 chưa hiện.");
+                Require(view.GetDisplayDimensionCount() == 2, "DIM Kegaki chưa tạo đủ hai kích thước W/L.");
+                AddOmoteMark(drawing, view);
+            }
             markStep?.Invoke("Lưu Drawing");
             drawing.ClearSelection2(true); drawing.ViewZoomtofit2();
             int error = 0, warning = 0;
@@ -516,6 +608,57 @@ namespace ADDIN.Commands.Kadai
                 app.CloseDoc(string.IsNullOrEmpty(savedPath) ? drawing.GetTitle() : savedPath);
                 throw;
             }
+        }
+
+        private static void PaintFlatConfiguration(ModelDoc2 part, string flatConfiguration, int uraNormal)
+        {
+            string folded = part.ConfigurationManager.ActiveConfiguration.Name;
+            Require(!string.IsNullOrEmpty(flatConfiguration) && folded != flatConfiguration,
+                "Drawing không tham chiếu cấu hình Flat Pattern riêng.");
+            Require(part.ShowConfiguration2(flatConfiguration), "Không mở được cấu hình Flat Pattern của Part.");
+            try
+            {
+                part.EditRebuild3();
+                PaintUra(part, uraNormal);
+            }
+            finally { Require(part.ShowConfiguration2(folded), "Không khôi phục được cấu hình ban đầu của Part."); }
+            int error = 0, warning = 0;
+            Require(part.Save3((int)swSaveAsOptions_e.swSaveAsOptions_Silent, ref error, ref warning) && error == 0,
+                "Không lưu được màu mặt của Part: " + error + "/" + warning);
+        }
+
+        private bool UraFacesViewer(View view, int uraNormal)
+        {
+            var vector = ((MathUtility)app.GetMathUtility()).CreateVector(new[] { 0d, 0, (double)uraNormal }) as MathVector;
+            var inView = vector?.MultiplyTransform(view.ModelToViewTransform) as MathVector;
+            var direction = inView?.ArrayData as double[];
+            Require(direction != null && Math.Abs(direction[2]) > 1e-9 &&
+                Math.Abs(direction[0]) + Math.Abs(direction[1]) < Math.Abs(direction[2]) * .001,
+                "Không đọc được hướng mặt tấm của view 展開.");
+            return direction[2] > 0;
+        }
+
+        private static void SetJapaneseViewName(DrawingDoc drawing, View view)
+        {
+            const string prefix = "図面ビュー";
+            if (view.GetName2().StartsWith(prefix, StringComparison.Ordinal)) return;
+            var usedNames = new HashSet<string>(Items(drawing.GetViews()).SelectMany(Items).OfType<View>()
+                .Select(candidate => candidate.GetName2()), StringComparer.OrdinalIgnoreCase);
+            int number = 1;
+            while (usedNames.Contains(prefix + number)) number++;
+            Require(view.SetName2(prefix + number), "Không đặt được tên 図面ビュー cho hình chiếu.");
+        }
+
+        private static void AddOmoteMark(ModelDoc2 drawing, View view)
+        {
+            drawing.ClearSelection2(true);
+            var bounds = (double[])view.GetOutline();
+            var note = drawing.InsertNote("表") as Note;
+            Require(note != null && note.SetBalloon((int)swBalloonStyle_e.swBS_Circular, (int)swBalloonFit_e.swBF_Tightest),
+                "Không tạo được ký hiệu mặt 表.");
+            var annotation = note.GetAnnotation() as Annotation;
+            Require(annotation != null && annotation.SetPosition2((bounds[0] + bounds[2]) / 2, bounds[3] + .005, 0),
+                "Không đặt được ký hiệu mặt 表 trên bản vẽ.");
         }
 
         private static void FitFlatViewToTemplate(ModelDoc2 drawing, View view, Action<string> markStep)

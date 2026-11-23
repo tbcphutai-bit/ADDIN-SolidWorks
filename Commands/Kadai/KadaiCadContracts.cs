@@ -33,22 +33,27 @@ namespace ADDIN.Commands.Kadai
         public string MaterialName, MaterialDatabase;
     }
 
+    internal enum KadaiUraSide { Unset = 0, First = -1, Second = 1 }
+
     internal sealed class KadaiApplyOptions
     {
         internal readonly string PartTemplate, DrawingTemplate, MaterialName, MaterialDatabase;
         private readonly Dictionary<string, string> partNames;
+        private readonly Dictionary<string, KadaiUraSide> uraSides;
 
         internal KadaiApplyOptions(string partTemplate, string drawingTemplate, string materialName,
-            string materialDatabase, Dictionary<string, string> partNames)
+            string materialDatabase, Dictionary<string, string> partNames, Dictionary<string, KadaiUraSide> uraSides)
         {
             PartTemplate = partTemplate;
             DrawingTemplate = drawingTemplate;
             MaterialName = materialName;
             MaterialDatabase = materialDatabase;
             this.partNames = new Dictionary<string, string>(partNames, StringComparer.Ordinal);
+            this.uraSides = new Dictionary<string, KadaiUraSide>(uraSides, StringComparer.Ordinal);
         }
 
         internal string PartName(string ribId) { return partNames[ribId]; }
+        internal KadaiUraSide UraSide(string ribId) { return uraSides[ribId]; }
 
         internal void Validate(IEnumerable<KadaiProfile3D> ribs)
         {
@@ -60,6 +65,9 @@ namespace ADDIN.Commands.Kadai
             if (ids.Length != partNames.Count || ids.Any(id => !partNames.ContainsKey(id)))
                 throw new InvalidOperationException("Danh sách tên Part không khớp với Preview.");
             ValidateNames(ids.Select(PartName));
+            if (ids.Length != uraSides.Count || ids.Any(id => !uraSides.TryGetValue(id, out var side) ||
+                (side != KadaiUraSide.First && side != KadaiUraSide.Second)))
+                throw new InvalidOperationException("Chọn mặt ウラ cho tất cả các thanh trong Preview.");
         }
 
         internal static void RequireTemplate(string path, string extension)
