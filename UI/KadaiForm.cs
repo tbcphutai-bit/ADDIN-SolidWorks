@@ -491,7 +491,135 @@ namespace ADDIN.UI
                 }
             }
 
-            private readonly DataGridView grid = new DataGridView
+            private sealed class UraSelectionGrid : DataGridView
+            {
+                private const int WmMouseMove = 0x0200;
+                private const int WmMouseLeave = 0x02A3;
+                private const int MkLeftButton = 0x0001;
+                private readonly Timer scrollDuringDrag = new Timer { Interval = 70 };
+                private int anchorRow = -1;
+                private int endRow = -1;
+                private bool selecting;
+                private Rectangle dragStartArea;
+                private Point pointer;
+                private int selectionColumnX;
+
+                internal UraSelectionGrid()
+                {
+                    scrollDuringDrag.Tick += (s, e) => ExtendSelection(true);
+                }
+
+                protected override void OnMouseDown(MouseEventArgs e)
+                {
+                    StopDrag();
+                    base.OnMouseDown(e);
+                    if (e.Button != MouseButtons.Left || ModifierKeys != Keys.None) return;
+                    var hit = HitTest(e.X, e.Y);
+                    // The read-only rib column doubles as the row selection handle.
+                    if (hit.Type != DataGridViewHitTestType.Cell || hit.ColumnIndex != 0 || IsCurrentCellInEditMode) return;
+                    anchorRow = hit.RowIndex;
+                    selectionColumnX = e.X;
+                    Size threshold = SystemInformation.DragSize;
+                    dragStartArea = new Rectangle(e.X - threshold.Width / 2, e.Y - threshold.Height / 2,
+                        threshold.Width, threshold.Height);
+                    Capture = true;
+                }
+
+                protected override void WndProc(ref Message message)
+                {
+                    if (anchorRow >= 0 && message.Msg == WmMouseLeave) return;
+                    if (anchorRow < 0 || message.Msg != WmMouseMove)
+                    {
+                        base.WndProc(ref message);
+                        return;
+                    }
+                    if ((message.WParam.ToInt64() & MkLeftButton) == 0)
+                    {
+                        StopDrag();
+                        base.WndProc(ref message);
+                        return;
+                    }
+                    // Handle the sweep before DataGridView moves its current cell or releases capture.
+                    long position = message.LParam.ToInt64();
+                    pointer = new Point(unchecked((short)position), unchecked((short)(position >> 16)));
+                    if (endRow < 0 && dragStartArea.Contains(pointer)) return;
+                    ExtendSelection(false);
+                    scrollDuringDrag.Start();
+                }
+
+                private void ExtendSelection(bool scroll)
+                {
+                    int first = FirstDisplayedScrollingRowIndex;
+                    if (anchorRow < 0 || first < 0) return;
+                    const int edge = 8;
+                    int top = GetRowDisplayRectangle(first, true).Top;
+                    if (scroll)
+                    {
+                        int step = pointer.Y < top + edge ? -1 : pointer.Y >= ClientSize.Height - edge ? 1 : 0;
+                        if (step == 0 || (step < 0 && first == 0) ||
+                            (step > 0 && Rows[Rows.Count - 1].Displayed &&
+                             GetRowDisplayRectangle(Rows.Count - 1, false).Bottom <= ClientSize.Height))
+                            return;
+                        FirstDisplayedScrollingRowIndex = first + step;
+                        first = FirstDisplayedScrollingRowIndex;
+                    }
+
+                    int last = Math.Min(Rows.Count - 1, first + DisplayedRowCount(true) - 1);
+                    int row = HitTest(selectionColumnX, pointer.Y).RowIndex;
+                    if (row < 0) row = pointer.Y < top ? first : last;
+                    if (row < 0 || endRow == row) return;
+
+                    endRow = row;
+                    int start = Math.Min(anchorRow, row);
+                    int end = Math.Max(anchorRow, row);
+                    selecting = true;
+                    try
+                    {
+                        foreach (DataGridViewRow item in Rows)
+                        {
+                            bool selected = item.Index >= start && item.Index <= end;
+                            if (item.Selected != selected) item.Selected = selected;
+                        }
+                    }
+                    finally { selecting = false; }
+                    OnSelectionChanged(EventArgs.Empty);
+                }
+
+                protected override void OnSelectionChanged(EventArgs e)
+                {
+                    if (!selecting) base.OnSelectionChanged(e);
+                }
+
+                protected override void OnMouseUp(MouseEventArgs e)
+                {
+                    if (e.Button == MouseButtons.Left) StopDrag();
+                    base.OnMouseUp(e);
+                }
+
+                protected override void OnMouseCaptureChanged(EventArgs e)
+                {
+                    if (!Capture && anchorRow >= 0) StopDrag();
+                    base.OnMouseCaptureChanged(e);
+                }
+
+                private void StopDrag()
+                {
+                    anchorRow = endRow = -1;
+                    scrollDuringDrag.Stop();
+                }
+
+                protected override void Dispose(bool disposing)
+                {
+                    if (disposing)
+                    {
+                        StopDrag();
+                        scrollDuringDrag.Dispose();
+                    }
+                    base.Dispose(disposing);
+                }
+            }
+
+            private readonly DataGridView grid = new UraSelectionGrid
             {
                 Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
                 AllowUserToResizeRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
@@ -522,7 +650,7 @@ namespace ADDIN.UI
 
                 var hint = Caption("Chọn thanh trong bảng. Xoay và zoom Assembly để xem hai mặt.");
                 AddFullRow(content, hint, new RowStyle(SizeType.AutoSize));
-                AddFullRow(content, Caption("Shift + nhấp để chọn một dải. Ctrl + nhấp để chọn từng thanh."),
+                AddFullRow(content, Caption("Kéo dọc cột Thanh để quét chọn. Ctrl+A chọn tất cả."),
                     new RowStyle(SizeType.AutoSize));
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Thanh", ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.NotSortable, FillWeight = 38 });
