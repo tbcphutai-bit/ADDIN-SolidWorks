@@ -520,9 +520,33 @@ namespace ADDIN.Commands.Kadai
                 normal = (MathVector)math.CreateVector(profile.ExtrusionDirection);
                 var solid = modeler.CreateExtrudedBody(sheet, normal, profile.ThicknessMeters);
                 if (solid == null || solid.GetType() != 0) { ReleaseOwned(solid); throw new InvalidOperationException("Preview extrusion failed."); }
-                return solid;
+                if (profile.OrientationHole == null) return solid;
+                try { return CutPreviewHole(modeler, solid, profile); }
+                finally { ReleaseOwned(solid); }
             } finally { foreach (var c in curves.Concat(untrimmed).Distinct()) ReleaseOwned(c);
                 ReleaseOwned(normal); ReleaseOwned(sheet); ReleaseOwned(plane); }
+        }
+
+        private static Body2 CutPreviewHole(Modeler modeler, Body2 solid, KadaiProfile3D profile)
+        {
+            var hole = profile.OrientationHole;
+            var origin = profile.PointsWorldMeters[profile.PointsWorldMeters.Count - 1];
+            var axis = profile.ExtrusionDirection;
+            const double overrun = .001;
+            var center = Enumerable.Range(0, 3).Select(i => origin[i] + hole.X * profile.AlongDirection[i]
+                + hole.Y * profile.HeightDirection[i] - axis[i] * (profile.ThicknessMeters / 2 + overrun));
+            var parameters = center.Concat(axis).Concat(new[] { hole.Diameter / 2, profile.ThicknessMeters + 2 * overrun }).ToArray();
+            var punch = modeler.CreateBodyFromCyl(parameters) as Body2;
+            if (punch == null) throw new InvalidOperationException("Không dựng được lỗ định hướng Preview.");
+            try
+            {
+                var results = (solid.Operations2((int)swBodyOperationType_e.SWBODYCUT, punch, out int error)
+                    as object[] ?? new object[0]).OfType<Body2>().ToArray();
+                if (error == 0 && results.Length == 1) return results[0];
+                foreach (var body in results) ReleaseOwned(body);
+                throw new InvalidOperationException("Không cắt được lỗ định hướng Preview cho " + profile.RibId + ".");
+            }
+            finally { ReleaseOwned(punch); }
         }
         public void ShowTemporaryPreview(ModelDoc2 document, KadaiPlan plan, List<KadaiProfile3D> ribs)
         {

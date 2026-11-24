@@ -170,6 +170,12 @@ namespace ADDIN.Commands.Kadai
                     Closed = true, ThicknessMeters = blank.ThicknessMeters, AlongDirection = blank.AlongDirection,
                     HeightDirection = blank.HeightDirection, ExtrusionDirection = blank.ExtrusionDirection,
                     ValidationMessage = blank.ValidationMessage };
+                if (plan.Settings.OrientationHole != null)
+                {
+                    blank.OrientationHole = PlaceOrientationHole(plan.Settings.OrientationHole, blank, perimeter,
+                        points[contourCount][0]);
+                    notched.OrientationHole = blank.OrientationHole;
+                }
                 var origin = blank.PointsWorldMeters[blank.PointsWorldMeters.Count - 1];
                 foreach (var point in perimeter)
                     notched.PointsWorldMeters.Add(Enumerable.Range(0, 3).Select(axis => origin[axis]
@@ -178,6 +184,39 @@ namespace ADDIN.Commands.Kadai
             }
             return result;
         }
+
+        private static KadaiOrientationHole PlaceOrientationHole(KadaiOrientationHoleSettings options,
+            KadaiProfile3D rib, List<double[]> perimeter, double length)
+        {
+            double diameter = options.DiameterMm * .001;
+            double endDistance = options.FromEndMm * .001;
+            double y = options.FromBaseMm * .001;
+            if (!Finite(diameter) || !Finite(endDistance) || !Finite(y) || diameter <= 0 || endDistance <= 0 || y <= 0)
+                throw new InvalidOperationException("Nhập đường kính và hai khoảng cách tâm lỗ lớn hơn 0.");
+            bool atFinish = rib.Direction == KadaiRibDirection.Longitudinal
+                ? options.LongitudinalAtFinish : options.TransverseAtFinish;
+            double x = atFinish ? length - endDistance : endDistance;
+            bool inside = false;
+            double limit = diameter * .5 + rib.ThicknessMeters;
+            for (int i = 0; i < perimeter.Count; i++)
+            {
+                var a = perimeter[i];
+                var b = perimeter[(i + 1) % perimeter.Count];
+                double dx = b[0] - a[0], dy = b[1] - a[1];
+                double norm = dx * dx + dy * dy;
+                if (norm < 1e-16) continue;
+                if ((a[1] > y) != (b[1] > y) && x < a[0] + dx * (y - a[1]) / dy) inside = !inside;
+                double t = Math.Max(0, Math.Min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / norm));
+                double ex = x - a[0] - t * dx, ey = y - a[1] - t * dy;
+                if (ex * ex + ey * ey < limit * limit)
+                    throw OrientationHoleOutside(rib.RibId);
+            }
+            if (!inside) throw OrientationHoleOutside(rib.RibId);
+            return new KadaiOrientationHole(x, y, diameter, atFinish ? length : 0);
+        }
+
+        private static InvalidOperationException OrientationHoleOutside(string ribId) =>
+            new InvalidOperationException(ribId + ": lỗ định hướng quá sát mép hoặc rãnh. Chỉnh đường kính hoặc vị trí lỗ.");
 
         private static double HeightAt(double[][] points, int count, double coordinate)
         {

@@ -30,6 +30,9 @@ namespace ADDIN.UI
         private readonly NumericUpDown endClearance = Number(0, 99999, 50, 1);
         private readonly NumericUpDown fixedHeight = Number(.1m, 99999, 170, 1);
         private readonly NumericUpDown jointHeight = Number(.1m, 99999, 100, 1);
+        private readonly Button orientationHoleButton = new Button { AutoSize = true, Anchor = AnchorStyles.Left };
+        private KadaiOrientationHoleSettings orientationHole = new KadaiOrientationHoleSettings(6, 15, 15, false, false);
+        private bool orientationHoleEnabled = true;
         private readonly ComboBox panelDirection = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
         private readonly Label panelName = FaceLabel();
         private readonly Label baseName = FaceLabel();
@@ -76,6 +79,8 @@ namespace ADDIN.UI
             AddRow(form, Caption("Khoảng chừa cuối base (mm)"), endClearance);
             AddRow(form, Caption("Chiều cao thanh cố định (mm)"), fixedHeight);
             AddRow(form, Caption("Chiều cao rãnh từ mặt đế (mm)"), jointHeight);
+            ConfigureOrientationHoleButton();
+            AddFullRow(form, orientationHoleButton, new RowStyle(SizeType.AutoSize));
             AddFullRow(form, map, new RowStyle(SizeType.Percent, 100));
             AddFullRow(form, status, new RowStyle(SizeType.Absolute, 42));
 
@@ -176,6 +181,7 @@ namespace ADDIN.UI
                     StartClearanceMm = (double)startClearance.Value, EndClearanceMm = (double)endClearance.Value,
                     FixedHeightMm = (double)fixedHeight.Value,
                     JointHeightMm = (double)jointHeight.Value,
+                    OrientationHole = orientationHoleEnabled ? orientationHole : null,
                     PanelRibDirection = panelDirection.SelectedIndex == 0 ? KadaiRibDirection.Longitudinal : KadaiRibDirection.Transverse,
                     LongThicknessMm = ribThicknessMm, CrossThicknessMm = ribThicknessMm,
                     LongSlotExtraMm = slotClearanceMm, CrossSlotExtraMm = slotClearanceMm
@@ -237,7 +243,6 @@ namespace ADDIN.UI
                         choices.Names, choices.UraSides);
                     step = "Tạo gói Kadai";
                     ApplyToFolder(folder.SelectedPath, options);
-                    previousStatus = "Đã chèn " + ready.Blanks.Count + " thanh vào Assembly. Bấm Ctrl+S để lưu Assembly.";
                 }
             }
             catch (Exception ex)
@@ -306,17 +311,97 @@ namespace ADDIN.UI
             internal SolidWorksWindow(IntPtr handle) { Handle = handle; }
         }
 
+        private void ConfigureOrientationHoleButton()
+        {
+            UpdateOrientationHoleButton();
+            orientationHoleButton.Click += (s, e) => EditOrientationHole();
+        }
+
+        private void UpdateOrientationHoleButton()
+        {
+            orientationHoleButton.Text = orientationHoleEnabled
+                ? "Lỗ định hướng · Ø" + orientationHole.DiameterMm.ToString("0.##") + " mm…"
+                : "Lỗ định hướng · Tắt…";
+        }
+
+        private void EditOrientationHole()
+        {
+            using (var dialog = new Form
+            {
+                Text = "Kadai · Lỗ định hướng", StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog, ClientSize = new Size(410, 245),
+                AutoScaleMode = AutoScaleMode.Dpi,
+                MaximizeBox = false, MinimizeBox = false, ShowInTaskbar = false, Font = Font
+            })
+            {
+                var settings = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Padding = new Padding(10) };
+                settings.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 202));
+                settings.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                var enabled = new CheckBox { Text = "Tạo lỗ định hướng", Checked = orientationHoleEnabled, AutoSize = true };
+                var diameter = Number(.1m, 1000, (decimal)orientationHole.DiameterMm, 2);
+                var end = Number(.1m, 99999, (decimal)orientationHole.FromEndMm, 2);
+                var bottom = Number(.1m, 99999, (decimal)orientationHole.FromBaseMm, 2);
+                var longitudinal = HoleEndChoice(orientationHole.LongitudinalAtFinish);
+                var transverse = HoleEndChoice(orientationHole.TransverseAtFinish);
+                settings.Controls.Add(enabled, 0, 0);
+                settings.SetColumnSpan(enabled, 2);
+                settings.Controls.Add(new Label { Text = "Đường kính Ø (mm)", AutoSize = true }, 0, 1);
+                settings.Controls.Add(diameter, 1, 1);
+                settings.Controls.Add(new Label { Text = "Từ đầu thanh đến tâm (mm)", AutoSize = true }, 0, 2);
+                settings.Controls.Add(end, 1, 2);
+                settings.Controls.Add(new Label { Text = "Từ đáy đến tâm (mm)", AutoSize = true }, 0, 3);
+                settings.Controls.Add(bottom, 1, 3);
+                settings.Controls.Add(new Label { Text = "Góc dưới · Nhóm Dọc", AutoSize = true }, 0, 4);
+                settings.Controls.Add(longitudinal, 1, 4);
+                settings.Controls.Add(new Label { Text = "Góc dưới · Nhóm Ngang", AutoSize = true }, 0, 5);
+                settings.Controls.Add(transverse, 1, 5);
+
+                var ok = new Button { Text = "OK", DialogResult = DialogResult.OK };
+                var cancel = new Button { Text = "Hủy", DialogResult = DialogResult.Cancel };
+                var actions = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill,
+                    FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
+                actions.Controls.AddRange(new Control[] { cancel, ok });
+                settings.Controls.Add(actions, 0, 6);
+                settings.SetColumnSpan(actions, 2);
+                enabled.CheckedChanged += (s, e) =>
+                {
+                    foreach (var input in new Control[] { diameter, end, bottom, longitudinal, transverse })
+                        input.Enabled = enabled.Checked;
+                };
+                diameter.Enabled = end.Enabled = bottom.Enabled = longitudinal.Enabled = transverse.Enabled = enabled.Checked;
+                dialog.AcceptButton = ok;
+                dialog.CancelButton = cancel;
+                dialog.Controls.Add(settings);
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                orientationHoleEnabled = enabled.Checked;
+                orientationHole = new KadaiOrientationHoleSettings((double)diameter.Value, (double)end.Value,
+                    (double)bottom.Value, longitudinal.SelectedIndex == 1, transverse.SelectedIndex == 1);
+                UpdateOrientationHoleButton();
+                ResetPreview();
+            }
+        }
+
+        private static ComboBox HoleEndChoice(bool finish)
+        {
+            var input = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
+            input.Items.AddRange(new[] { "Đầu thanh", "Cuối thanh" });
+            input.SelectedIndex = finish ? 1 : 0;
+            return input;
+        }
+
         private string ApplyToFolder(string parentDirectory, KadaiApplyOptions options)
         {
+            string directory;
             try
             {
-                string directory = backend.ApplyBaseLayout(layout, source, baseDatum, parentDirectory, options, SetApplyStatus, DimensionFlatView);
+                directory = backend.ApplyBaseLayout(layout, source, baseDatum, parentDirectory, options, SetApplyStatus, DimensionFlatView);
                 source = null;
                 baseDatum = null;
                 UpdateSelectionStatus();
-                return directory;
             }
             finally { ClearPreview(); }
+            Close();
+            return directory;
         }
 
         private void DimensionFlatView(ModelDoc2 drawing, SolidWorks.Interop.sldworks.View view)

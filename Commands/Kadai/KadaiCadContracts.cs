@@ -132,6 +132,20 @@ namespace ADDIN.Commands.Kadai
         public double[] AlongDirection;
         public double[] HeightDirection;
         internal bool HasPanelContact;
+        internal KadaiOrientationHole OrientationHole;
+    }
+
+    internal sealed class KadaiOrientationHole
+    {
+        internal readonly double X, Y, Diameter, EndX;
+
+        internal KadaiOrientationHole(double x, double y, double diameter, double endX)
+        {
+            X = x;
+            Y = y;
+            Diameter = diameter;
+            EndX = endX;
+        }
     }
 
     internal sealed class KadaiPartResult

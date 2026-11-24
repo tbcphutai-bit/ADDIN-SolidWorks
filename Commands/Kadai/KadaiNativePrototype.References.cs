@@ -144,9 +144,11 @@ namespace ADDIN.Commands.Kadai
             Link(doc, last, End(lines[4]));
             Constrain(doc, lines[0], "sgHORIZONTAL");
             Constrain(doc, lines[1], "sgVERTICAL");
-            Constrain(doc, lines[2], "sgFIXED");
+            Constrain(doc, lines[2], "sgHORIZONTAL");
             Constrain(doc, lines[3], "sgVERTICAL");
             Constrain(doc, lines[4], "sgHORIZONTAL");
+            AnchorPoint(doc, Start(lines[2]), left, 0);
+            DimensionBetween(doc, Start(lines[2]), End(lines[2]), true, (left + right) / 2, -.025, right - left);
             return new[] { left, right, width };
         }
 
@@ -160,8 +162,8 @@ namespace ADDIN.Commands.Kadai
             try
             {
                 double upper = 2 * local.Max(point => point[1]) + .01;
-                DrawPolygon(doc, Rectangle(bounds[0] - .01, -.01, 0, upper));
-                DrawPolygon(doc, Rectangle(bounds[2], -.01, bounds[1] + .01, upper));
+                DrawDimensionedRectangle(doc, bounds[0] - .01, -.01, 0, upper);
+                DrawDimensionedRectangle(doc, bounds[2], -.01, bounds[1] + .01, upper);
             }
             finally { manager.InsertSketch(true); }
             Require(SketchFeature(doc, sketch).Select2(false, 0), "Không chọn được sketch mép base.");
@@ -187,40 +189,13 @@ namespace ADDIN.Commands.Kadai
                 foreach (var slot in cuts) DrawMatingSlot(doc, sketch, slot, surfaces[slot.SlotId]);
                 return;
             }
-            var manager = doc.SketchManager;
-            manager.AddToDB = true;
-            SketchPoint datum;
-            try { datum = manager.CreatePoint(0, 0, 0); }
-            finally { manager.AddToDB = false; }
-            doc.ClearSelection2(true);
-            Require(datum != null && datum.Select4(false, null), "Không tạo được mốc dim rãnh từ mặt đế.");
-            doc.SketchAddConstraints("sgFIXED");
-            int preference = (int)swUserPreferenceToggle_e.swInputDimValOnCreate;
-            bool original = app.GetUserPreferenceToggle(preference);
-            try
+            foreach (var slot in cuts)
             {
-                app.SetUserPreferenceToggle(preference, false);
-                foreach (var slot in cuts)
-                {
-                    var corners = Rectangle(slot.Left, slot.Bottom, slot.Right, slot.Top);
-                    var lines = DrawChain(doc, corners.Concat(corners.Take(1)).ToArray());
-                    Link(doc, End(lines[3]), Start(lines[0]));
-                    Constrain(doc, lines[0], "sgFIXED");
-                    Constrain(doc, lines[1], "sgVERTICAL");
-                    Constrain(doc, lines[2], "sgHORIZONTAL");
-                    Constrain(doc, lines[3], "sgVERTICAL");
-                    doc.ClearSelection2(true);
-                    Require(Start(lines[2]).Select4(false, null) && datum.Select4(true, null),
-                        "Không chọn được hai mốc DIM cho " + slot.SlotId + ".");
-                    var dimension = (doc.AddVerticalDimension2(slot.Right + .015, slot.Top / 2, 0) as DisplayDimension)?.GetDimension2(0);
-                    Require(dimension != null && Math.Abs(dimension.SystemValue - slot.Top) < SketchTolerance,
-                        "SolidWorks không giữ DIM điều khiển rãnh " + slot.SlotId + ".");
-                }
-            }
-            finally
-            {
-                app.SetUserPreferenceToggle(preference, original);
-                doc.ClearSelection2(true);
+                var lines = DrawRectangleWithRelations(doc, slot.Left, slot.Bottom, slot.Right, slot.Top);
+                DimensionFromOrigin(doc, Start(lines[2]), false, slot.Right + .015, slot.Top / 2, slot.Top);
+                AnchorPoint(doc, Start(lines[0]), slot.Left, slot.Bottom);
+                DimensionBetween(doc, Start(lines[0]), End(lines[0]), true, (slot.Left + slot.Right) / 2,
+                    slot.Bottom - .012, slot.Right - slot.Left);
             }
         }
 
@@ -240,9 +215,118 @@ namespace ADDIN.Commands.Kadai
             Link(doc, right, End(lines[4]));
             Constrain(doc, lines[0], "sgHORIZONTAL");
             Constrain(doc, lines[1], "sgVERTICAL");
-            Constrain(doc, lines[2], "sgFIXED");
+            Constrain(doc, lines[2], "sgHORIZONTAL");
             Constrain(doc, lines[3], "sgVERTICAL");
             Constrain(doc, lines[4], "sgHORIZONTAL");
+            DimensionFromOrigin(doc, Start(lines[2]), false, slot.Left - .015, slot.Top / 2, slot.Top);
+            DimensionBetween(doc, Start(lines[0]), End(lines[0]), true, (left.X + slot.Left) / 2, left.Y - .01, left.X - slot.Left);
+            DimensionBetween(doc, Start(lines[4]), End(lines[4]), true, (right.X + slot.Right) / 2, right.Y - .01, slot.Right - right.X);
+        }
+
+        private void DrawOrientationHole(ModelDoc2 doc, Feature plane, KadaiProfile3D profile)
+        {
+            var hole = profile.OrientationHole;
+            var body = Items(((PartDoc)doc).GetBodies2((int)swBodyType_e.swSolidBody, false)).OfType<Body2>().Single();
+            var corner = Items(body.GetVertices()).OfType<Vertex>()
+                .Select(vertex => new { Vertex = vertex, Point = (double[])vertex.GetPoint() })
+                .Where(candidate => Math.Abs(candidate.Point[0] - hole.EndX) < SketchTolerance && Math.Abs(candidate.Point[1]) < SketchTolerance)
+                .OrderBy(candidate => Math.Abs(candidate.Point[2])).Select(candidate => candidate.Vertex).FirstOrDefault();
+            Require(corner != null, "Không tìm thấy góc dưới để đặt lỗ " + profile.RibId + ".");
+            doc.ClearSelection2(true);
+            Require(plane.Select2(false, 0), "Không chọn được mặt phẳng sketch lỗ định hướng.");
+            var manager = doc.SketchManager;
+            manager.InsertSketch(true);
+            var sketch = manager.ActiveSketch;
+            try
+            {
+                manager.AddToDB = true;
+                SketchSegment circle;
+                try { circle = manager.CreateCircleByRadius(hole.X, hole.Y, 0, hole.Diameter * .5); }
+                finally { manager.AddToDB = false; }
+                Require(circle is SketchArc, "Không vẽ được đường tròn lỗ định hướng.");
+                var center = (SketchPoint)((SketchArc)circle).GetCenterPoint2();
+                Func<bool> reference = () => ((Entity)corner).Select4(true, null);
+                DimensionFromReference(doc, center, reference, true, (hole.X + hole.EndX) / 2, -.012, Math.Abs(hole.X - hole.EndX));
+                DimensionFromReference(doc, center, reference, false, hole.EndX + (hole.X - hole.EndX) * 2, hole.Y / 2, hole.Y);
+                doc.ClearSelection2(true);
+                Require(circle.Select4(false, null), "Không chọn được đường tròn để ghi DIM đường kính.");
+                RequireDrivingDimension(doc.AddDiameterDimension2(hole.X + hole.Diameter, hole.Y + hole.Diameter, 0), hole.Diameter);
+            }
+            finally { doc.ClearSelection2(true); manager.InsertSketch(true); }
+            var feature = SketchFeature(doc, sketch);
+            feature.Name = "Kadai_OrientationHoleSketch_" + profile.RibId;
+            Require(feature.Select2(false, 0), "Không tìm thấy sketch lỗ định hướng.");
+            CutThroughSheet(doc, "Kadai_OrientationHole_" + profile.RibId);
+        }
+
+        private void WithDrivingDimensions(ModelDoc2 doc, Action draw)
+        {
+            int preference = (int)swUserPreferenceToggle_e.swInputDimValOnCreate;
+            bool original = app.GetUserPreferenceToggle(preference);
+            try { app.SetUserPreferenceToggle(preference, false); draw(); }
+            finally { app.SetUserPreferenceToggle(preference, original); doc.ClearSelection2(true); }
+        }
+
+        private static SketchLine[] DrawRectangleWithRelations(ModelDoc2 doc, double left, double bottom, double right, double top)
+        {
+            var corners = Rectangle(left, bottom, right, top);
+            var lines = DrawChain(doc, corners.Concat(corners.Take(1)).ToArray());
+            Link(doc, End(lines[3]), Start(lines[0]));
+            for (int i = 0; i < lines.Length; i++) Constrain(doc, lines[i], i % 2 == 0 ? "sgHORIZONTAL" : "sgVERTICAL");
+            return lines;
+        }
+
+        private static void DrawDimensionedRectangle(ModelDoc2 doc, double left, double bottom, double right, double top)
+        {
+            var lines = DrawRectangleWithRelations(doc, left, bottom, right, top);
+            var anchor = Math.Abs(left) <= Math.Abs(right) ? Start(lines[0]) : End(lines[0]);
+            AnchorPoint(doc, anchor, anchor.X, bottom);
+            DimensionBetween(doc, Start(lines[0]), End(lines[0]), true, (left + right) / 2, bottom - .018, right - left);
+            DimensionBetween(doc, Start(lines[3]), End(lines[3]), false, left - .018, (top + bottom) / 2, top - bottom);
+        }
+
+        private static void AnchorPoint(ModelDoc2 doc, SketchPoint point, double x, double y)
+        {
+            bool zeroX = Math.Abs(x) < SketchTolerance, zeroY = Math.Abs(y) < SketchTolerance;
+            if (zeroX || zeroY)
+            {
+                doc.ClearSelection2(true);
+                Require(point.Select4(false, null) && SelectOrigin(doc), "Không chọn được gốc sketch.");
+                doc.SketchAddConstraints(zeroX && zeroY ? "sgCOINCIDENT" : zeroX ? "sgVERTPOINTS" : "sgHORIZPOINTS");
+            }
+            if (!zeroX) DimensionFromOrigin(doc, point, true, x / 2, y - .006, Math.Abs(x));
+            if (!zeroY) DimensionFromOrigin(doc, point, false, x - .006, y / 2, Math.Abs(y));
+        }
+
+        private static bool SelectOrigin(ModelDoc2 doc)
+        {
+            for (var feature = doc.FirstFeature() as Feature; feature != null; feature = feature.GetNextFeature() as Feature)
+                if (feature.GetTypeName2() == "OriginProfileFeature" &&
+                    doc.Extension.SelectByID2("Point1@" + feature.Name, "EXTSKETCHPOINT", 0, 0, 0, true, 0, null, 0))
+                    return true;
+            return doc.Extension.SelectByID2("", "EXTSKETCHPOINT", 0, 0, 0, true, 0, null, 0);
+        }
+
+        private static void DimensionFromOrigin(ModelDoc2 doc, SketchPoint point, bool horizontal, double x, double y, double expected) =>
+            DimensionFromReference(doc, point, () => SelectOrigin(doc), horizontal, x, y, expected);
+
+        private static void DimensionBetween(ModelDoc2 doc, SketchPoint first, SketchPoint second,
+            bool horizontal, double x, double y, double expected) =>
+            DimensionFromReference(doc, first, () => second.Select4(true, null), horizontal, x, y, expected);
+
+        private static void DimensionFromReference(ModelDoc2 doc, SketchPoint point, Func<bool> selectReference,
+            bool horizontal, double x, double y, double expected)
+        {
+            doc.ClearSelection2(true);
+            Require(point.Select4(false, null) && selectReference(), "Không chọn được hai mốc DIM trong sketch Kadai.");
+            RequireDrivingDimension(horizontal ? doc.AddHorizontalDimension2(x, y, 0) : doc.AddVerticalDimension2(x, y, 0), expected);
+        }
+
+        private static void RequireDrivingDimension(object display, double expected)
+        {
+            var dimension = (display as DisplayDimension)?.GetDimension2(0);
+            Require(dimension != null && !dimension.ReadOnly && Math.Abs(dimension.SystemValue - expected) < SketchTolerance,
+                "SolidWorks không tạo được DIM điều khiển " + (expected * 1000).ToString("0.###") + " mm.");
         }
 
         private static SketchPoint[] Endpoints(SketchSegment segment)

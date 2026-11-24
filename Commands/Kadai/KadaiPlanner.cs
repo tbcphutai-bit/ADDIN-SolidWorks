@@ -9,6 +9,22 @@ namespace ADDIN.Commands.Kadai
 {
     internal enum KadaiRibDirection { Longitudinal, Transverse }
 
+    internal sealed class KadaiOrientationHoleSettings
+    {
+        internal readonly double DiameterMm, FromEndMm, FromBaseMm;
+        internal readonly bool LongitudinalAtFinish, TransverseAtFinish;
+
+        internal KadaiOrientationHoleSettings(double diameterMm, double fromEndMm, double fromBaseMm,
+            bool longitudinalAtFinish, bool transverseAtFinish)
+        {
+            DiameterMm = diameterMm;
+            FromEndMm = fromEndMm;
+            FromBaseMm = fromBaseMm;
+            LongitudinalAtFinish = longitudinalAtFinish;
+            TransverseAtFinish = transverseAtFinish;
+        }
+    }
+
     internal sealed class KadaiRequest
     {
         public string Preset = "KDA1";
@@ -23,6 +39,7 @@ namespace ADDIN.Commands.Kadai
         public KadaiRibDirection? PanelRibDirection;
         public double FixedHeightMm = 170;
         public double? JointHeightMm;
+        internal KadaiOrientationHoleSettings OrientationHole;
         public bool OpensAtBottom(KadaiRibDirection direction)
         {
             return direction == (PanelRibDirection ?? KadaiRibDirection.Longitudinal);

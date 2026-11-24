@@ -66,7 +66,9 @@ namespace ADDIN.Commands.Kadai
             double[] endTrim = null;
             try {
                 if (surfaces != null && surfaces.TryGetValue(PanelSurfaceKey, out Feature panelSurface))
-                    endTrim = DrawLinkedPanelProfile(doc, profileSketchObject, panelSurface, local);
+                    WithDrivingDimensions(doc, () => endTrim = DrawLinkedPanelProfile(doc, profileSketchObject, panelSurface, local));
+                else if (!prototype)
+                    WithDrivingDimensions(doc, () => DrawDimensionedRectangle(doc, 0, 0, local[local.Length - 2][0], local[0][1]));
                 else
                     DrawPolygon(doc, local);
             } finally { sketch.AddToDB = false; sketch.InsertSketch(true); }
@@ -81,7 +83,7 @@ namespace ADDIN.Commands.Kadai
             Require(flange != null, "Native Sheet Metal Base Flange failed.");
             flange.Name = "Kadai_BaseFlange_" + profile.RibId;
             if (endTrim != null)
-                TrimLinkedProfile(doc, plane, profile.RibId, local, endTrim);
+                WithDrivingDimensions(doc, () => TrimLinkedProfile(doc, plane, profile.RibId, local, endTrim));
             if (materialDatabasePath != null) {
                 doc.ClearSelection2(true);
                 SetBodyBendTable(doc);
@@ -96,7 +98,7 @@ namespace ADDIN.Commands.Kadai
             var slotSketchObject = sketch.ActiveSketch;
             try {
                 if (surfaces != null)
-                    DrawLinkedSlots(doc, slotSketchObject, cuts, opensAtBottom, surfaces);
+                    WithDrivingDimensions(doc, () => DrawLinkedSlots(doc, slotSketchObject, cuts, opensAtBottom, surfaces));
                 else
                     foreach (var slot in cuts) DrawPolygon(doc, Rectangle(slot.Left, slot.Bottom, slot.Right, slot.Top));
             } finally { sketch.AddToDB = false; sketch.InsertSketch(true); }
@@ -105,6 +107,11 @@ namespace ADDIN.Commands.Kadai
             slotSketch.Name = "Kadai_Slots_" + profile.RibId;
             // Through-all both directions, NormalCut=true, single native Part body.
             cut = CutThroughSheet(doc, "Kadai_JointCut_" + profile.RibId);
+            }
+            if (profile.OrientationHole != null)
+            {
+                doc.EditRebuild3();
+                WithDrivingDimensions(doc, () => DrawOrientationHole(doc, plane, profile));
             }
             doc.EditRebuild3();
             Require(doc.Extension.NeedsRebuild2 == 0, "Part requires a rebuild.");
