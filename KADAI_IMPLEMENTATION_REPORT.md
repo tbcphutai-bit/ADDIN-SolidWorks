@@ -357,3 +357,29 @@ Trên bản sao 6866 với SolidWorks Professional 2024 SP5.0, cả Dọc và Ng
 Build Debug và Release x64 đạt. So với bản TAI TOOL trước, 11 mục mới ngoài bộ lọc tên Kadai đều thuộc kiểu ẩn danh C# do trình biên dịch sinh riêng cho phép chọn đỉnh trong sketch lỗ. Không có mục IL hoặc metadata nào của các lệnh hiện có khác bị sửa. MVID kiểm thử bản TAI TOOL `7e645a46-1820-418f-bf73-8c33f409cead`. Log ở `kadai-assembly-6866/dims-hole-native-live-03/run.log`, `kadai-assembly-6866/dims-hole-native-cross-04/run.log` và `kadai-assembly-6866/dims-hole-native-reopen-05/run.log`.
 
 Đã đồng bộ bảy file nguồn Kadai để người dùng tự rebuild TAI TOOL. Các file gồm `KadaiCadContracts.cs`, `KadaiJointGeometry.cs`, `KadaiNativePrototype.References.cs`, `KadaiNativePrototype.cs`, `KadaiPlanner.cs`, `KadaiPreviewBackend.cs` trong Commands/Kadai và `KadaiForm.cs` trong UI. [Commit triển khai](https://github.com/tbcphutai-bit/ADDIN-SolidWorks/commit/89d4ef4fd62dbdc051ad8c110a3f75d76dfe0a03)
+
+## 23. Tạo ống và cắt gân trong Assembly
+
+Kadai có tùy chọn **Tạo ống và cắt gân**, mặc định tắt. Người dùng nhập đường kính, chiều dày, khoảng chừa ở đầu ống và lượng chừa thêm cho vết cắt. Khi nhập số ống thủ công, có thể chọn **Tiếp xúc ở đầu nhỏ** hoặc **Chia đều ở hai đầu**. Tự tính số ống dùng chế độ tiếp xúc ở đầu nhỏ của V3. Kadai dùng chung bốn file tính hình học hiện tại của CircleFace V3. Luồng độc lập **Tạo ống V3** giữ nguyên.
+
+API đọc mẫu 4315 thấy sketch `TUBE_AXES_3D_41` trong Part tham chiếu. Gân `t4` nhận các mặt trụ thật qua Offset Surface. Sketch và Cut-Extrude cuối tạo chỗ đặt ống bằng Normal Cut xuyên tấm 1,6 mm. Kadai tái hiện quan hệ này bằng Part ống có DIM đường kính, Boss-Extrude theo chiều dài trục và Shell hai đầu. Mỗi gân tham chiếu mặt trụ của các ống giao với nó. Sketch dùng Intersection Curve và Normal Cut ở cấp Part. Các biên rời cùng nằm trong một sketch. Các biên có thể chồng chia thành từng nhóm cắt để SolidWorks xử lý được.
+
+Preview dùng body ống rỗng và vết cắt tạm đúng trên gân. Mỗi vết cắt có phần bù theo góc ống, chiều dày của gân và lượng chừa thêm được nhập. Luồng Apply kiểm tra lại giao thể tích giữa ống, gân và panel sau rebuild, và kiểm tra giao thể tích giữa các ống. Vật liệu ống được chọn riêng bằng Material của SolidWorks. Part ống được chèn trực tiếp vào Assembly và có dòng BOM. Drawing triển khai tiếp tục tạo cho các Part gân Sheet Metal. [SOLIDWORKS API dựng mặt cắt ellipse tạm](https://help.solidworks.com/2024/english/api/sldworksapi/Create_Temporary_Elliptical_Extrusion_Example_VB.htm)
+
+Rebuild của SolidWorks cập nhật vết cắt theo component ống đã đặt. Việc tính lại số lượng hoặc hướng trục khi biên panel thay đổi diễn ra trong lượt Preview mới.
+
+Trên bản sao Assembly **6866-02-円錐架台-上型** với SOLIDWORKS Professional 2024 SP5.0, Preview đạt với 24 ống ở chế độ tiếp xúc và 12 ống ở chế độ chia đều. Trường hợp 41 ống chia đều phát hiện 40 cặp giao nhau và khóa Apply. Lượt Apply đầu tạo được 12 ống, 7 gân dọc, 4 gân ngang, 84 vị trí cắt và 11 Drawing. Hai lần thử lại sau đó ghi lỗi khởi động `0xC0000005` trước khi phiên SOLIDWORKS đăng ký đối tượng API. Lượt tiếp theo kết nối được sau khi đóng các tiến trình thử cũ đã xác nhận chỉ chứa tài liệu thử.
+
+Lượt xác nhận dùng bản Debug x64 MVID `c7f18db7-bdae-4ff9-b147-6061c98bf7c8`. Chế độ tự tính Preview được 41 ống. Chế độ chia đều 12 ống tạo 84 vị trí cắt trong 7 Normal Cut. Ống dùng **St** từ thư viện thanh. Gân và cấu hình 展開 dùng **StSA-** từ thư viện tấm. Sau khi lưu và mở lại Assembly, dịch một ống 0,5 mm làm cả 7 giao tuyến tham chiếu dịch 0,5 mm. Cả 11 Drawing mở lại có view Flat Pattern, Bounding Box và 2 kích thước W/L khớp Bounding Box. Preview khi tắt tùy chọn vẫn tạo đúng 11 gân. GUI được kiểm tra bằng WinForms API để xác nhận trạng thái mặc định, Auto và hai giá trị bố trí thủ công.
+
+Lượt Apply **Tiếp xúc ở đầu nhỏ** tạo 24 ống, 11 gân, 168 vị trí cắt trong 8 Normal Cut và 11 Drawing. Cả hai lượt Apply đều qua kiểm tra giao thể tích sau rebuild. Hai lượt dùng gân dọc làm gân đỡ ống, chừa 100 mm hai đầu trên mặt đế, thanh cố định cao 140 mm, và ống Ø20 mm thành dày 2,6 mm. Auto được kiểm chứng đến Preview.
+
+Build Debug và Release x64 đạt cho nhánh Kadai lẫn project TAI TOOL. 31 mã băm CAD đầu vào của thư mục 6866 khớp sau phép thử. Đã đồng bộ 11 file nguồn vào TAI TOOL để người dùng tự rebuild. DLL đang cài có SHA-256 `CC4653A4E460AD818F0B44EAAC0743E48241535C53387E881A3B67B16D9E4AC9` trước và sau đồng bộ. Log chế độ chia đều và mở lại nằm tại `kadai-assembly-6866/tube-kadai-native-07/run.log`. Log Auto và chế độ tiếp xúc nằm tại `kadai-assembly-6866/tube-kadai-native-08/run.log`.
+
+File thay đổi theo nhóm:
+
+- Project và UI gồm `ADDIN.csproj`, `UI/KadaiForm.cs` và `UI/KadaiTubeOptionsDialog.cs`.
+- Backend trong `Commands/Kadai` gồm `KadaiCadContracts.cs`, `KadaiJointGeometry.cs`, `KadaiNativePrototype.cs`, `KadaiNativePrototype.References.cs`, `KadaiNativePrototype.Tubes.cs`, `KadaiPlanner.cs`, `KadaiPreviewBackend.cs` và `KadaiTubeLayout.cs`.
+- Nhánh Kadai dùng nguyên bốn file tính toán từ TAI TOOL trong `Commands/CircleFaceTubeLayout` gồm `BoundaryRails.cs`, `SwFaceLayout.cs`, `TubeGeometry.cs` và `TubeLayoutSolver.cs`.
+
+Commit mã nguồn `e8369d54ea3c7fe28dd8924d389c610a3b8439bc`. Các lệnh Make Hole, Fix Tỉ lệ và DIM Kegaki không đổi mã nguồn.
