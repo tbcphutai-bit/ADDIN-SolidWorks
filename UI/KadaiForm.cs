@@ -579,6 +579,8 @@ namespace ADDIN.UI
             private sealed class UraSelectionGrid : DataGridView
             {
                 private const int WmMouseMove = 0x0200;
+                private const int WmLeftButtonDown = 0x0201;
+                private const int WmLeftButtonUp = 0x0202;
                 private const int WmMouseLeave = 0x02A3;
                 private const int MkLeftButton = 0x0001;
                 private readonly Timer scrollDuringDrag = new Timer { Interval = 70 };
@@ -588,32 +590,55 @@ namespace ADDIN.UI
                 private Rectangle dragStartArea;
                 private Point pointer;
                 private int selectionColumnX;
+                private Message pendingMouseDown;
 
                 internal UraSelectionGrid()
                 {
                     scrollDuringDrag.Tick += (s, e) => ExtendSelection(true);
                 }
 
-                protected override void OnMouseDown(MouseEventArgs e)
+                private bool BeginDrag(Message message)
                 {
                     StopDrag();
-                    base.OnMouseDown(e);
-                    if (e.Button != MouseButtons.Left || ModifierKeys != Keys.None) return;
-                    var hit = HitTest(e.X, e.Y);
-                    // The read-only rib column doubles as the row selection handle.
-                    if (hit.Type != DataGridViewHitTestType.Cell || hit.ColumnIndex != 0 || IsCurrentCellInEditMode) return;
+                    if (ModifierKeys != Keys.None) return false;
+                    var point = MousePoint(message);
+                    var hit = HitTest(point.X, point.Y);
+                    if (hit.Type != DataGridViewHitTestType.Cell) return false;
+                    if (!ContainsFocus) Focus();
                     anchorRow = hit.RowIndex;
-                    selectionColumnX = e.X;
+                    selectionColumnX = point.X;
+                    pendingMouseDown = message;
                     Size threshold = SystemInformation.DragSize;
-                    dragStartArea = new Rectangle(e.X - threshold.Width / 2, e.Y - threshold.Height / 2,
+                    dragStartArea = new Rectangle(point.X - threshold.Width / 2, point.Y - threshold.Height / 2,
                         threshold.Width, threshold.Height);
                     Capture = true;
+                    return true;
                 }
 
                 protected override void WndProc(ref Message message)
                 {
-                    if (anchorRow >= 0 && message.Msg == WmMouseLeave) return;
-                    if (anchorRow < 0 || message.Msg != WmMouseMove)
+                    if (message.Msg == WmLeftButtonDown && BeginDrag(message)) return;
+                    if (anchorRow < 0)
+                    {
+                        base.WndProc(ref message);
+                        return;
+                    }
+                    if (message.Msg == WmMouseLeave) return;
+                    if (message.Msg == WmLeftButtonUp)
+                    {
+                        bool wasDrag = endRow >= 0;
+                        Message click = pendingMouseDown;
+                        StopDrag();
+                        Capture = false;
+                        // A normal click still reaches the native Part name or face editor.
+                        if (!wasDrag)
+                        {
+                            base.WndProc(ref click);
+                            base.WndProc(ref message);
+                        }
+                        return;
+                    }
+                    if (message.Msg != WmMouseMove)
                     {
                         base.WndProc(ref message);
                         return;
@@ -621,15 +646,24 @@ namespace ADDIN.UI
                     if ((message.WParam.ToInt64() & MkLeftButton) == 0)
                     {
                         StopDrag();
+                        Capture = false;
                         base.WndProc(ref message);
                         return;
                     }
-                    // Handle the sweep before DataGridView moves its current cell or releases capture.
-                    long position = message.LParam.ToInt64();
-                    pointer = new Point(unchecked((short)position), unchecked((short)(position >> 16)));
-                    if (endRow < 0 && dragStartArea.Contains(pointer)) return;
+                    pointer = MousePoint(message);
+                    if (endRow < 0)
+                    {
+                        if (dragStartArea.Contains(pointer) || !EndEdit() || anchorRow < 0) return;
+                        CurrentCell = Rows[anchorRow].Cells[0];
+                    }
                     ExtendSelection(false);
                     scrollDuringDrag.Start();
+                }
+
+                private static Point MousePoint(Message message)
+                {
+                    long position = message.LParam.ToInt64();
+                    return new Point(unchecked((short)position), unchecked((short)(position >> 16)));
                 }
 
                 private void ExtendSelection(bool scroll)
@@ -645,7 +679,8 @@ namespace ADDIN.UI
                             (step > 0 && Rows[Rows.Count - 1].Displayed &&
                              GetRowDisplayRectangle(Rows.Count - 1, false).Bottom <= ClientSize.Height))
                             return;
-                        FirstDisplayedScrollingRowIndex = first + step;
+                        int increment = pointer.Y < top || pointer.Y >= ClientSize.Height ? 3 : 1;
+                        FirstDisplayedScrollingRowIndex = Math.Max(0, Math.Min(Rows.Count - 1, first + step * increment));
                         first = FirstDisplayedScrollingRowIndex;
                     }
 
@@ -673,12 +708,6 @@ namespace ADDIN.UI
                 protected override void OnSelectionChanged(EventArgs e)
                 {
                     if (!selecting) base.OnSelectionChanged(e);
-                }
-
-                protected override void OnMouseUp(MouseEventArgs e)
-                {
-                    if (e.Button == MouseButtons.Left) StopDrag();
-                    base.OnMouseUp(e);
                 }
 
                 protected override void OnMouseCaptureChanged(EventArgs e)
@@ -735,7 +764,7 @@ namespace ADDIN.UI
 
                 var hint = Caption("Chọn thanh trong bảng. Xoay và zoom Assembly để xem hai mặt.");
                 AddFullRow(content, hint, new RowStyle(SizeType.AutoSize));
-                AddFullRow(content, Caption("Kéo dọc cột Thanh để quét chọn. Ctrl+A chọn tất cả."),
+                AddFullRow(content, Caption("Kéo qua các dòng ở bất kỳ cột nào. Ctrl+A chọn tất cả."),
                     new RowStyle(SizeType.AutoSize));
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Thanh", ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.NotSortable, FillWeight = 38 });
