@@ -40,6 +40,7 @@ namespace ADDIN.Commands.Kadai
         public double FixedHeightMm = 170;
         public double? JointHeightMm;
         internal KadaiOrientationHoleSettings OrientationHole;
+        internal KadaiTubeSettings Tubes;
         public bool OpensAtBottom(KadaiRibDirection direction)
         {
             return direction == (PanelRibDirection ?? KadaiRibDirection.Longitudinal);

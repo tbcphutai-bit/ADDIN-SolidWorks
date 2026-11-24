@@ -84,6 +84,7 @@ namespace ADDIN.Commands.Kadai
             flange.Name = "Kadai_BaseFlange_" + profile.RibId;
             if (endTrim != null)
                 WithDrivingDimensions(doc, () => TrimLinkedProfile(doc, plane, profile.RibId, local, endTrim));
+            var tubeCuts = surfaces == null ? new List<Feature>() : CutTubeSeats(doc, plane, surfaces);
             if (materialDatabasePath != null) {
                 doc.ClearSelection2(true);
                 SetBodyBendTable(doc);
@@ -127,6 +128,8 @@ namespace ADDIN.Commands.Kadai
             }
             bool warning;
             if (cut != null) Require(cut.GetErrorCode2(out warning) == 0 && !warning, "Cut rebuild error/warning.");
+            foreach (var tubeCut in tubeCuts)
+                Require(tubeCut.GetErrorCode2(out warning) == 0 && !warning, "Lỗi rebuild " + tubeCut.Name);
             var flat = FindFlatPattern(doc);
             Require(flat.SetSuppression2(1, 1, null), "Cannot unsuppress Flat Pattern."); doc.EditRebuild3();
             Require(flat.GetErrorCode2(out warning) == 0 && !warning, "Flat Pattern failed.");
@@ -218,7 +221,7 @@ namespace ADDIN.Commands.Kadai
         {
             Require(targetAssembly is AssemblyDoc, "Chọn Assembly đích để chèn thanh Kadai.");
             WritePackage(layout.Plan, layout.Blanks, layout.Joints, directory, true, null, progress,
-                targetAssembly, panel, options, dimensionView);
+                targetAssembly, panel, options, dimensionView, layout.Tubes);
         }
 
         private static string PartName(string ribId, string packageName)
@@ -229,7 +232,7 @@ namespace ADDIN.Commands.Kadai
         private void WritePackage(KadaiPlan plan, List<KadaiProfile3D> profiles,
             Dictionary<string, List<KadaiJointCut>> cuts, string directory, bool export, string assemblyTemplate,
             Action<string> progress, ModelDoc2 targetAssembly = null, KadaiPanelSource panel = null,
-            KadaiApplyOptions options = null, Action<ModelDoc2, View> dimensionView = null)
+            KadaiApplyOptions options = null, Action<ModelDoc2, View> dimensionView = null, KadaiTubeLayout tubes = null)
         {
             directory = Path.GetFullPath(directory);
             Require(!Directory.Exists(directory) && !File.Exists(directory), "A new output folder is required.");
@@ -273,6 +276,13 @@ namespace ADDIN.Commands.Kadai
                 markStep(step);
                 if (prototype) assemblyDoc = StartAssembly(AssemblyPath(directory, null), assemblyTemplate);
                 else ActivateAssembly(assemblyDoc);
+                var tubeComponents = new List<Component2>();
+                if (tubes != null)
+                {
+                    markStep("Tạo ống trong Assembly");
+                    progress?.Invoke(step);
+                    InsertTubes(assemblyDoc, directory, panel, tubes, options, added, tubeComponents, bom);
+                }
                 foreach (var profile in profiles)
                 {
                     string name = options == null ? profile.RibId : options.PartName(profile.RibId);
@@ -293,7 +303,7 @@ namespace ADDIN.Commands.Kadai
                             componentsById.Add(profile.RibId, component);
                             markStep("Gắn tham chiếu " + name);
                             return AddLinkedFaces(assemblyDoc, partDoc, component, profile, cuts[profile.RibId],
-                                panel, opensAtBottom, componentsById, cuts);
+                                panel, opensAtBottom, componentsById, cuts, tubes, tubeComponents);
                         };
                     }
                     var part = WritePart(profile, plan.Settings.BottomMm, partPath, cuts[profile.RibId], prototype, uraNormal,
@@ -329,7 +339,13 @@ namespace ADDIN.Commands.Kadai
                 if (prototype) SaveAssembly(assemblyDoc, AssemblyPath(directory, null), profiles.Count, bom);
                 else
                 {
-                    VerifyInsertedRibs(assemblyDoc, added, profiles, markStep);
+                    var ribs = added.Skip(tubeComponents.Count).ToList();
+                    VerifyInsertedRibs(assemblyDoc, ribs, profiles, markStep);
+                    if (tubes != null)
+                    {
+                        markStep("Kiểm tra giao thể tích sau cắt giữa ống, gân và panel");
+                        VerifyInsertedTubes(assemblyDoc, panel, tubes, tubeComponents, ribs);
+                    }
                     File.WriteAllLines(Path.Combine(directory, "BOM.csv"), bom);
                 }
                 File.WriteAllText(complete, prototype ? "Native prototype only; production gate closed." : "Kadai components inserted.");

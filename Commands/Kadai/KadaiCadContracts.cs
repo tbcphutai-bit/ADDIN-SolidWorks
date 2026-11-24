@@ -52,16 +52,26 @@ namespace ADDIN.Commands.Kadai
     internal sealed class KadaiApplyOptions
     {
         internal readonly string PartTemplate, DrawingTemplate, MaterialName, MaterialDatabase;
+        internal readonly string TubeMaterialName, TubeMaterialDatabase;
         private readonly Dictionary<string, string> partNames;
         private readonly Dictionary<string, KadaiUraSide> uraSides;
 
         internal KadaiApplyOptions(string partTemplate, string drawingTemplate, string materialName,
             string materialDatabase, Dictionary<string, string> partNames, Dictionary<string, KadaiUraSide> uraSides)
+            : this(partTemplate, drawingTemplate, materialName, materialDatabase, partNames, uraSides, null, null)
+        {
+        }
+
+        internal KadaiApplyOptions(string partTemplate, string drawingTemplate, string materialName,
+            string materialDatabase, Dictionary<string, string> partNames, Dictionary<string, KadaiUraSide> uraSides,
+            string tubeMaterialName, string tubeMaterialDatabase)
         {
             PartTemplate = partTemplate;
             DrawingTemplate = drawingTemplate;
             MaterialName = materialName;
             MaterialDatabase = materialDatabase;
+            TubeMaterialName = tubeMaterialName;
+            TubeMaterialDatabase = tubeMaterialDatabase;
             this.partNames = new Dictionary<string, string>(partNames, StringComparer.Ordinal);
             this.uraSides = new Dictionary<string, KadaiUraSide>(uraSides, StringComparer.Ordinal);
         }

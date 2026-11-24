@@ -31,6 +31,8 @@ namespace ADDIN.UI
         private readonly NumericUpDown fixedHeight = Number(.1m, 99999, 170, 1);
         private readonly NumericUpDown jointHeight = Number(.1m, 99999, 100, 1);
         private readonly Button orientationHoleButton = new Button { AutoSize = true, Anchor = AnchorStyles.Left };
+        private readonly Button tubeButton = new Button { Text = "Tạo ống và cắt gân…", AutoSize = true, Anchor = AnchorStyles.Left };
+        private KadaiTubeSettings tubeSettings;
         private KadaiOrientationHoleSettings orientationHole = new KadaiOrientationHoleSettings(6, 15, 15, false, false);
         private bool orientationHoleEnabled = true;
         private readonly ComboBox panelDirection = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
@@ -80,7 +82,19 @@ namespace ADDIN.UI
             AddRow(form, Caption("Chiều cao thanh cố định (mm)"), fixedHeight);
             AddRow(form, Caption("Chiều cao rãnh từ mặt đế (mm)"), jointHeight);
             ConfigureOrientationHoleButton();
-            AddFullRow(form, orientationHoleButton, new RowStyle(SizeType.AutoSize));
+            var optionsRow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
+            optionsRow.Controls.AddRange(new Control[] { orientationHoleButton, tubeButton });
+            AddFullRow(form, optionsRow, new RowStyle(SizeType.AutoSize));
+            tubeButton.Click += (s, e) =>
+            {
+                using (var dialog = new KadaiTubeOptionsDialog(tubeSettings))
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                    tubeSettings = dialog.Settings;
+                    tubeButton.Text = tubeSettings == null ? "Tạo ống và cắt gân…" : "Cài đặt ống · Đang bật";
+                    ResetPreview();
+                }
+            };
             AddFullRow(form, map, new RowStyle(SizeType.Percent, 100));
             AddFullRow(form, status, new RowStyle(SizeType.Absolute, 42));
 
@@ -182,17 +196,19 @@ namespace ADDIN.UI
                     FixedHeightMm = (double)fixedHeight.Value,
                     JointHeightMm = (double)jointHeight.Value,
                     OrientationHole = orientationHoleEnabled ? orientationHole : null,
+                    Tubes = tubeSettings,
                     PanelRibDirection = panelDirection.SelectedIndex == 0 ? KadaiRibDirection.Longitudinal : KadaiRibDirection.Transverse,
                     LongThicknessMm = ribThicknessMm, CrossThicknessMm = ribThicknessMm,
                     LongSlotExtraMm = slotClearanceMm, CrossSlotExtraMm = slotClearanceMm
                 };
                 var result = backend.BuildBaseLayout(request, source, baseDatum);
-                backend.ShowTemporaryPreview(source, result.Profiles);
+                backend.ShowTemporaryPreview(source, result);
                 layout = result;
                 apply.Enabled = CanApply;
                 map.Invalidate();
                 int outside = layout.Plan.CrossingCount - layout.JoinedCrossings;
                 status.Text = outside == 0 ? "Đã tạo Preview." : "Đã tạo Preview. " + outside + " giao điểm nằm ngoài biên thanh.";
+                if (layout.Tubes != null) status.Text += " " + layout.Tubes.Axes.Length + " ống.";
                 if (!CanApply) status.Text += " Apply cần Assembly.";
             }
             catch (Exception ex) { ClearPreview(); status.Text = ex.Message; }
@@ -216,13 +232,20 @@ namespace ADDIN.UI
                 string materialDatabase;
                 string material = SelectMaterial(partTemplate, out materialDatabase);
                 if (material == null) return;
+                string tubeMaterial = null, tubeDatabase = null;
+                if (ready.Tubes != null)
+                {
+                    step = "Chọn vật liệu ống";
+                    tubeMaterial = SelectMaterialFor(partTemplate, out tubeDatabase, "2. Chọn vật liệu ống, bấm Apply rồi đóng hộp thoại Material.");
+                    if (tubeMaterial == null) return;
+                }
                 int activateError = 0;
                 app.ActivateDoc3(sourceDocument.DocumentTransient.GetTitle(), false,
                     (int)swRebuildOnActivation_e.swDontRebuildActiveDoc, ref activateError);
 
                 step = "Đặt tên Part và chọn mặt ウラ";
                 // Switching to the material Part may discard the displayed bodies.
-                backend.ShowTemporaryPreview(sourceDocument, ready.Profiles);
+                backend.ShowTemporaryPreview(sourceDocument, ready);
                 var choices = await ChoosePartNamesAsync(ready.Blanks, material, sourceDocument);
                 if (choices.Names == null || IsDisposed) return;
                 if (!backend.IsSourceCurrent(sourceDocument) || baseDatum == null || !backend.IsSourceCurrent(baseDatum.Source))
@@ -240,7 +263,7 @@ namespace ADDIN.UI
                 {
                     if (folder.ShowDialog(this) != DialogResult.OK) return;
                     var options = new KadaiApplyOptions(partTemplate, drawingTemplate, material, materialDatabase,
-                        choices.Names, choices.UraSides);
+                        choices.Names, choices.UraSides, tubeMaterial, tubeDatabase);
                     step = "Tạo gói Kadai";
                     ApplyToFolder(folder.SelectedPath, options);
                 }
@@ -535,10 +558,13 @@ namespace ADDIN.UI
             }
         }
 
-        private string SelectMaterial(string partTemplate, out string databasePath)
+        private string SelectMaterial(string partTemplate, out string databasePath) =>
+            SelectMaterialFor(partTemplate, out databasePath, "2. Chọn vật liệu, bấm Apply rồi đóng hộp thoại Material.");
+
+        private string SelectMaterialFor(string partTemplate, out string databasePath, string instruction)
         {
             databasePath = null;
-            SetApplyStatus("2. Chọn vật liệu, bấm Apply rồi đóng hộp thoại Material.");
+            SetApplyStatus(instruction);
             var scratch = app.NewDocument(partTemplate, 0, 0, 0) as ModelDoc2;
             if (scratch == null)
                 throw new InvalidOperationException("SolidWorks không mở được Part tạm từ template đã chọn.");

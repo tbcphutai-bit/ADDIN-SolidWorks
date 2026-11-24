@@ -169,7 +169,7 @@ namespace ADDIN.Commands.Kadai
                 var notched = new KadaiProfile3D { RibId = blank.RibId, Direction = blank.Direction,
                     Closed = true, ThicknessMeters = blank.ThicknessMeters, AlongDirection = blank.AlongDirection,
                     HeightDirection = blank.HeightDirection, ExtrusionDirection = blank.ExtrusionDirection,
-                    ValidationMessage = blank.ValidationMessage };
+                    HasPanelContact = blank.HasPanelContact, ValidationMessage = blank.ValidationMessage };
                 if (plan.Settings.OrientationHole != null)
                 {
                     blank.OrientationHole = PlaceOrientationHole(plan.Settings.OrientationHole, blank, perimeter,

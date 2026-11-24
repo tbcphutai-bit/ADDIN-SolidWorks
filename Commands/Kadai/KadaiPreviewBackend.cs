@@ -10,7 +10,7 @@ using SolidWorks.Interop.swconst;
 namespace ADDIN.Commands.Kadai
 {
     // Principal-axis sections in panel Part coordinates, displayed in the active model.
-    internal sealed class KadaiPreviewBackend : IKadaiCadBackend, IDisposable
+    internal sealed partial class KadaiPreviewBackend : IKadaiCadBackend, IDisposable
     {
         internal sealed class SlottedLayout
         {
@@ -19,6 +19,7 @@ namespace ADDIN.Commands.Kadai
             public List<KadaiProfile3D> Blanks;
             public int JoinedCrossings;
             public Dictionary<string, List<KadaiJointCut>> Joints;
+            internal KadaiTubeLayout Tubes;
         }
 
         private readonly ISldWorks app;
@@ -215,6 +216,21 @@ namespace ADDIN.Commands.Kadai
                 throw new NotSupportedException("P2 chưa hỗ trợ face có lỗ/nhiều loop; chọn một face liên tục.");
             var surface = (Surface)face.GetSurface();
             var modeler = (Modeler)app.GetModeler();
+            double offset = plan.Settings.Tubes?.PanelOffset ?? 0;
+            Surface offsetSurface = null;
+            try
+            {
+                if (offset > 0)
+                    offsetSurface = modeler.CreateOffsetSurface(surface, face.FaceInSurfaceSense() ? -offset : offset) as Surface
+                        ?? throw new InvalidOperationException("Không tạo được mặt offset đỡ ống.");
+                return CalculateProfiles(plan, panel, datum, straightHeightMm, face, offsetSurface ?? surface, modeler, offset);
+            }
+            finally { ReleaseOwned(offsetSurface); }
+        }
+
+        private List<KadaiProfile3D> CalculateProfiles(KadaiPlan plan, KadaiPanelSource panel,
+            KadaiBaseDatum datum, double straightHeightMm, Face2 face, Surface surface, Modeler modeler, double sectionOffset)
+        {
             var baseFace = datum == null ? null : Resolve(datum.Source);
             var settings = plan.Settings;
             int h = settings.HeightAxis, sign = settings.HeightSign, u = UAxis(h), v = VAxis(h);
@@ -229,7 +245,7 @@ namespace ADDIN.Commands.Kadai
                 double fixedCoordinate = ((longitudinal ? settings.OriginUmm : settings.OriginVmm) + rib.CoordinateMm) * .001;
                 bool followsPanel = datum == null || rib.Direction == settings.PanelRibDirection;
                 Func<double, double[]> panelAt = coordinate => Intersect(face, surface, modeler, h, along, across,
-                    coordinate, fixedCoordinate, box[h] - 1, box[h + 3] + 1, sign * settings.GapToPanelMm * .001);
+                    coordinate, fixedCoordinate, box[h] - 1, box[h + 3] + 1, sign * settings.GapToPanelMm * .001, sectionOffset);
                 List<double[]> samples;
                 bool hasPanelContact = false;
                 if (baseFace == null)
@@ -315,10 +331,13 @@ namespace ADDIN.Commands.Kadai
                 seamMm < thickness + depthClearanceMm || seamMm > straightHeight - thickness)
                 throw new InvalidOperationException("Chiều cao rãnh từ mặt đế phải chừa đủ vật liệu ở cả hai phía của thanh đỡ.");
             var plan = KadaiPlanner.Build(request);
+            var tubes = request.Tubes == null ? null : CalculateTubes(request.Tubes, panel, datum);
             var blanks = CalculateProfiles(plan, panel, datum, straightHeight);
             var cuts = KadaiJointGeometry.Build(plan, blanks, seamMm, depthClearanceMm);
+            var profiles = KadaiJointGeometry.NotchedProfiles(plan, blanks, cuts);
+            if (tubes != null) PlanTubeSeats(tubes, profiles);
             return new SlottedLayout { Plan = plan, Blanks = blanks, Joints = cuts, JoinedCrossings = cuts.Values.Sum(list => list.Count) / 2,
-                Profiles = KadaiJointGeometry.NotchedProfiles(plan, blanks, cuts) };
+                Profiles = profiles, Tubes = tubes };
         }
 
         internal string ApplyBaseLayout(SlottedLayout layout, KadaiPanelSource panel, KadaiBaseDatum datum,
@@ -337,6 +356,8 @@ namespace ADDIN.Commands.Kadai
                 throw new InvalidOperationException("Chọn thư mục để lưu bộ chi tiết Kadai.");
 
             options.Validate(layout.Blanks);
+            if (layout.Tubes != null && (string.IsNullOrWhiteSpace(options.TubeMaterialName) || !File.Exists(options.TubeMaterialDatabase)))
+                throw new InvalidOperationException("Chọn vật liệu ống từ thư viện SolidWorks có thể truy cập.");
             var openPartPaths = ((app.GetDocuments() as object[]) ?? new object[0]).OfType<ModelDoc2>()
                 .Where(doc => doc.GetType() == (int)swDocumentTypes_e.swDocPART)
                 .Select(doc => doc.GetPathName());
@@ -460,7 +481,7 @@ namespace ADDIN.Commands.Kadai
         }
         private static double[] Intersect(Face2 face, Surface surface, Modeler modeler,
             int height, int along, int across, double coordinate, double fixedCoordinate,
-            double low, double high, double gap)
+            double low, double high, double gap, double sectionOffset)
         {
             var a = new double[3]; a[height] = low; a[along] = coordinate; a[across] = fixedCoordinate;
             var b = (double[])a.Clone(); b[height] = high;
@@ -474,13 +495,22 @@ namespace ADDIN.Commands.Kadai
                 var hits = new List<double[]>();
                 for (int i = 0; i + 2 < xyz.Length; i += 3) {
                     var p = new[] { xyz[i], xyz[i + 1], xyz[i + 2] };
-                    if (IsOnFace(face, p)
+                    bool onFace = sectionOffset == 0 ? IsOnFace(face, p) : IsOnOffsetFace(face, p, sectionOffset);
+                    if (onFace
                         && !hits.Any(q0 => Math.Abs(q0[height] - p[height]) < 1e-7)) hits.Add(p);
                 }
                 if (hits.Count > 1) throw new NotSupportedException("Panel không single-valued theo datum đã chọn.");
                 if (hits.Count == 0) return null;
                 hits[0][height] -= gap; return hits[0];
             } finally { ReleaseOwned(bounded); ReleaseOwned(line); }
+        }
+
+        private static bool IsOnOffsetFace(Face2 face, double[] point, double offset)
+        {
+            var closest = face.GetClosestPointOn(point[0], point[1], point[2]) as double[];
+            if (closest == null) return false;
+            double distance = Math.Sqrt(Enumerable.Range(0, 3).Sum(i => Math.Pow(point[i] - closest[i], 2)));
+            return Math.Abs(distance - offset) < .000002;
         }
 
         private static bool IsOnFace(Face2 face, double[] point)
@@ -562,7 +592,14 @@ namespace ADDIN.Commands.Kadai
             ShowTemporaryPreview(source.DocumentTransient, ribs, source.PanelComponent);
         }
 
-        private void ShowTemporaryPreview(ModelDoc2 document, List<KadaiProfile3D> ribs, Component2 component)
+        internal void ShowTemporaryPreview(KadaiPanelSource source, SlottedLayout layout)
+        {
+            if (!IsSourceCurrent(source))
+                throw new InvalidOperationException("Nguồn panel đã đổi; Capture lại mặt.");
+            ShowTemporaryPreview(source.DocumentTransient, layout.Profiles, source.PanelComponent, layout.Tubes);
+        }
+
+        private void ShowTemporaryPreview(ModelDoc2 document, List<KadaiProfile3D> ribs, Component2 component, KadaiTubeLayout tubes = null)
         {
             CheckThread(); ClearTemporaryPreview(null);
             var active = app.ActiveDoc as ModelDoc2;
@@ -575,10 +612,26 @@ namespace ADDIN.Commands.Kadai
                 foreach (var rib in ribs) {
                     int color = rib.Direction == KadaiRibDirection.Longitudinal ? 0x70C040 : 0x4090F0;
                     var body = CreatePreviewBody(rib);
+                    try
+                    {
+                        if (tubes != null) body = CutTubePreview(body, rib, tubes, tubes.Seats[rib.RibId]);
+                    }
+                    catch { ReleaseOwned(body); throw; }
                     visibleBodies.Add(rib.RibId, (body, color, rib.ExtrusionDirection));
                     // Display3 with a Component2 applies its placement to Part-local geometry.
                     // swTempBodySelectOptionNone = 0. Bodies cannot steal source face selection.
                     DisplayPreviewBody(body, color);
+                }
+                if (tubes != null)
+                {
+                    var modeler = (Modeler)app.GetModeler();
+                    for (int i = 0; i < tubes.Axes.Length; i++)
+                    {
+                        const int tubeColor = 0xD0D5DC;
+                        var body = CreateTubePreview(modeler, tubes, i);
+                        visibleBodies.Add(KadaiTubeLayout.Id(i), (body, tubeColor, tubes.Axes[i].Direction.Array()));
+                        DisplayPreviewBody(body, tubeColor);
+                    }
                 }
                 document.GraphicsRedraw2();
                 if (document.GetSaveFlag() != dirty) throw new InvalidOperationException("Preview unexpectedly changed document save state.");

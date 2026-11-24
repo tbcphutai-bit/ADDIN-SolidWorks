@@ -22,7 +22,8 @@ namespace ADDIN.Commands.Kadai
 
         private Dictionary<string, Feature> AddLinkedFaces(ModelDoc2 doc, ModelDoc2 part, Component2 component,
             KadaiProfile3D profile, List<KadaiJointCut> cuts, KadaiPanelSource panel, bool opensAtBottom,
-            Dictionary<string, Component2> components, Dictionary<string, List<KadaiJointCut>> allCuts)
+            Dictionary<string, Component2> components, Dictionary<string, List<KadaiJointCut>> allCuts,
+            KadaiTubeLayout tubes, List<Component2> tubeComponents)
         {
             var surfaces = new Dictionary<string, Feature>();
             if (profile.HasPanelContact || (!opensAtBottom && cuts.Count > 0))
@@ -39,8 +40,21 @@ namespace ADDIN.Commands.Kadai
                         var face = panel.PanelPart.Extension.GetObjectByPersistReference3(
                             Convert.FromBase64String(panel.PersistentReferenceEncoded), out int error) as Face2;
                         Require(face != null && error == 0, "Mất tham chiếu đến mặt panel đã chọn.");
-                        surfaces.Add(PanelSurfaceKey, InsertLinkedSurface(doc, part, panel.PanelComponent, face, 0,
-                            "Kadai_PanelFace_" + profile.RibId));
+                        surfaces.Add(PanelSurfaceKey, InsertLinkedSurface(doc, part, panel.PanelComponent, face,
+                            tubes?.Settings.PanelOffset ?? 0, "Kadai_PanelFace_" + profile.RibId, false));
+                        if (tubes != null)
+                        {
+                            foreach (var seat in tubes.Seats[profile.RibId])
+                            {
+                                var tube = tubeComponents[seat.TubeIndex];
+                                var outer = FindTubeOuterFace(tube, tubes.Settings.Radius);
+                                string name = TubeSurfacePrefix + KadaiTubeLayout.Id(seat.TubeIndex);
+                                var linked = InsertLinkedSurface(doc, part, tube, outer, seat.OutwardOffset, name, false);
+                                Require(Math.Abs(CylinderRadius(Items(linked.GetFaces()).OfType<Face2>().Single()) - seat.Radius) < 1e-7,
+                                    "Bán kính mặt tham chiếu ống không khớp " + name + ".");
+                                surfaces.Add(name, linked);
+                            }
+                        }
                     }
                     if (!opensAtBottom)
                     {
@@ -70,13 +84,13 @@ namespace ADDIN.Commands.Kadai
         }
 
         private static Feature InsertLinkedSurface(ModelDoc2 assembly, ModelDoc2 part, Component2 source, Face2 face,
-            double offset, string name)
+            double offset, string name, bool? reverseOffset = null)
         {
             var old = new HashSet<string>(OffsetSurfaces(part).Select(feature => feature.Name));
             assembly.ClearSelection2(true);
             var contextFace = source.GetCorrespondingEntity(face) as Entity;
             Require(contextFace != null && contextFace.Select4(false, null), "Không chọn được mặt tham chiếu " + name + ".");
-            bool reverse = offset > 0 && ((double[])face.Normal)[1] > 0;
+            bool reverse = reverseOffset ?? (offset > 0 && ((double[])face.Normal)[1] > 0);
             assembly.InsertOffsetSurface(offset, reverse);
             var created = OffsetSurfaces(part).SingleOrDefault(feature => !old.Contains(feature.Name));
             Require(created != null && Items(created.GetFaces()).Length == 1,
@@ -109,16 +123,26 @@ namespace ADDIN.Commands.Kadai
 
         private SketchSegment[] Intersection(ModelDoc2 doc, Sketch sketch, Feature surface)
         {
+            return Intersections(doc, sketch, new[] { surface });
+        }
+
+        private SketchSegment[] Intersections(ModelDoc2 doc, Sketch sketch, IEnumerable<Feature> surfaces)
+        {
             var old = new HashSet<string>(Items(sketch.GetSketchSegments()).OfType<SketchSegment>()
                 .Select(segment => string.Join(",", (int[])segment.GetID())));
-            var face = Items(surface.GetFaces()).OfType<Face2>().Single();
             doc.ClearSelection2(true);
-            Require(((Entity)face).Select4(false, null) && app.RunCommand(IntersectionCurveCommand, ""),
-                "Không chạy được 交線カーブ trên " + surface.Name + ".");
+            var sources = surfaces.ToArray();
+            string names = string.Join(", ", sources.Select(surface => surface.Name));
+            foreach (var surface in sources)
+            {
+                var face = Items(surface.GetFaces()).OfType<Face2>().Single();
+                Require(((Entity)face).Select4(true, null), "Không chọn được mặt tham chiếu " + surface.Name + ".");
+            }
+            Require(app.RunCommand(IntersectionCurveCommand, ""), "Không chạy được 交線カーブ trên " + names + ".");
             var result = Items(sketch.GetSketchSegments()).OfType<SketchSegment>()
                 .Where(segment => !old.Contains(string.Join(",", (int[])segment.GetID()))).ToArray();
             Require(result.Length > 0 && result.All(segment => segment.GetRelationsCount() > 0),
-                "交線カーブ không tạo được giao tuyến có tham chiếu từ " + surface.Name + ".");
+                "交線カーブ không tạo được giao tuyến có tham chiếu từ " + names + ".");
             doc.ClearSelection2(true);
             return result;
         }
