@@ -372,7 +372,7 @@ Trên bản sao Assembly **6866-02-円錐架台-上型** với SOLIDWORKS Profes
 
 Lượt xác nhận dùng bản Debug x64 MVID `c7f18db7-bdae-4ff9-b147-6061c98bf7c8`. Chế độ tự tính Preview được 41 ống. Chế độ chia đều 12 ống tạo 84 vị trí cắt trong 7 Normal Cut. Ống dùng **St** từ thư viện thanh. Gân và cấu hình 展開 dùng **StSA-** từ thư viện tấm. Sau khi lưu và mở lại Assembly, dịch một ống 0,5 mm làm cả 7 giao tuyến tham chiếu dịch 0,5 mm. Cả 11 Drawing mở lại có view Flat Pattern, Bounding Box và 2 kích thước W/L khớp Bounding Box. Preview khi tắt tùy chọn vẫn tạo đúng 11 gân. GUI được kiểm tra bằng WinForms API để xác nhận trạng thái mặc định, Auto và hai giá trị bố trí thủ công.
 
-Lượt Apply **Tiếp xúc ở đầu nhỏ** tạo 24 ống, 11 gân, 168 vị trí cắt trong 8 Normal Cut và 11 Drawing. Cả hai lượt Apply đều qua kiểm tra giao thể tích sau rebuild. Hai lượt dùng gân dọc làm gân đỡ ống, chừa 100 mm hai đầu trên mặt đế, thanh cố định cao 140 mm, và ống Ø20 mm thành dày 2,6 mm. Auto được kiểm chứng đến Preview.
+Lượt Apply **Tiếp xúc ở đầu nhỏ** tạo 24 ống, 11 gân, 168 vị trí cắt trong 8 Normal Cut và 11 Drawing. Cả hai lượt Apply đều qua kiểm tra giao thể tích sau rebuild. Hai lượt dùng gân dọc làm gân đỡ ống, chừa 100 mm hai đầu trên mặt đế, thanh cố định cao 140 mm, và ống Ø20 mm thành dày 2,6 mm. Lượt này kiểm tra Auto ở bước Preview. Kết quả Apply Auto nằm ở mục 24.
 
 Build Debug và Release x64 đạt cho nhánh Kadai lẫn project TAI TOOL. 31 mã băm CAD đầu vào của thư mục 6866 khớp sau phép thử. Đã đồng bộ 11 file nguồn vào TAI TOOL để người dùng tự rebuild. DLL đang cài có SHA-256 `CC4653A4E460AD818F0B44EAAC0743E48241535C53387E881A3B67B16D9E4AC9` trước và sau đồng bộ. Log chế độ chia đều và mở lại nằm tại `kadai-assembly-6866/tube-kadai-native-07/run.log`. Log Auto và chế độ tiếp xúc nằm tại `kadai-assembly-6866/tube-kadai-native-08/run.log`.
 
@@ -383,3 +383,11 @@ File thay đổi theo nhóm:
 - Nhánh Kadai dùng nguyên bốn file tính toán từ TAI TOOL trong `Commands/CircleFaceTubeLayout` gồm `BoundaryRails.cs`, `SwFaceLayout.cs`, `TubeGeometry.cs` và `TubeLayoutSolver.cs`.
 
 Commit mã nguồn `e8369d54ea3c7fe28dd8924d389c610a3b8439bc`. Các lệnh Make Hole, Fix Tỉ lệ và DIM Kegaki không đổi mã nguồn.
+
+## 24. Kiểm tra Auto qua task pane của project TAI TOOL
+
+Build Debug x64 trực tiếp từ project TAI TOOL đã đồng bộ cho DLL thử MVID `06918462-4eb4-4832-b85c-ee525b1e7118`. Hai lần gọi LoadAddIn trả mã 0 nhưng phép kiểm tra assembly trong tiến trình SOLIDWORKS không tìm thấy DLL thử. Lượt xác nhận dùng API SolidWorks để gắn control của đúng DLL vào task pane riêng, giữ nguyên đăng ký COM của bản đang cài. [Mẫu SOLIDWORKS API gắn WinForms control vào Task Pane](https://help.solidworks.com/2024/english/api/sldworksapi/add_.net_controls_to_solidworks_using_an_add-in_example_csharp.htm)
+
+Nút **Model → Macro → Kadai** trong task pane thử mở đúng form. Hai nút chọn mặt nhận đúng panel và đế từ bản sao 6866. Preview Auto tạo 41 ống và 287 vị trí cắt, giữ số component và trạng thái lưu của Assembly. Kiểm thử cấp template, vật liệu và tên qua đối tượng tùy chọn Apply. Apply chèn **41 ống và 11 gân**, tạo **287 vị trí cắt tham chiếu trong 8 Normal Cut**, xuất **11 Drawing** và đóng cửa sổ Kadai.
+
+Đã lưu và mở lại bản sao. Dịch ống `T-001` 0,5 mm làm giao tuyến trong 7 gân liên quan dịch cùng lượng. Cả 11 Drawing mở lại giữ view Flat Pattern, Bounding Box, W/L khớp Bounding Box và vật liệu StSA-. Mã băm của 31 file CAD nguồn và DLL đang cài khớp trước và sau lượt thử. Mã nguồn add-in của lượt này giữ nguyên. Log kiểm thử nằm tại `kadai-assembly-6866/kadai-full-current-auto-03/run.log`.
